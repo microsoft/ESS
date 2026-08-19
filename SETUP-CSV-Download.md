@@ -97,7 +97,7 @@ You can skip this step and add Agent Credits later — the template loads cleanl
 ## Step 4 — Download & open the template
 
 1. **Download the .pbit**
-   - In this repo, click **[`ESS Dashboard - Dynamic Topics (CSV) V7.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V7.pbit)**
+   - In this repo, click **[`ESS Dashboard - Dynamic Topics (CSV) V10.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V10.pbit)**
    - Click **Download raw file** (top-right of the file preview)
 
 2. **Open it**

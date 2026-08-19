@@ -10,7 +10,9 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 
 ![ESS Insights — animated preview of the executive dashboard](images/dashboard-preview.gif)
 
-> 📖 **New — [Interpretation Guide (PDF)](ESS%20Insights%20Dashboard%20-%20Interpretation%20Guide.pdf):** a consultant-style, page-by-page walkthrough of every dashboard page — what each visual means and, more importantly, what to *do* with it. Numbered markers connect each chart to plain-language interpretation and a recommended next step.
+> 📖 **New — [Interpretation Guide (PowerPoint)](ESS%20Insights%20Dashboard%20-%20Interpretation%20Guide.pptx):** a consultant-style, page-by-page walkthrough of every dashboard page — what each visual means and, more importantly, what to *do* with it. Numbered markers connect each chart to plain-language interpretation and a recommended next step.
+>
+> 📈 **Companion deck — [Topic to Time Savings](Topic%20to%20Time%20Savings.pptx):** shows how to translate topic-level conversation data into a defensible hours-saved and dollar-value estimate for the Business Impact page.
 
 ---
 
@@ -22,18 +24,19 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 ---
 
 <details open>
-<summary><strong>🆕 What's new in V7</strong></summary>
+<summary><strong>🆕 What's new in V10</strong></summary>
 
+- **Adoption toggle preserves your filters** — switching between the Conversations and Users view on the Adoption page no longer resets your selected date range, org, or country filters.
+- **Verbatim Feedback now scrolls correctly in every case** — long comment tables reliably scroll instead of clipping, closing a gap that remained in earlier releases.
 - **Accurate per-agent cost and ROI** — credit consumption, cost, and ROI now scope correctly to the agent you have selected. Previously, filtering to a single agent could still show credits from every agent, overstating cost and understating ROI.
 - **Corrected weekly user mix** — the **New / Retained / Churned / Resurrected** cohort breakdown now evaluates each week against your full history rather than the visible window, so returning users are no longer misclassified as new. The weekly axis now sorts chronologically.
 - **Expanded Metric Glossary** — the glossary now covers the topic leaderboards, the weekly retention cohorts, and the credit and ROI measures, alongside the existing per-page definitions. Several definitions that did not match the underlying calculation were corrected.
 - **Business Impact page fix** — resolved a rendering issue that could leave the page showing a solid colored panel instead of its visuals.
 - **Wider savings assumptions** — the *minutes saved per ticket* selector now offers 0, 5, 10, 15, 20, 25, 30, 45, and 60 minutes.
-- **Readable verbatim feedback** — long comment tables now scroll instead of clipping.
 - **Page icons** — each page in the navigation now carries an icon for faster orientation.
 - **No hardcoded dates** — every date calculation derives from your own data, so the report stays correct in any reporting period.
 
-V7 is cumulative — it includes every improvement from the earlier 1.x, V5, and V6 releases, including scheduled-refresh support and system-topic filtering. Applies to both the CSV Upload and Dataverse Direct editions.
+V10 is cumulative — it includes every improvement from the earlier 1.x, V5, V6, V7, V8, and V9 releases, including scheduled-refresh support and system-topic filtering. Applies to both the CSV Upload and Dataverse Direct editions.
 
 </details>
 
@@ -71,9 +74,9 @@ All nine pages light up from a single Power Platform export. Add optional compan
 | 3 | **Adoption** | Volume, distinct users, repeat-usage rate, DAU/WAU/MAU, breakdown by Org & Country |
 | 4 | **Time to Knowledge** | Avg duration, response time, turns to resolve, abandonment & unengaged rate |
 | 5 | **Conversation Details** | Per-topic drill-through with full transcripts and a first-message word cloud |
-| 6 | **Agent Feedback** | In-conversation thumbs, CSAT, verbatim comments, satisfaction trend |
-| 7 | **Business Impact** | Tickets deflected, hours saved, $ saved, credit-consumption leaderboard |
-| 8 | **Improvement Opportunities** | Which intents need authoring help — per-topic deflection, abandonment, and the training backlog to prioritize |
+| 6 | **Business Impact** | Tickets deflected, hours saved, $ saved, credit-consumption leaderboard |
+| 7 | **Improvement Opportunities** | Which intents need authoring help — per-topic deflection, abandonment, and the training backlog to prioritize |
+| 8 | **Agent Feedback** | In-conversation thumbs, CSAT, verbatim comments, satisfaction trend |
 | 9 | **📖 Glossary** | Every metric defined, calculated, and sourced — no black boxes |
 
 *(A hidden **Alternate Executive Summary** page is retained in the file as an optional layout — not shown in the published report.)*
@@ -187,7 +190,7 @@ This dashboard ships in **two flavors**. Pick the one that matches how you want 
 | **Who can run it** | Anyone who can run the Dataverse export | Anyone with the **Bot Transcript Viewer** role on the environment |
 | **Lookback control** | Whatever the export window allows (default 30 days) | Parameter — pull 30 / 90 / 365 days at will |
 | **Best for** | One-off snapshots, demos, sharing with people outside the tenant | Production dashboards, scheduled refresh, ongoing monitoring |
-| **Get the template** | [`ESS Dashboard - Dynamic Topics (CSV) V7.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V7.pbit) | [`ESS Dashboard - Dynamic Topics (Dataverse) V7.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(Dataverse)%20V7.pbit) |
+| **Get the template** | [`ESS Dashboard - Dynamic Topics (CSV) V10.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V10.pbit) | [`ESS Dashboard - Dynamic Topics (Dataverse) V10.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(Dataverse)%20V10.pbit) |
 | **Setup guide** | 📘 **[Written Setup Guide — CSV Upload](./SETUP-CSV-Download.md)** | 📘 **[Written Setup Guide — Dataverse Direct](./SETUP-Dataverse.md)** |
 
 > 💡 **Not sure?** If this is your first time exploring the dashboard, start with **CSV Upload** — no tenant permissions needed beyond running the Dataverse export. Move to **Dataverse Direct** once you're ready to put the dashboard in front of stakeholders on a schedule.

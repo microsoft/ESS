@@ -12,7 +12,7 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 > ✅ **Start here:** For hands‑off, production dashboards, **Dataverse Direct (Path A)** is the simplest — no file hosting, no gateway. If you must stay on CSV, **host it on SharePoint/OneDrive (Path B)** so the cloud can refresh it without a gateway.
 
-> 🆕 **Why this matters for refresh:** Some older template versions could trip a **"dynamic data source"** error in the service that blocked *all* scheduled refresh. The current **V7** templates structure every data source (Dataverse and web/SharePoint) so the service can identify and authenticate it statically — the prerequisite for scheduled refresh. **Use the V7 templates** for anything you intend to auto‑refresh.
+> 🆕 **Why this matters for refresh:** Some older template versions could trip a **"dynamic data source"** error in the service that blocked *all* scheduled refresh. The current **V10** templates structure every data source (Dataverse and web/SharePoint) so the service can identify and authenticate it statically — the prerequisite for scheduled refresh. **Use the V10 templates** for anything you intend to auto‑refresh.
 
 ---
 
@@ -30,7 +30,7 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 The Dataverse Direct template connects the service **directly to your Dataverse environment** — no exported files, no gateway.
 
-1. **Publish** the `ESS Dashboard - Dynamic Topics (Dataverse) V7` report to your workspace.
+1. **Publish** the `ESS Dashboard - Dynamic Topics (Dataverse) V10` report to your workspace.
 2. In the service, open the **dataset → Settings** (or **… → Settings** next to the dataset).
 3. Expand **Data source credentials** and click **Edit credentials** on the Dataverse source:
    - **Authentication method:** `OAuth2`
@@ -60,7 +60,7 @@ You can get **gateway‑free cloud refresh** with the CSV Upload template *if th
 
 ### B2. Point the template at it
 
-3. Open `ESS Dashboard - Dynamic Topics (CSV) V7` in Desktop. When prompted (or via **Transform data → Edit Parameters**), paste the **direct SharePoint URL** into **Copilot Studio Transcript**. (Optional Org Data / Agent Credits files can be hosted the same way.)
+3. Open `ESS Dashboard - Dynamic Topics (CSV) V10` in Desktop. When prompted (or via **Transform data → Edit Parameters**), paste the **direct SharePoint URL** into **Copilot Studio Transcript**. (Optional Org Data / Agent Credits files can be hosted the same way.)
 4. **Home → Refresh** to confirm it loads locally, then **Publish** to your workspace.
 
 ### B3. Bind credentials & schedule
@@ -97,7 +97,7 @@ If the parameter points at a **local file** (`C:\Data\…`) or a **network share
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | Data source URL/connection can't be resolved statically (older template, or a viewer‑style SharePoint link). | Use the **V7** template, and for CSV use a **direct file path URL** (Path B), not a `?web=1`/sharing link. |
+| **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | Data source URL/connection can't be resolved statically (older template, or a viewer‑style SharePoint link). | Use the **V10** template, and for CSV use a **direct file path URL** (Path B), not a `?web=1`/sharing link. |
 | **“We couldn't authenticate with the credentials provided.”** | Credentials not bound, or account lacks access. | **dataset → Settings → Data source credentials → Edit credentials**; sign in with an account that has Bot Transcript Viewer (Dataverse) or library read (SharePoint). |
 | **Scheduled refresh option is greyed out.** | Credentials for one or more sources not yet set. | Edit credentials on **every** listed source first, then the schedule unlocks. |
 | **Refresh succeeds but data is stale.** | New export saved under a new name/path. | Overwrite the file at the **same URL/path** the parameter points to. |
