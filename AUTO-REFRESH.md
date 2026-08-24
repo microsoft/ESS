@@ -14,6 +14,8 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 > 🆕 **Why this matters for refresh:** Some older template versions could trip a **"dynamic data source"** error in the service that blocked *all* scheduled refresh. The current **V10** templates structure every data source (Dataverse and web/SharePoint) so the service can identify and authenticate it statically — the prerequisite for scheduled refresh. **Use the V10 templates** for anything you intend to auto‑refresh.
 
+> 🆕 **Already need more than this?** Path A and Path B above already give you gateway‑free, cloud‑to‑cloud scheduled refresh — most customers don't need anything else. If you're consolidating multiple Dataverse environments into one dashboard, hitting refresh limits at very large scale, or want built‑in Copilot credit‑consumption analytics alongside conversation data, see **[SETUP-Fabric.md ↗](SETUP-Fabric.md)**.
+
 ---
 
 ## Before you begin (all paths)

@@ -35,6 +35,8 @@ V17 is cumulative — it includes every improvement from the earlier 1.x, V5–V
 
 </details>
 
+> 🆕 **New: a Fabric path is now available.** For teams managing multiple Dataverse environments, needing refresh at very large scale, or wanting built-in Copilot credit-consumption analytics, see the **[ESS - Fabric V1 setup guide ↗](SETUP-Fabric.md)**. It's an additional option alongside CSV Upload and Dataverse Direct — most customers should keep using whichever of those two they're already on.
+
 ---
 
 ## Why use this template for your ESS agent
@@ -191,6 +193,8 @@ This dashboard ships in **two flavors**. Pick the one that matches how you want 
 > 💡 **Not sure?** If this is your first time exploring the dashboard, start with **CSV Upload** — no tenant permissions needed beyond running the Dataverse export. Move to **Dataverse Direct** once you're ready to put the dashboard in front of stakeholders on a schedule.
 
 > 🔄 **Want it to update itself?** See **[Set up automatic (scheduled) refresh ↗](AUTO-REFRESH.md)** — gateway‑free for Dataverse Direct and for SharePoint/OneDrive‑hosted CSVs.
+
+> 🆕 **Need more than CSV or Dataverse Direct?** If you're consolidating multiple Dataverse environments into one dashboard, hitting refresh limits at very large scale, or want built-in Copilot credit-consumption analytics, see the **[Fabric path ↗](SETUP-Fabric.md)** — an add-on for teams that have outgrown Path A/B, not a replacement for either.
 
 ---
 
