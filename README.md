@@ -24,19 +24,13 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 ---
 
 <details open>
-<summary><strong>🆕 What's new in V10</strong></summary>
+<summary><strong>🆕 What's new in V16</strong></summary>
 
-- **Adoption toggle preserves your filters** — switching between the Conversations and Users view on the Adoption page no longer resets your selected date range, org, or country filters.
-- **Verbatim Feedback now scrolls correctly in every case** — long comment tables reliably scroll instead of clipping, closing a gap that remained in earlier releases.
-- **Accurate per-agent cost and ROI** — credit consumption, cost, and ROI now scope correctly to the agent you have selected. Previously, filtering to a single agent could still show credits from every agent, overstating cost and understating ROI.
-- **Corrected weekly user mix** — the **New / Retained / Churned / Resurrected** cohort breakdown now evaluates each week against your full history rather than the visible window, so returning users are no longer misclassified as new. The weekly axis now sorts chronologically.
-- **Expanded Metric Glossary** — the glossary now covers the topic leaderboards, the weekly retention cohorts, and the credit and ROI measures, alongside the existing per-page definitions. Several definitions that did not match the underlying calculation were corrected.
-- **Business Impact page fix** — resolved a rendering issue that could leave the page showing a solid colored panel instead of its visuals.
-- **Wider savings assumptions** — the *minutes saved per ticket* selector now offers 0, 5, 10, 15, 20, 25, 30, 45, and 60 minutes.
-- **Page icons** — each page in the navigation now carries an icon for faster orientation.
-- **No hardcoded dates** — every date calculation derives from your own data, so the report stays correct in any reporting period.
+- **Fixed Filters-panel view reset (Business Impact & Adoption)** — opening or closing the Filters panel no longer resets the page to the wrong view. Previously, toggling Filters while viewing a non-default category (e.g., Credit Leaderboard, Value vs Resolution, or Value Over Time on Business Impact, or Users on Adoption) could snap back to the default view.
+- **Fixed Org Data enrichment for real-world exports** — Job Title, Country, and Display Name now populate correctly when using a standard Microsoft 365 Admin Center "Active users" export. Previously these three fields could come through blank for real customer data even though Department and User Principal Name worked, because the column-matching logic only recognized a narrow set of column names.
+- **Adjust Topic Assumptions redesigned as a dedicated page** — the Business Impact page's assumptions panel is now a genuine separate page instead of an overlay, for more consistent, reliable behavior.
 
-V10 is cumulative — it includes every improvement from the earlier 1.x, V5, V6, V7, V8, and V9 releases, including scheduled-refresh support and system-topic filtering. Applies to both the CSV Upload and Dataverse Direct editions.
+V16 is cumulative — it includes every improvement from the earlier 1.x, V5–V10 releases, including scheduled-refresh support, system-topic filtering, and all V10 fixes (adoption toggle filter preservation, verbatim feedback scrolling, per-agent cost/ROI accuracy, weekly user mix correction, expanded glossary, and more). Applies to both the CSV Upload and Dataverse Direct editions.
 
 </details>
 
@@ -190,7 +184,7 @@ This dashboard ships in **two flavors**. Pick the one that matches how you want 
 | **Who can run it** | Anyone who can run the Dataverse export | Anyone with the **Bot Transcript Viewer** role on the environment |
 | **Lookback control** | Whatever the export window allows (default 30 days) | Parameter — pull 30 / 90 / 365 days at will |
 | **Best for** | One-off snapshots, demos, sharing with people outside the tenant | Production dashboards, scheduled refresh, ongoing monitoring |
-| **Get the template** | [`ESS Dashboard - Dynamic Topics (CSV) V10.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V10.pbit) | [`ESS Dashboard - Dynamic Topics (Dataverse) V10.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(Dataverse)%20V10.pbit) |
+| **Get the template** | [`ESS Dashboard - Dynamic Topics (CSV) V16.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V16.pbit) | [`ESS Dashboard - Dynamic Topics (Dataverse) V16.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(Dataverse)%20V16.pbit) |
 | **Setup guide** | 📘 **[Written Setup Guide — CSV Upload](./SETUP-CSV-Download.md)** | 📘 **[Written Setup Guide — Dataverse Direct](./SETUP-Dataverse.md)** |
 
 > 💡 **Not sure?** If this is your first time exploring the dashboard, start with **CSV Upload** — no tenant permissions needed beyond running the Dataverse export. Move to **Dataverse Direct** once you're ready to put the dashboard in front of stakeholders on a schedule.
