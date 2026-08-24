@@ -24,13 +24,14 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 ---
 
 <details open>
-<summary><strong>🆕 What's new in V16</strong></summary>
+<summary><strong>🆕 What's new in V17</strong></summary>
 
+- **Fixed blank User Id for non-ESS agents in multi-agent setups** — the Conversation Details "User Id" column now uses the report's built-in identity-resolution logic (ESS conversation variable → Entra ID crosswalk → raw identity), so conversations handled by non-ESS sub-agents in a multi-agent orchestration now show a resolved user identity instead of blank.
 - **Fixed Filters-panel view reset (Business Impact & Adoption)** — opening or closing the Filters panel no longer resets the page to the wrong view. Previously, toggling Filters while viewing a non-default category (e.g., Credit Leaderboard, Value vs Resolution, or Value Over Time on Business Impact, or Users on Adoption) could snap back to the default view.
 - **Fixed Org Data enrichment for real-world exports** — Job Title, Country, and Display Name now populate correctly when using a standard Microsoft 365 Admin Center "Active users" export. Previously these three fields could come through blank for real customer data even though Department and User Principal Name worked, because the column-matching logic only recognized a narrow set of column names.
 - **Adjust Topic Assumptions redesigned as a dedicated page** — the Business Impact page's assumptions panel is now a genuine separate page instead of an overlay, for more consistent, reliable behavior.
 
-V16 is cumulative — it includes every improvement from the earlier 1.x, V5–V10 releases, including scheduled-refresh support, system-topic filtering, and all V10 fixes (adoption toggle filter preservation, verbatim feedback scrolling, per-agent cost/ROI accuracy, weekly user mix correction, expanded glossary, and more). Applies to both the CSV Upload and Dataverse Direct editions.
+V17 is cumulative — it includes every improvement from the earlier 1.x, V5–V10 releases, including scheduled-refresh support, system-topic filtering, and all V10 fixes (adoption toggle filter preservation, verbatim feedback scrolling, per-agent cost/ROI accuracy, weekly user mix correction, expanded glossary, and more). Applies to both the CSV Upload and Dataverse Direct editions.
 
 </details>
 
@@ -184,7 +185,7 @@ This dashboard ships in **two flavors**. Pick the one that matches how you want 
 | **Who can run it** | Anyone who can run the Dataverse export | Anyone with the **Bot Transcript Viewer** role on the environment |
 | **Lookback control** | Whatever the export window allows (default 30 days) | Parameter — pull 30 / 90 / 365 days at will |
 | **Best for** | One-off snapshots, demos, sharing with people outside the tenant | Production dashboards, scheduled refresh, ongoing monitoring |
-| **Get the template** | [`ESS Dashboard - Dynamic Topics (CSV) V16.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V16.pbit) | [`ESS Dashboard - Dynamic Topics (Dataverse) V16.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(Dataverse)%20V16.pbit) |
+| **Get the template** | [`ESS Dashboard - Dynamic Topics (CSV) V17.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V17.pbit) | [`ESS Dashboard - Dynamic Topics (Dataverse) V17.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(Dataverse)%20V17.pbit) |
 | **Setup guide** | 📘 **[Written Setup Guide — CSV Upload](./SETUP-CSV-Download.md)** | 📘 **[Written Setup Guide — Dataverse Direct](./SETUP-Dataverse.md)** |
 
 > 💡 **Not sure?** If this is your first time exploring the dashboard, start with **CSV Upload** — no tenant permissions needed beyond running the Dataverse export. Move to **Dataverse Direct** once you're ready to put the dashboard in front of stakeholders on a schedule.
