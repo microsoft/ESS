@@ -26,16 +26,11 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 <details open>
 <summary><strong>🆕 What's new in V17</strong></summary>
 
-- **Fixed blank User Id for non-ESS agents in multi-agent setups** — the Conversation Details "User Id" column now uses the report's built-in identity-resolution logic (ESS conversation variable → Entra ID crosswalk → raw identity), so conversations handled by non-ESS sub-agents in a multi-agent orchestration now show a resolved user identity instead of blank.
-- **Fixed Filters-panel view reset (Business Impact & Adoption)** — opening or closing the Filters panel no longer resets the page to the wrong view. Previously, toggling Filters while viewing a non-default category (e.g., Credit Leaderboard, Value vs Resolution, or Value Over Time on Business Impact, or Users on Adoption) could snap back to the default view.
-- **Fixed Org Data enrichment for real-world exports** — Job Title, Country, and Display Name now populate correctly when using a standard Microsoft 365 Admin Center "Active users" export. Previously these three fields could come through blank for real customer data even though Department and User Principal Name worked, because the column-matching logic only recognized a narrow set of column names.
-- **Adjust Topic Assumptions redesigned as a dedicated page** — the Business Impact page's assumptions panel is now a genuine separate page instead of an overlay, for more consistent, reliable behavior.
+- **New: Fabric Auto-Refresh path available** — for teams managing multiple Dataverse environments, needing refresh at very large scale, or wanting built-in Copilot credit-consumption analytics and automatic offline topic identification, see the **[ESS - Fabric V1 setup guide ↗](SETUP-Fabric.md)**. It's an additional option alongside CSV Upload and Dataverse Direct — most customers should keep using whichever of those two they're already on.
 
 V17 is cumulative — it includes every improvement from the earlier 1.x, V5–V10 releases, including scheduled-refresh support, system-topic filtering, and all V10 fixes (adoption toggle filter preservation, verbatim feedback scrolling, per-agent cost/ROI accuracy, weekly user mix correction, expanded glossary, and more). Applies to both the CSV Upload and Dataverse Direct editions.
 
 </details>
-
-> 🆕 **New: a Fabric path is now available.** For teams managing multiple Dataverse environments, needing refresh at very large scale, or wanting built-in Copilot credit-consumption analytics, see the **[ESS - Fabric V1 setup guide ↗](SETUP-Fabric.md)**. It's an additional option alongside CSV Upload and Dataverse Direct — most customers should keep using whichever of those two they're already on.
 
 ---
 
@@ -194,7 +189,18 @@ This dashboard ships in **two flavors**. Pick the one that matches how you want 
 
 > 🔄 **Want it to update itself?** See **[Set up automatic (scheduled) refresh ↗](AUTO-REFRESH.md)** — gateway‑free for Dataverse Direct and for SharePoint/OneDrive‑hosted CSVs.
 
-> 🆕 **Need more than CSV or Dataverse Direct?** If you're consolidating multiple Dataverse environments into one dashboard, hitting refresh limits at very large scale, or want built-in Copilot credit-consumption analytics, see the **[Fabric path ↗](SETUP-Fabric.md)** — an add-on for teams that have outgrown Path A/B, not a replacement for either.
+### 🧱 Need more than CSV or Dataverse Direct? — Fabric Auto-Refresh (add-on)
+
+Not a third default choice — an optional add-on for teams that have outgrown the two paths above. Use it only if: you're consolidating **multiple Dataverse environments** into one dashboard, you're hitting **refresh limits at very large scale**, or you want **built-in Copilot credit-consumption analytics** and automatic offline topic identification.
+
+| | 🧱 **Fabric Auto-Refresh** |
+|---|---|
+| **How it loads data** | Notebooks land conversation data into a Fabric Lakehouse; the template connects via the Lakehouse SQL endpoint or Direct Lake |
+| **Refresh** | Fully automatic once the notebooks are scheduled — no manual re-export or re-import |
+| **Get the template** | [`ESS - Fabric V1.pbit`](./ESS%20-%20Fabric%20V1.pbit) |
+| **Setup guide** | 📘 **[Written Setup Guide — Fabric](./SETUP-Fabric.md)** |
+
+> Most customers should keep using CSV Upload or Dataverse Direct above. See **[SETUP-Fabric.md](./SETUP-Fabric.md)** for the full "is this path right for you?" checklist before starting.
 
 ---
 
