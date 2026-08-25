@@ -32,7 +32,7 @@ If none of these apply, use **[Dataverse Direct](SETUP-Dataverse.md)** or **[CSV
 ✅ A **Fabric workspace** with Fabric capacity assigned (a trial capacity is enough to evaluate)
 ✅ A **Lakehouse** created in that workspace
 ✅ Permission to **create and run notebooks** in that workspace
-✅ The same Dataverse read access this dashboard always needs — **Bot Transcript Viewer** (or equivalent) on each Dataverse environment you're consolidating
+✅ A **Microsoft Entra app registration** added as a Dataverse **Application User** (with read access on Conversation Transcript) in every Dataverse environment you're ingesting from — this typically needs a Dataverse or Entra administrator to set up; it's a different, additional requirement from the CSV/Dataverse-Direct paths' simpler Bot Transcript Viewer role
 ✅ **Power BI Desktop** installed — [download free](https://powerbi.microsoft.com/desktop/)
 
 ---
@@ -56,6 +56,8 @@ You'll need three files:
 1. In your Fabric workspace, import both `Copilot_Agent_Transcript_Parser.ipynb` and `Copilot_Credit_Consumption_Ingester.ipynb` (**New → Import notebook**).
 2. Attach each notebook to your **Lakehouse** (**Add lakehouse** in the notebook's Explorer pane).
 3. Update the source-connection cells in each notebook to point at your Dataverse environment(s) — repeat the transcript parser once per environment if you're consolidating more than one.
+
+> 💡 **Fill in the CONFIG cell.** `Copilot_Agent_Transcript_Parser.ipynb`'s CONFIG cell needs `TENANT_ID`, `CLIENT_ID`, and `CLIENT_SECRET` filled in for the app registration from the checklist above. For production, use `notebookutils.credentials.getSecret('<kv-uri>', '<secret-name>')` instead of a literal secret value in the notebook.
 
 ---
 

@@ -196,7 +196,12 @@ Not a third default choice — an optional add-on for teams that have outgrown t
 | | 🧱 **Fabric Auto-Refresh** |
 |---|---|
 | **How it loads data** | Notebooks land conversation data into a Fabric Lakehouse; the template connects via the Lakehouse SQL endpoint or Direct Lake |
+| **Setup time** | Meaningfully longer than either path above, first time through — realistically **30–60+ minutes of hands-on work**: create/configure the Fabric workspace and Lakehouse (a trial capacity is enough to evaluate), import and configure the two notebooks, and run the initial ingestion. Add more time if you also need to provision the Entra app registration the live pull uses (see **Who can run it** below). Re-running later is just re-running the notebooks — or fully automatic once scheduled |
 | **Refresh** | Fully automatic once the notebooks are scheduled — no manual re-export or re-import |
+| **Power BI Service refresh** | No traditional "Scheduled refresh" toggle in the same sense as the other two paths. The template connects via the Lakehouse SQL analytics endpoint (Import/DirectQuery — schedule a refresh against that endpoint, cloud-to-cloud, no Gateway) or Direct Lake (no import step at all; it syncs automatically as the Lakehouse's Delta tables change). Either way, how current the numbers are depends on how often the two ingestion notebooks are run or scheduled — not on the report's own refresh setting |
+| **Who can run it** | A higher bar than the other two paths: Fabric workspace access with permission to create/run notebooks and create a Lakehouse, **plus** — for the live Dataverse pull this path is built around — an Entra app registration added as a Dataverse **Application User** with Read access on Conversation Transcript in every environment being ingested. Setting that up typically needs an Entra or Dataverse admin, not just the report owner |
+| **Lookback control** | A `LOOKBACK_DAYS` parameter in the transcript-parser notebook's config cell (default `7` days; `0` = full history on `conversationstarttime`). It's one shared value per notebook run, applied to every Dataverse environment configured in that run — not a distinct value per environment within a single run, though the config cell is built for a pipeline to override it, so different environments can get different windows by running the notebook once per environment |
+| **Best for** | Consolidating **multiple Dataverse environments** into one dashboard, refresh performance at **very large scale** where live Dataverse queries run slow or time out, or wanting **built-in Copilot credit-consumption analytics** and automatic topic identification without a manual export every cycle |
 | **Get the template** | [`ESS - Fabric V1.pbit`](./ESS%20-%20Fabric%20V1.pbit) |
 | **Setup guide** | 📘 **[Written Setup Guide — Fabric](./SETUP-Fabric.md)** |
 
@@ -228,8 +233,21 @@ Not a third default choice — an optional add-on for teams that have outgrown t
 | 2 | **Org Data** (HR roster) | ⭐ Recommended | [admin.microsoft.com](https://admin.microsoft.com) → **Users ▸ Active users ▸ Export users ▸ Confirm** | [📘 Dataverse guide — Step 2](./SETUP-Dataverse.md) |
 | 3 | **Agent Credits** | Optional | [copilotstudio.microsoft.com](https://copilotstudio.microsoft.com) → open your agent → **Analytics ▸ Message Consumption** → **Export** | [📘 Dataverse guide — Step 3](./SETUP-Dataverse.md) |
 
+### 🧱 Fabric Auto-Refresh — get these files
+
+> 💡 **New to Fabric?** A **Fabric workspace** is just a project folder in the Power BI/Fabric service. A **Lakehouse** is a storage location inside that workspace where the notebooks below will save your conversation data. A **notebook** is a small, pre-written program — you don't need to know how to code to run it, just how to click "Run all cells."
+
+| # | File | Required? | Where to get it | Full steps |
+|---|---|---|---|---|
+| 1 | **`ESS - Fabric V1.pbit`** (the dashboard template) | ✅ **Required** | Download from this repo's root folder | [📘 Fabric guide — Step 1](./SETUP-Fabric.md) |
+| 2 | **`Copilot_Agent_Transcript_Parser.ipynb`** (notebook — parses conversation transcripts) | ✅ **Required** | Download from [`Fabric/notebooks/`](./Fabric/notebooks/) in this repo | [📘 Fabric guide — Step 1](./SETUP-Fabric.md) |
+| 3 | **`Copilot_Credit_Consumption_Ingester.ipynb`** (notebook — ingests Copilot credit usage) | Optional | Download from [`Fabric/notebooks/`](./Fabric/notebooks/) in this repo | [📘 Fabric guide — Step 1](./SETUP-Fabric.md) |
+| 4 | **A Fabric workspace with a Lakehouse** | ✅ **Required** | Create one in the [Microsoft Fabric portal](https://app.fabric.microsoft.com/) — a trial capacity is enough to evaluate | [📘 Fabric guide — Before you start](./SETUP-Fabric.md#before-you-start) |
+
+> ⚠️ **This path is more involved than CSV Upload or Dataverse Direct** — it requires access to a Fabric workspace and running two notebooks (a one-time setup, then optionally scheduled to repeat automatically). If you're not sure you need this, see [Is this path right for you?](./SETUP-Fabric.md#is-this-path-right-for-you) before starting.
+
 **Next:** download the matching `.pbit` from [Choose your path](#quick-start--choose-your-path) above, open it in Power BI Desktop, and paste your file paths (or environment URL) into the parameter prompt.
-→ **[Full CSV setup guide](./SETUP-CSV-Download.md)** · **[Full Dataverse setup guide](./SETUP-Dataverse.md)**
+→ **[Full CSV setup guide](./SETUP-CSV-Download.md)** · **[Full Dataverse setup guide](./SETUP-Dataverse.md)** · **[Full Fabric setup guide](./SETUP-Fabric.md)**
 
 > 🔑 **Can't find the ConversationTranscript table, or transcripts come back empty?** You're almost certainly missing the **Bot Transcript Viewer** security role (Environment Maker is *not* enough), or your agent runs in an unsupported environment (Teams / M365 Copilot). See [Before you start](#before-you-start) and [Prerequisites — details](#prerequisites--details).
 
