@@ -10,7 +10,9 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 
 ![ESS Insights — animated preview of the executive dashboard](images/dashboard-preview.gif)
 
-> 🎬 **New — [ESS Insights Overview (video)](ESS_Insights_Overview.mp4):** a quick video walkthrough of the dashboard's capabilities — the fastest way to see what it does before diving into setup.
+> 🎬 **New — ESS Insights Overview (video):** a quick video walkthrough of the dashboard's capabilities — the fastest way to see what it does before diving into setup.
+>
+> https://github.com/user-attachments/assets/efa683f8-edec-4a53-897b-8e02fc112f3f
 >
 > 📖 **New — [Interpretation Guide (PowerPoint)](ESS%20Insights%20Dashboard%20-%20Interpretation%20Guide.pptx):** a consultant-style, page-by-page walkthrough of every dashboard page — what each visual means and, more importantly, what to *do* with it. Numbered markers connect each chart to plain-language interpretation and a recommended next step.
 >
