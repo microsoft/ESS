@@ -28,11 +28,13 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 ---
 
 <details open>
-<summary><strong>🆕 What's new in V17</strong></summary>
+<summary><strong>🆕 What's new in Dataverse V18</strong></summary>
+
+- **Agent filtering on Improvement Opportunities** — the Dataverse Direct edition now includes an Agent slicer so multi-agent environments can isolate improvement opportunities for a single agent.
 
 - **New: Fabric Auto-Refresh path available** — for teams managing multiple Dataverse environments, needing refresh at very large scale, or wanting built-in Copilot credit-consumption analytics and automatic offline topic identification, see the **[ESS - Fabric V1 setup guide ↗](SETUP-Fabric.md)**. It's an additional option alongside CSV Upload and Dataverse Direct — most customers should keep using whichever of those two they're already on.
 
-V17 is cumulative — it includes every improvement from the earlier 1.x, V5–V10 releases, including scheduled-refresh support, system-topic filtering, and all V10 fixes (adoption toggle filter preservation, verbatim feedback scrolling, per-agent cost/ROI accuracy, weekly user mix correction, expanded glossary, and more). Applies to both the CSV Upload and Dataverse Direct editions.
+Dataverse Direct V18 and CSV Upload V17 are cumulative — both include every improvement from the earlier 1.x, V5–V10 releases, including scheduled-refresh support, system-topic filtering, and all V10 fixes (adoption toggle filter preservation, verbatim feedback scrolling, per-agent cost/ROI accuracy, weekly user mix correction, expanded glossary, and more).
 
 </details>
 
@@ -186,7 +188,7 @@ This dashboard ships in **two flavors**. Pick the one that matches how you want 
 | **Who can run it** | Anyone who can run the Dataverse export | Anyone with the **Bot Transcript Viewer** role on the environment |
 | **Lookback control** | Whatever the export window allows (default 30 days) | Parameter — pull 30 / 90 / 365 days at will |
 | **Best for** | One-off snapshots, demos, sharing with people outside the tenant | Production dashboards, scheduled refresh, ongoing monitoring |
-| **Get the template** | [`ESS Dashboard - Dynamic Topics (CSV) V17.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V17.pbit) | [`ESS Dashboard - Dynamic Topics (Dataverse) V17.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(Dataverse)%20V17.pbit) |
+| **Get the template** | [`ESS Dashboard - Dynamic Topics (CSV) V17.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V17.pbit) | [`ESS Dashboard - Dynamic Topics (Dataverse) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(Dataverse)%20V18.pbit) |
 | **Setup guide** | 📘 **[Written Setup Guide — CSV Upload](./SETUP-CSV-Download.md)** | 📘 **[Written Setup Guide — Dataverse Direct](./SETUP-Dataverse.md)** |
 
 > 💡 **Not sure?** If this is your first time exploring the dashboard, start with **CSV Upload** — no tenant permissions needed beyond running the Dataverse export. Move to **Dataverse Direct** once you're ready to put the dashboard in front of stakeholders on a schedule.
