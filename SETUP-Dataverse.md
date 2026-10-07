@@ -59,18 +59,22 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 ---
 
-## Step 3 — (Optional) Export Agent Credits
+## Step 3 — (Optional) Download Copilot Credits reports
 
-1. Sign in to [Copilot Studio](https://copilotstudio.microsoft.com) and open your ESS agent.
-2. **Analytics → Message Consumption**.
-3. Apply a date range matching your transcripts.
-4. **Export** → save to `Documents/AgentData/AgentCredits.csv`.
+1. Sign in to the **Power Platform admin center** as a tenant administrator, Power Platform Administrator, or Dynamics 365 Administrator. **Power Platform Administrator** is the recommended least-privilege role.
+2. Go to **Licensing → Copilot Studio → Summary → Download report**.
+3. Set **Usage type** to `Copilot Credits`; choose a `30`, `60`, `90`, or `180` day lookback.
+4. For Dataverse V19, download **User-Level Credit Consumption** with a **30-day** lookback. Fabric V2 additionally uses the Environment and Agent reports.
+
+At 30 days the generated names are `EntitlementConsumptionTenantDetailsReport_MCSMessages_30.csv`, `EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30.csv`, and `EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv`. The environment export is daily by `Usage Date`; agent and user exports are aggregate snapshots without an activity date. Credit values are decimals, agent IDs are bare GUIDs, and blank `User Email` values are unmatched identities—not rows to discard.
+
+> Dataverse V19 matches credits to ESS by `Agent Id` and joins organization data through `User Email`. PPAC has no conversation ID, so cost per resolved conversation, net value, and ROI are labeled modeled allocations.
 
 ---
 
 ## Step 4 — Download & open the template
 
-1. In this repo, click **[`ESS Dashboard - Dynamic Topics (Dataverse) V10.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(Dataverse)%20V10.pbit)** → **Download raw file**.
+1. In this repo, click **[`ESS Dashboard - Dynamic Topics (Dataverse) V19.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(Dataverse)%20V19.pbit)** → **Download raw file**.
 2. Double-click the downloaded `.pbit` — it opens in Power BI Desktop and shows a parameter prompt.
 
 ---
@@ -82,7 +86,7 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 | **Dataverse Environment URL** | ✅ Yes | `https://orgabc12345.crm.dynamics.com` |
 | **Transcript Lookback Days** | Optional — leave blank for 90 | `30`, `60`, `180` |
 | **Org Data File** | ⭐ Recommended | `/Users/<you>/Documents/AgentData/OrgData.csv` |
-| **Agent Credits File** | Optional | `…/AgentCredits.csv` |
+| **Agent Credits File** | Optional | `…/EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv` |
 
 Click **Load**.
 
@@ -101,6 +105,10 @@ After Load, Power BI prompts for credentials on the Dataverse data source:
 > 💡 **One-time per environment.** Power BI caches the credential under *File → Options → Data source settings*. To switch environments, clear the entry there and re-auth.
 
 > ⚠️ **"We couldn't authenticate with the credentials provided."** Confirm you signed in with an account that has the **Bot Transcript Viewer** role in this environment. Tenant admin ≠ environment role.
+
+### Validate optional files with fabricated data
+
+Use `SampleData/OrgData.csv` and `SampleData/EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv` to validate organization and credit visuals. Dataverse conversation rows still come from the supplied environment URL, so the signed-in account must have **Bot Transcript Viewer**. To validate the entire report without tenant access, use CSV V18 with all three matching files described in the CSV guide.
 
 ---
 
@@ -137,7 +145,7 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 |---|---|---|---|
 | 1 | Copy Environment URL | Power Apps → ⚙️ → Session details | 1 min |
 | 2 | Export HR roster (optional) | M365 Admin Center | 2 min |
-| 3 | Export Agent Credits (optional) | Copilot Studio → Analytics | 2 min |
+| 3 | Download 30-day User-Level Credit Consumption CSV (optional) | PPAC → Licensing → Copilot Studio → Summary → Download report | 2 min |
 | 4 | Download & open `.pbit` | This repo | 1 min |
 | 5 | Paste env URL + lookback into prompt | Power BI Desktop | 1 min |
 | 6 | OAuth into Dataverse | Auth dialog | 1 min |
@@ -155,7 +163,8 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 | Refresh succeeds but **Total Conversations = 0** | Teams/Developer/M365 Copilot env (transcripts not written), or empty lookback | Move agent to a standard production/sandbox Dataverse env; widen Lookback Days |
 | Refresh is very slow (5+ min) | Lookback too wide | Lower Lookback Days |
 | `Users by Organization` all `(Blank)` | Org Data UPN doesn't match transcripts | Confirm `UserPrincipalName` column with full UPNs |
-| Credit Consumption page blank | Agent Credits file not loaded | Export from Copilot Studio Analytics → Message Consumption |
+| `Access to the resource is forbidden` | Account lacks Dataverse read access | Grant **Bot Transcript Viewer** in the target environment; Power Platform Administrator or Environment Maker alone is insufficient |
+| Observed Credit Leaderboard is blank | User-Level Credit Consumption file is missing or no `Agent Id` matches Dataverse `BotId` | Use the 30-day PPAC User-Level export for the same ESS agent |
 | Total Users too low | Same employee as both UPN and Entra Object ID | Already handled by the model |
 | Repeat-usage rate is 0% | Lookback too short | Widen to 60 or 90 days |
 | Need to switch environment | Cached credential points at old env | **File → Options → Data source settings → Clear Permissions** |

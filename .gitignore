@@ -5,6 +5,7 @@ Thumbs.db
 .pbitemp/
 Data Files/
 *.csv
+!SampleData/*.csv
 *.xlsx
 !images/*.png
 .vscode/

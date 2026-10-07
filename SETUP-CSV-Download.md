@@ -81,23 +81,25 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 ---
 
-## Step 3 — (Optional) Export Agent Credits
+## Step 3 — (Optional) Download Copilot Credits reports
 
-**Outcome:** unlocks the Business Impact page's credit-consumption leaderboard.
+**Outcome:** obtains observed Copilot Studio credits for the Business Impact page.
 
-1. Sign in to [Copilot Studio](https://copilotstudio.microsoft.com) and open your ESS agent.
-2. In the left navigation, select **Analytics** → **Message Consumption**.
-3. Apply a date range matching your transcripts export.
-4. Click **Export** and save the resulting CSV to your data folder, e.g. `Documents/AgentData/AgentCredits.csv`.
+1. Sign in to the **Power Platform admin center** as a tenant administrator, Power Platform Administrator, or Dynamics 365 Administrator. **Power Platform Administrator** is the recommended least-privilege role.
+2. Go to **Licensing → Copilot Studio → Summary → Download report**.
+3. Set **Usage type** to `Copilot Credits`; choose a `30`, `60`, `90`, or `180` day lookback.
+4. For CSV V18, download **User-Level Credit Consumption** with a **30-day** lookback. Fabric V2 additionally uses the Environment and Agent reports.
 
-You can skip this step and add Agent Credits later — the template loads cleanly without it.
+For a 30-day lookback the generated names are `EntitlementConsumptionTenantDetailsReport_MCSMessages_30.csv`, `EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30.csv`, and `EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv`. The environment file has daily `Usage Date` rows; agent and user files are lookback aggregates with no activity date. Credits are decimals, agent IDs are bare GUIDs, and blank `User Email` values must remain visible as unmatched identities.
+
+> CSV V18 matches credits to ESS by `Agent Id` and joins organization data through `User Email`. PPAC has no conversation ID, so cost per resolved conversation, net value, and ROI are labeled modeled allocations.
 
 ---
 
 ## Step 4 — Download & open the template
 
 1. **Download the .pbit**
-   - In this repo, click **[`ESS Dashboard - Dynamic Topics (CSV) V10.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V10.pbit)**
+   - In this repo, click **[`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V18.pbit)**
    - Click **Download raw file** (top-right of the file preview)
 
 2. **Open it**
@@ -113,13 +115,23 @@ In the parameter prompt, paste the **full absolute path** to each CSV from Steps
 |---|---|---|
 | **Transcript File** | ✅ Yes | `/Users/<you>/Documents/AgentData/ConversationTranscripts.csv` |
 | **Org Data File** | ⭐ Recommended | `/Users/<you>/Documents/AgentData/OrgData.csv` |
-| **Agent Credits File** | Optional — leave blank | `…/AgentCredits.csv` |
+| **Agent Credits File** | Optional | `…/EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv` |
 
 Click **Load**.
 
 > 💡 **Leaving an optional field blank is fine.** The template loads cleanly and the relevant pages just stay empty until you add the data.
 
 > ⚠️ **Use forward slashes on Mac, backslashes on Windows.** Wrap paths in nothing — just paste the raw path.
+
+### Validate with fabricated sample data
+
+The repository's [`SampleData`](./SampleData/) folder contains a matching, fully synthetic set. For CSV V18 use:
+
+- `SampleData/ConversationTranscripts.csv`
+- `SampleData/OrgData.csv`
+- `SampleData/EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv`
+
+The expected validation totals are **168 conversations**, **25 users**, **109 resolved conversations**, **1,651.75 observed credits**, and **516.89 observed billable credits**.
 
 ---
 
@@ -155,7 +167,7 @@ Save this as a sticky note:
 |---|---|---|---|
 | 1 | Export `ConversationTranscript` table | Power Apps → Tables | 5 min |
 | 2 | Export HR roster (optional) | HR system or Entra/Graph | 2 min |
-| 3 | Export Agent Credits / Message Consumption (optional) | Copilot Studio → Analytics | 2 min |
+| 3 | Download 30-day User-Level Credit Consumption CSV (optional) | PPAC → Licensing → Copilot Studio → Summary → Download report | 2 min |
 | 4 | Download & open `.pbit` | This repo | 1 min |
 | 5 | Paste file paths into parameter prompt | Power BI Desktop | 1 min |
 | 6 | Validate Total Users + Total Conversations | Adoption page | 1 min |
@@ -173,7 +185,7 @@ Save this as a sticky note:
 | Power BI hangs or runs out of memory on load | Very large transcript file (>500 MB) | Apply a date filter at the Dataverse export step to narrow the window |
 | `Users by Organization` shows everyone as `(Blank)` | Org Data UPN column doesn't match transcripts | Confirm column is named `UserPrincipalName` and values are full UPNs (`user@contoso.com`) |
 | `Users by Country` chart shows "Something's wrong with one or more fields" | Org Data CSV missing the `Country` column | Add a `Country` column (can be empty), or download the latest `.pbit` from this repo |
-| Credit Consumption page is blank | Agent Credits file not loaded | Export from Copilot Studio **Analytics → Message Consumption**, not Dataverse |
+| Observed Credit Leaderboard is blank | User-Level Credit Consumption file is missing or no `Agent Id` matches the transcripts | Use the 30-day PPAC User-Level export and verify it covers the same ESS agent |
 | Total Users count seems too low | Same employee shows as both UPN and Entra Object ID in transcripts | Already handled — the model cross-walks both identities automatically |
 | Repeat-usage rate is 0% | Period too short — everyone is a first-time user | Widen the date filter or wait for more data |
 

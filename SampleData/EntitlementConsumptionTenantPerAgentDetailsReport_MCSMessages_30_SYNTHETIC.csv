@@ -1,0 +1,5 @@
+Agent Name,Agent Id,Product,AI Feature/Billable Feature,Billed credit,Non-billed credit,Channel,Knowledge Sources,Tool Used,LLM Model,Scenario Name,Environment Id,Environment Name
+ESS Employee Self-Service Agent,f1d40245-f319-4e2d-8023-9e7b6f6456ac,Copilot Studio,Generative answers,232.60,510.69,Microsoft Teams,,,GPT-4.1,,77777777-7777-4777-8777-777777777777,ESS Synthetic Validation
+ESS Employee Self-Service Agent,f1d40245-f319-4e2d-8023-9e7b6f6456ac,Copilot Studio,Tenant graph grounding,155.07,340.46,Microsoft Teams,Microsoft Graph,,GPT-4.1,,77777777-7777-4777-8777-777777777777,ESS Synthetic Validation
+ESS Employee Self-Service Agent,f1d40245-f319-4e2d-8023-9e7b6f6456ac,Copilot Studio,Agent actions,77.53,170.23,Microsoft Teams,,ESS connectors,,Employee self-service,77777777-7777-4777-8777-777777777777,ESS Synthetic Validation
+ESS Employee Self-Service Agent,f1d40245-f319-4e2d-8023-9e7b6f6456ac,Copilot Studio,Classic answers,51.69,113.48,Microsoft Teams,,,,,77777777-7777-4777-8777-777777777777,ESS Synthetic Validation
