@@ -14,7 +14,7 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 > 🆕 **Why this matters for refresh:** Some older template versions could trip a **"dynamic data source"** error in the service that blocked *all* scheduled refresh. Use the current **CSV V18** or **Dataverse V19** template.
 
-> 🆕 **Already need more than this?** Path A and Path B above already give you gateway‑free, cloud‑to‑cloud scheduled refresh — most customers don't need anything else. If you're consolidating multiple Dataverse environments into one dashboard, hitting refresh limits at very large scale, or want PPAC credit-consumption analytics alongside conversation data (with a separate file-landing step), see **[SETUP-Fabric.md ↗](SETUP-Fabric.md)**.
+> 🆕 **Already need more than this?** Path A and Path B above already give you gateway‑free, cloud‑to‑cloud scheduled refresh — most customers don't need anything else. If you're consolidating multiple Dataverse environments into one dashboard, hitting refresh limits at very large scale, or want [Power Platform admin center](https://admin.powerplatform.microsoft.com) credit-consumption analytics alongside conversation data (with a separate file-landing step), see **[SETUP-Fabric.md ↗](SETUP-Fabric.md)**.
 
 ---
 
@@ -62,7 +62,7 @@ You can get **gateway‑free cloud refresh** with the CSV Upload template *if th
 
 ### B2. Point the template at it
 
-3. Open `ESS Dashboard - Dynamic Topics (CSV) V18` in Desktop. Paste the **direct SharePoint URL** into **Copilot Studio Transcript**. Optional Org Data and the 30-day PPAC User-Level Credit Consumption CSV can be hosted the same way.
+3. Open `ESS Dashboard - Dynamic Topics (CSV) V18` in Desktop. Paste the **direct SharePoint URL** into **Copilot Studio Transcript**. Optional Org Data and the 30-day Power Platform admin center User-Level Credit Consumption CSV can be hosted the same way.
 4. **Home → Refresh** to confirm it loads locally, then **Publish** to your workspace.
 
 ### B3. Bind credentials & schedule

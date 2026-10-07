@@ -61,14 +61,14 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 ## Step 3 — (Optional) Download Copilot Credits reports
 
-1. Sign in to the **Power Platform admin center** as a tenant administrator, Power Platform Administrator, or Dynamics 365 Administrator. **Power Platform Administrator** is the recommended least-privilege role.
+1. Sign in to the [Power Platform admin center](https://admin.powerplatform.microsoft.com) as a tenant administrator, Power Platform Administrator, or Dynamics 365 Administrator. **Power Platform Administrator** is the recommended least-privilege role.
 2. Go to **Licensing → Copilot Studio → Summary → Download report**.
 3. Set **Usage type** to `Copilot Credits`; choose a `30`, `60`, `90`, or `180` day lookback.
 4. For Dataverse V19, download **User-Level Credit Consumption** with a **30-day** lookback. Fabric V2 additionally uses the Environment and Agent reports.
 
 At 30 days the generated names are `EntitlementConsumptionTenantDetailsReport_MCSMessages_30.csv`, `EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30.csv`, and `EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv`. The environment export is daily by `Usage Date`; agent and user exports are aggregate snapshots without an activity date. Credit values are decimals, agent IDs are bare GUIDs, and blank `User Email` values are unmatched identities—not rows to discard.
 
-> Dataverse V19 matches credits to ESS by `Agent Id` and joins organization data through `User Email`. PPAC has no conversation ID, so cost per resolved conversation, net value, and ROI are labeled modeled allocations.
+> Dataverse V19 matches credits to ESS by `Agent Id` and joins organization data through `User Email`. The Power Platform admin center export has no conversation ID, so cost per resolved conversation, net value, and ROI are labeled modeled allocations.
 
 ---
 
@@ -145,7 +145,7 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 |---|---|---|---|
 | 1 | Copy Environment URL | Power Apps → ⚙️ → Session details | 1 min |
 | 2 | Export HR roster (optional) | M365 Admin Center | 2 min |
-| 3 | Download 30-day User-Level Credit Consumption CSV (optional) | PPAC → Licensing → Copilot Studio → Summary → Download report | 2 min |
+| 3 | Download 30-day User-Level Credit Consumption CSV (optional) | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → Licensing → Copilot Studio → Summary → Download report | 2 min |
 | 4 | Download & open `.pbit` | This repo | 1 min |
 | 5 | Paste env URL + lookback into prompt | Power BI Desktop | 1 min |
 | 6 | OAuth into Dataverse | Auth dialog | 1 min |
@@ -164,7 +164,7 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 | Refresh is very slow (5+ min) | Lookback too wide | Lower Lookback Days |
 | `Users by Organization` all `(Blank)` | Org Data UPN doesn't match transcripts | Confirm `UserPrincipalName` column with full UPNs |
 | `Access to the resource is forbidden` | Account lacks Dataverse read access | Grant **Bot Transcript Viewer** in the target environment; Power Platform Administrator or Environment Maker alone is insufficient |
-| Observed Credit Leaderboard is blank | User-Level Credit Consumption file is missing or no `Agent Id` matches Dataverse `BotId` | Use the 30-day PPAC User-Level export for the same ESS agent |
+| Observed Credit Leaderboard is blank | User-Level Credit Consumption file is missing or no `Agent Id` matches Dataverse `BotId` | Use the 30-day Power Platform admin center User-Level export for the same ESS agent |
 | Total Users too low | Same employee as both UPN and Entra Object ID | Already handled by the model |
 | Repeat-usage rate is 0% | Lookback too short | Widen to 60 or 90 days |
 | Need to switch environment | Cached credential points at old env | **File → Options → Data source settings → Clear Permissions** |

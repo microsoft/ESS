@@ -85,14 +85,14 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 **Outcome:** obtains observed Copilot Studio credits for the Business Impact page.
 
-1. Sign in to the **Power Platform admin center** as a tenant administrator, Power Platform Administrator, or Dynamics 365 Administrator. **Power Platform Administrator** is the recommended least-privilege role.
+1. Sign in to the [Power Platform admin center](https://admin.powerplatform.microsoft.com) as a tenant administrator, Power Platform Administrator, or Dynamics 365 Administrator. **Power Platform Administrator** is the recommended least-privilege role.
 2. Go to **Licensing → Copilot Studio → Summary → Download report**.
 3. Set **Usage type** to `Copilot Credits`; choose a `30`, `60`, `90`, or `180` day lookback.
 4. For CSV V18, download **User-Level Credit Consumption** with a **30-day** lookback. Fabric V2 additionally uses the Environment and Agent reports.
 
 For a 30-day lookback the generated names are `EntitlementConsumptionTenantDetailsReport_MCSMessages_30.csv`, `EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30.csv`, and `EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv`. The environment file has daily `Usage Date` rows; agent and user files are lookback aggregates with no activity date. Credits are decimals, agent IDs are bare GUIDs, and blank `User Email` values must remain visible as unmatched identities.
 
-> CSV V18 matches credits to ESS by `Agent Id` and joins organization data through `User Email`. PPAC has no conversation ID, so cost per resolved conversation, net value, and ROI are labeled modeled allocations.
+> CSV V18 matches credits to ESS by `Agent Id` and joins organization data through `User Email`. The Power Platform admin center export has no conversation ID, so cost per resolved conversation, net value, and ROI are labeled modeled allocations.
 
 ---
 
@@ -167,7 +167,7 @@ Save this as a sticky note:
 |---|---|---|---|
 | 1 | Export `ConversationTranscript` table | Power Apps → Tables | 5 min |
 | 2 | Export HR roster (optional) | HR system or Entra/Graph | 2 min |
-| 3 | Download 30-day User-Level Credit Consumption CSV (optional) | PPAC → Licensing → Copilot Studio → Summary → Download report | 2 min |
+| 3 | Download 30-day User-Level Credit Consumption CSV (optional) | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → Licensing → Copilot Studio → Summary → Download report | 2 min |
 | 4 | Download & open `.pbit` | This repo | 1 min |
 | 5 | Paste file paths into parameter prompt | Power BI Desktop | 1 min |
 | 6 | Validate Total Users + Total Conversations | Adoption page | 1 min |
@@ -185,7 +185,7 @@ Save this as a sticky note:
 | Power BI hangs or runs out of memory on load | Very large transcript file (>500 MB) | Apply a date filter at the Dataverse export step to narrow the window |
 | `Users by Organization` shows everyone as `(Blank)` | Org Data UPN column doesn't match transcripts | Confirm column is named `UserPrincipalName` and values are full UPNs (`user@contoso.com`) |
 | `Users by Country` chart shows "Something's wrong with one or more fields" | Org Data CSV missing the `Country` column | Add a `Country` column (can be empty), or download the latest `.pbit` from this repo |
-| Observed Credit Leaderboard is blank | User-Level Credit Consumption file is missing or no `Agent Id` matches the transcripts | Use the 30-day PPAC User-Level export and verify it covers the same ESS agent |
+| Observed Credit Leaderboard is blank | User-Level Credit Consumption file is missing or no `Agent Id` matches the transcripts | Use the 30-day Power Platform admin center User-Level export and verify it covers the same ESS agent |
 | Total Users count seems too low | Same employee shows as both UPN and Entra Object ID in transcripts | Already handled — the model cross-walks both identities automatically |
 | Repeat-usage rate is 0% | Period too short — everyone is a first-time user | Widen the date filter or wait for more data |
 

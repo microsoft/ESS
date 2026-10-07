@@ -32,11 +32,11 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 
 - **Agent filtering on Improvement Opportunities** — the Dataverse Direct edition now includes an Agent slicer so multi-agent environments can isolate improvement opportunities for a single agent.
 
-- **Validated Copilot Studio credits** — CSV V18 and Dataverse V19 now accept the 30-day PPAC **User-Level Credit Consumption** export. Credits match ESS through `Agent Id`; organization attribution uses `User Email`.
+- **Validated Copilot Studio credits** — CSV V18 and Dataverse V19 now accept the 30-day **User-Level Credit Consumption** export from the [Power Platform admin center](https://admin.powerplatform.microsoft.com). Credits match ESS through `Agent Id`; organization attribution uses `User Email`.
 
-- **Clear observed-versus-modeled labeling** — total and billable credits are observed PPAC values. Cost, cost per resolved conversation, net value, and ROI are modeled because PPAC provides no conversation or topic ID.
+- **Clear observed-versus-modeled labeling** — total and billable credits are observed Power Platform admin center values. Cost, cost per resolved conversation, net value, and ROI are modeled because the export provides no conversation or topic ID.
 
-- **Fabric V2 decimal-credit support** — preserves fractional Copilot Credits and validates the three PPAC export schemas before writing the Lakehouse tables.
+- **Fabric V2 decimal-credit support** — preserves fractional Copilot Credits and validates the three Power Platform admin center export schemas before writing the Lakehouse tables.
 
 Dataverse Direct V19 and CSV Upload V18 are cumulative — both include every improvement from the earlier releases.
 
@@ -206,7 +206,7 @@ Not a third default choice — an optional add-on for teams that have outgrown t
 | | 🧱 **Fabric Auto-Refresh** |
 |---|---|
 | **How it loads data** | Notebooks land conversation data into a Fabric Lakehouse; the supplied template imports it through the Lakehouse SQL analytics endpoint |
-| **Setup time** | Meaningfully longer than either path above, first time through — realistically **30–60+ minutes of hands-on work**: create/configure the Fabric workspace and Lakehouse, import/configure the notebooks, land the three PPAC exports, and run the initial ingestion. Transcript ingestion can be scheduled later; credit refresh remains manual unless you separately implement and validate an export-landing pipeline |
+| **Setup time** | Meaningfully longer than either path above, first time through — realistically **30–60+ minutes of hands-on work**: create/configure the Fabric workspace and Lakehouse, import/configure the notebooks, land the three [Power Platform admin center](https://admin.powerplatform.microsoft.com) exports, and run the initial ingestion. Transcript ingestion can be scheduled later; credit refresh remains manual unless you separately implement and validate an export-landing pipeline |
 | **Refresh** | Transcript ingestion can be scheduled. Credit exports must first be landed under `Files/credit_consumption`; manual upload works now, while automated landing is an architecture option (no flow is included in this repo) |
 | **Power BI Service refresh** | The supplied template uses **Import mode through the Lakehouse SQL analytics endpoint**. Schedule semantic-model refresh after the notebooks run; no on-premises gateway is required. This template does not offer selectable Direct Lake or DirectQuery modes |
 | **Who can run it** | A higher bar than the other two paths: Fabric workspace access with permission to create/run notebooks and create a Lakehouse, **plus** — for the live Dataverse pull this path is built around — an Entra app registration added as a Dataverse **Application User** with Read access on Conversation Transcript in every environment being ingested. Setting that up typically needs an Entra or Dataverse admin, not just the report owner |
@@ -223,7 +223,7 @@ Not a third default choice — an optional add-on for teams that have outgrown t
 
 **This is the part most people ask about: where do I actually go to get each file?** Below is the exact click-path for every input, and which template needs it. Each row links to the full step-by-step (with every menu spelled out) in the setup guide for your path.
 
-> 📌 **The only difference between the two templates:** the **CSV Upload** template needs a **transcript CSV** you export yourself; the **Dataverse Direct** template pulls transcripts **live** and only needs your **environment URL**. Org Data and the PPAC User-Level Credit Consumption input work with both.
+> 📌 **The only difference between the two templates:** the **CSV Upload** template needs a **transcript CSV** you export yourself; the **Dataverse Direct** template pulls transcripts **live** and only needs your **environment URL**. Org Data and the Power Platform admin center User-Level Credit Consumption input work with both.
 
 ### 📄 CSV Upload — get these files
 
@@ -231,7 +231,7 @@ Not a third default choice — an optional add-on for teams that have outgrown t
 |---|---|---|---|---|
 | 1 | **Conversation Transcripts** | ✅ **Required** | [make.powerapps.com](https://make.powerapps.com) → switch to your agent's environment (top-right selector) → **Tables** → **All** → search `conversation` → open **ConversationTranscript** → **Export ▸ Export data** → **Download exported data** → unzip the CSV | [📘 CSV guide — Step 1](./SETUP-CSV-Download.md) |
 | 2 | **Org Data** (HR roster) | ⭐ Recommended | [admin.microsoft.com](https://admin.microsoft.com) → **Users ▸ Active users ▸ Export users ▸ Confirm** — *or* export a roster CSV from your HR system | [📘 CSV guide — Step 2](./SETUP-CSV-Download.md) |
-| 3 | **Copilot Credits** | Optional | PPAC → **Licensing ▸ Copilot Studio ▸ Summary ▸ Download report ▸ User-Level Credit Consumption**; select **30 days** | [📘 CSV guide — Step 3](./SETUP-CSV-Download.md) |
+| 3 | **Copilot Credits** | Optional | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → **Licensing ▸ Copilot Studio ▸ Summary ▸ Download report ▸ User-Level Credit Consumption**; select **30 days** | [📘 CSV guide — Step 3](./SETUP-CSV-Download.md) |
 
 > ⚠️ **Do not open the transcript CSV in Excel** — Excel corrupts the JSON in the `Content` column and the template fails to load with an `M Engine error`. Load it straight into Power BI.
 
@@ -241,7 +241,7 @@ Not a third default choice — an optional add-on for teams that have outgrown t
 |---|---|---|---|---|
 | 1 | **Dataverse Environment URL** *(no file — pulls transcripts live)* | ✅ **Required** | [make.powerapps.com](https://make.powerapps.com) → switch to your agent's environment → **⚙️ (gear) ▸ Session details** → copy **Instance url** (e.g. `https://orgabc12345.crm.dynamics.com`) | [📘 Dataverse guide — Step 1](./SETUP-Dataverse.md) |
 | 2 | **Org Data** (HR roster) | ⭐ Recommended | [admin.microsoft.com](https://admin.microsoft.com) → **Users ▸ Active users ▸ Export users ▸ Confirm** | [📘 Dataverse guide — Step 2](./SETUP-Dataverse.md) |
-| 3 | **Copilot Credits** | Optional | PPAC → **Licensing ▸ Copilot Studio ▸ Summary ▸ Download report ▸ User-Level Credit Consumption**; select **30 days** | [📘 Dataverse guide — Step 3](./SETUP-Dataverse.md) |
+| 3 | **Copilot Credits** | Optional | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → **Licensing ▸ Copilot Studio ▸ Summary ▸ Download report ▸ User-Level Credit Consumption**; select **30 days** | [📘 Dataverse guide — Step 3](./SETUP-Dataverse.md) |
 
 ### 🧱 Fabric Auto-Refresh — get these files
 
@@ -258,7 +258,7 @@ Not a third default choice — an optional add-on for teams that have outgrown t
 
 ### Copilot credit exports — validated source and contract
 
-Use **Power Platform admin center → Licensing → Copilot Studio → Summary → Download report**. PPAC allows a **tenant administrator**, **Power Platform Administrator**, or **Dynamics 365 Administrator**; use **Power Platform Administrator** as the least-privilege choice for this workflow. In the download panel choose:
+Use the [Power Platform admin center](https://admin.powerplatform.microsoft.com) → **Licensing → Copilot Studio → Summary → Download report**. This page allows a **tenant administrator**, **Power Platform Administrator**, or **Dynamics 365 Administrator**; use **Power Platform Administrator** as the least-privilege choice for this workflow. In the download panel choose:
 
 - **Usage type:** `Copilot Credits`
 - **Lookback:** `30`, `60`, `90`, or `180` days
@@ -274,11 +274,11 @@ The environment file is daily (`Usage Date`) and contains: `BillingPlan Id`, `Bi
 
 Credit fields are decimal values (for example, `113.89`), and live `Agent Id` values are bare GUIDs. Agent and user files are aggregate snapshots for the selected lookback and have no activity date. `User Email` can be blank; retain those rows as **unmatched identity**. Do not append overlapping snapshots as transactions.
 
-> **Compatibility:** CSV V18 and Dataverse V19 accept the **30-day User-Level Credit Consumption** CSV directly. Fabric V2 uses all three PPAC exports. The separate **M365 Copilot Credits report** is a narrower source for metered declarative agents in M365 Copilot Chat and is not the recommended ESS source.
+> **Compatibility:** CSV V18 and Dataverse V19 accept the **30-day User-Level Credit Consumption** CSV directly. Fabric V2 uses all three Power Platform admin center exports. The separate **M365 Copilot Credits report** is a narrower source for metered declarative agents in M365 Copilot Chat and is not the recommended ESS source.
 
 #### Observed credits versus modeled conversation attribution
 
-PPAC provides observed credits at environment-day, agent-window, and user-agent-window grain. It provides no conversation/session ID, so credits can be matched to ESS by bare `Agent Id` and, where present, normalized `User Email`, but not observed per conversation, resolved conversation, topic, or outcome. For modeled analysis, preserve the PPAC aggregate as the control total, place blank-email rows in an unmatched bucket, and allocate each user-agent snapshot across in-scope resolved conversations using a documented rule (for example equal share, or proportional transcript diagnostic cost). Reconcile allocated values back to each PPAC control total and label every conversation/topic/outcome value **modeled allocation**, never billing-observed.
+The Power Platform admin center exports provide observed credits at environment-day, agent-window, and user-agent-window grain. They provide no conversation/session ID, so credits can be matched to ESS by bare `Agent Id` and, where present, normalized `User Email`, but not observed per conversation, resolved conversation, topic, or outcome. For modeled analysis, preserve the exported aggregate as the control total, place blank-email rows in an unmatched bucket, and allocate each user-agent snapshot across in-scope resolved conversations using a documented rule (for example equal share, or proportional transcript diagnostic cost). Reconcile allocated values back to each exported control total and label every conversation/topic/outcome value **modeled allocation**, never billing-observed.
 
 **Next:** download the matching `.pbit` from [Choose your path](#quick-start--choose-your-path) above, open it in Power BI Desktop, and paste your file paths (or environment URL) into the parameter prompt.
 → **[Full CSV setup guide](./SETUP-CSV-Download.md)** · **[Full Dataverse setup guide](./SETUP-Dataverse.md)** · **[Full Fabric setup guide](./SETUP-Fabric.md)**
@@ -295,9 +295,9 @@ The [`SampleData`](./SampleData/) folder contains only fabricated `example.com` 
 |---|---|
 | [`ConversationTranscripts.csv`](./SampleData/ConversationTranscripts.csv) | 168 fabricated conversations for one ESS agent and 25 users |
 | [`OrgData.csv`](./SampleData/OrgData.csv) | Matching organization, country, title, display-name, and email attributes |
-| [`EntitlementConsumptionTenantDetailsReport_MCSMessages_30_SYNTHETIC.csv`](./SampleData/EntitlementConsumptionTenantDetailsReport_MCSMessages_30_SYNTHETIC.csv) | PPAC Environment Consumption Summary shape with daily rows |
-| [`EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30_SYNTHETIC.csv`](./SampleData/EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30_SYNTHETIC.csv) | PPAC Agent-Level Credit Consumption shape |
-| [`EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv`](./SampleData/EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv) | PPAC User-Level Credit Consumption shape used directly by CSV V18 and Dataverse V19 |
+| [`EntitlementConsumptionTenantDetailsReport_MCSMessages_30_SYNTHETIC.csv`](./SampleData/EntitlementConsumptionTenantDetailsReport_MCSMessages_30_SYNTHETIC.csv) | Power Platform admin center Environment Consumption Summary shape with daily rows |
+| [`EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30_SYNTHETIC.csv`](./SampleData/EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30_SYNTHETIC.csv) | Power Platform admin center Agent-Level Credit Consumption shape |
+| [`EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv`](./SampleData/EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv) | Power Platform admin center User-Level Credit Consumption shape used directly by CSV V18 and Dataverse V19 |
 
 The three consumption files reconcile to **1,651.75 total credits**. The User-Level file contains **516.89 observed billable credits** and matches the transcript agent through `Agent Id = BotId`.
 
@@ -316,7 +316,7 @@ The three consumption files reconcile to **1,651.75 total credits**. The User-Le
 |---|---|---|---|
 | **Conversation Transcripts** (Dataverse export from your ESS environment) | ✅ Required | **Bot Transcript Viewer** (minimum, least-privilege) — or any role with Read on the `conversationtranscript` table. **System Administrator** always works. **System Customizer** usually works but isn't guaranteed; assign Bot Transcript Viewer alongside it to be safe. | All adoption, outcomes, time-to-knowledge, and in-conversation thumbs/CSAT feedback |
 | **Org Data** (HR roster CSV: UPN, Department, JobTitle, Country) | ⭐ Recommended | **Global Reader**, **User Administrator**, or **Global Administrator** (Microsoft 365 Admin Center) | "Users by Organization" and "Users by Country" breakouts on every page |
-| **Copilot Credits** | Optional | **Power Platform Administrator** recommended; tenant administrator or Dynamics 365 Administrator also accepted | CSV V18/Dataverse V19 use the 30-day User-Level export; Fabric V2 uses all three PPAC exports |
+| **Copilot Credits** | Optional | **Power Platform Administrator** recommended; tenant administrator or Dynamics 365 Administrator also accepted | CSV V18/Dataverse V19 use the 30-day User-Level export; Fabric V2 uses all three Power Platform admin center exports |
 
 > ⚠️ **`Environment Maker` alone is not enough** to read transcripts. Customers often have this role and assume they're covered — they aren't. Grant **Bot Transcript Viewer** (or higher) explicitly.
 

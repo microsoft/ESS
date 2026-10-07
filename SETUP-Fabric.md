@@ -22,7 +22,7 @@ If none of these apply, use **[Dataverse Direct](SETUP-Dataverse.md)** or **[CSV
 
 - **Schedulable ingestion and refresh.** Transcript ingestion notebooks can be scheduled. Copilot Credits files must first be landed in the Lakehouse; manual upload is supported now, and automated landing can be added separately.
 - **Multiple Dataverse environments, one dashboard.** Conversations from two or more Dataverse environments can be ingested into the same Lakehouse and consolidated into a single dashboard, instead of maintaining a separate `.pbit` copy per environment.
-- **Copilot credit-consumption analytics.** `Copilot_Credit_Consumption_Ingester.ipynb` reads the three PPAC Copilot Credits reports after they are landed under `Files/credit_consumption`.
+- **Copilot credit-consumption analytics.** `Copilot_Credit_Consumption_Ingester.ipynb` reads the three Power Platform admin center Copilot Credits reports after they are landed under `Files/credit_consumption`.
 - **Automatic topic identification for every conversation.** `Copilot_Agent_Transcript_Parser.ipynb` includes a two-stage classifier that assigns a topic to every conversation — including ones Copilot Studio itself never assigned a topic to — with zero manual keyword curation required. It runs fully offline: no conversation data leaves the customer's Fabric workspace, and no LLM or external API call is involved. (See Step 3 below for how it works.)
 
 ---
@@ -45,7 +45,7 @@ You'll need three files:
 |---|---|
 | `ESS - Fabric V2.pbit` | The dashboard template — imports the Lakehouse SQL analytics endpoint and preserves decimal Copilot Credits |
 | `Copilot_Agent_Transcript_Parser.ipynb` | Notebook that parses conversation transcripts into the `agent_sessions` and `agent_catalogue` Delta tables |
-| `Copilot_Credit_Consumption_Ingester.ipynb` | Notebook that ingests PPAC reports into `dbo.credit_consumption_tenant`, `dbo.credit_consumption_agent`, and `dbo.credit_consumption_user` |
+| `Copilot_Credit_Consumption_Ingester.ipynb` | Notebook that ingests Power Platform admin center reports into `dbo.credit_consumption_tenant`, `dbo.credit_consumption_agent`, and `dbo.credit_consumption_user` |
 
 > Both notebooks are adapted from the community, MIT-licensed **[StudioLens-for-Copilot-Studio](https://github.com/Keithland89/StudioLens-for-Copilot-Studio)** project by **Keithland89** — see [Attribution & license ↓](#attribution--license).
 
@@ -61,7 +61,7 @@ You'll need three files:
 
 ### Land the three Copilot Credits exports
 
-1. In **Power Platform admin center**, go to **Licensing → Copilot Studio → Summary → Download report**. Access shown by PPAC is tenant administrator, Power Platform Administrator, or Dynamics 365 Administrator; use **Power Platform Administrator** as least privilege for this workflow.
+1. In the [Power Platform admin center](https://admin.powerplatform.microsoft.com), go to **Licensing → Copilot Studio → Summary → Download report**. This page allows a tenant administrator, Power Platform Administrator, or Dynamics 365 Administrator; use **Power Platform Administrator** as least privilege for this workflow.
 2. Set **Usage type** to `Copilot Credits`, choose a `30`, `60`, `90`, or `180` day lookback, and download each type: **Environment Consumption Summary**, **Agent-Level Credit Consumption**, and **User-Level Credit Consumption**.
 3. In the attached Lakehouse, create/open **Files → `credit_consumption`** and upload all three CSVs. At 30 days their generated names are:
    - `EntitlementConsumptionTenantDetailsReport_MCSMessages_30.csv`
@@ -80,7 +80,7 @@ The validated raw contracts are:
 
 Credit quantities are decimals (for example, `113.89` and `150.94`), and `Agent Id` is a bare GUID—not a `P_`-prefixed value. The environment report has daily `Usage Date` rows; agent and user reports have no activity date and represent the entire selected lookback. `User Email` may be blank and must be retained as unmatched identity. The separate **M365 Copilot Credits report** is limited to metered declarative agents in M365 Copilot Chat and is not the recommended ESS source.
 
-> 💡 **Fabricated validation files:** [`SampleData`](./SampleData/) includes schema-identical Environment, Agent, and User PPAC files that reconcile to **1,651.75 credits**. Upload exactly those three consumption files to `Files/credit_consumption` to validate the credit notebook without customer data.
+> 💡 **Fabricated validation files:** [`SampleData`](./SampleData/) includes schema-identical Environment, Agent, and User Power Platform admin center files that reconcile to **1,651.75 credits**. Upload exactly those three consumption files to `Files/credit_consumption` to validate the credit notebook without customer data.
 
 ---
 
@@ -89,7 +89,7 @@ Credit quantities are decimals (for example, `113.89` and `150.94`), and `Agent 
 1. **Run all cells** in `Copilot_Agent_Transcript_Parser.ipynb` first — it populates `agent_sessions` and `agent_catalogue`.
 2. After landing the three CSVs under `Files/credit_consumption`, **run all cells** in `Copilot_Credit_Consumption_Ingester.ipynb`. It populates `dbo.credit_consumption_tenant`, `dbo.credit_consumption_agent`, and `dbo.credit_consumption_user`.
 3. Confirm `agent_sessions`, `agent_catalogue`, and all three `credit_consumption_*` Delta tables appear under your Lakehouse's **Tables** list.
-4. *(Recommended for production)* Schedule the notebooks (or wrap them in a Fabric pipeline). If credits must be hands-off, separately implement and schedule the PPAC-export landing step before the credit notebook.
+4. *(Recommended for production)* Schedule the notebooks (or wrap them in a Fabric pipeline). If credits must be hands-off, separately implement and schedule the Power Platform admin center export-landing step before the credit notebook.
 
 > ⚠️ **Rolling snapshots are not transactions.** The agent and user reports overlap when the same lookback is downloaded repeatedly. Use the default `overwrite` mode for a current snapshot. If you intentionally use `append`, `LoadDate` is snapshot-history metadata; measures must select/deduplicate snapshots and must not sum overlapping windows as transaction history.
 
@@ -121,9 +121,9 @@ Credit quantities are decimals (for example, `113.89` and `150.94`), and `Agent 
 
 ### Observed versus modeled attribution
 
-PPAC credits are observed only at environment-day, agent-lookback, and user-agent-lookback grain. They can be linked to ESS by bare `Agent Id` and, for nonblank identities, normalized `User Email`; there is no conversation/session ID. Therefore any credit shown per resolved conversation, topic, or outcome is a **modeled allocation**, not observed billing.
+Power Platform admin center credits are observed only at environment-day, agent-lookback, and user-agent-lookback grain. They can be linked to ESS by bare `Agent Id` and, for nonblank identities, normalized `User Email`; there is no conversation/session ID. Therefore any credit shown per resolved conversation, topic, or outcome is a **modeled allocation**, not observed billing.
 
-A defensible model keeps each PPAC snapshot as the control total, retains blank-email credits in an unmatched bucket, then allocates a user-agent total only across in-scope resolved conversations using a documented weight (for example equal share, or proportional transcript diagnostic cost). Reconcile allocations back to each PPAC total, expose unmatched/unallocated amounts, and label all downstream conversation/topic/outcome figures as modeled.
+A defensible model keeps each exported snapshot as the control total, retains blank-email credits in an unmatched bucket, then allocates a user-agent total only across in-scope resolved conversations using a documented weight (for example equal share, or proportional transcript diagnostic cost). Reconcile allocations back to each exported total, expose unmatched/unallocated amounts, and label all downstream conversation/topic/outcome figures as modeled.
 
 ---
 
