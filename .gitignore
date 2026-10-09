@@ -6,6 +6,7 @@ Thumbs.db
 Data Files/
 *.csv
 !SampleData/*.csv
+!taxonomy/topics-taxonomy.csv
 *.xlsx
 !images/*.png
 .vscode/
@@ -31,4 +32,5 @@ _synthetic_test_data/
 Working Docs VS/
 Original Templates/
 Updated Template/
-tools/
+tools/__pycache__/
+*.pyc
