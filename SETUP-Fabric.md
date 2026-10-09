@@ -1,8 +1,10 @@
 # Step-by-Step Setup Guide — Fabric
 
-> ⚠️ **Read this first.** If you have a single Dataverse environment and just need scheduled refresh, use **[Dataverse Direct](SETUP-Dataverse.md)** + **[AUTO-REFRESH.md](AUTO-REFRESH.md)** instead — it's simpler and requires no Fabric capacity.
+> **Choose this path for:** independently governed history, multiple Dataverse environments in one report, very large-scale ingestion, or Lakehouse-based credit analytics. If you have one environment and need scheduled refresh, use [Dataverse Direct](SETUP-Dataverse.md) with [scheduled refresh](AUTO-REFRESH.md) instead. [Compare all paths](README.md#choose-your-path).
 
 This path adds a **Fabric/Lakehouse ingestion layer** in front of the same ESS Insights dashboard, for teams that have outgrown the CSV Upload and Dataverse Direct paths. It is **not** a replacement for either — most customers should keep using whichever of those two they're already on.
+
+> ⚠️ **History requires the full ingestion solution.** The `.pbit` does not archive Dataverse data. A scheduled transcript-parser notebook must ingest each record before Dataverse deletes it. The default merge mode then preserves that record in Delta, but it cannot recover history that expired before the first successful run.
 
 ---
 
@@ -11,6 +13,7 @@ This path adds a **Fabric/Lakehouse ingestion layer** in front of the same ESS I
 Use this path only if at least one of these is true:
 
 - [ ] **Multiple Dataverse environments.** You want conversations from two or more Dataverse environments (e.g. regional or business-unit agents) consolidated into a single dashboard, instead of maintaining one `.pbit` copy per environment.
+- [ ] **Durable Lakehouse history.** You need an independently governed transcript history beyond the Dataverse source-retention window and can operate a scheduled ingestion process.
 - [ ] **Refresh performance at scale.** Per-refresh live Dataverse queries against a very large environment (long history, high conversation volume) are slow or timing out with Dataverse Direct.
 - [ ] **Credit-consumption analytics.** You want the three current Power Platform admin center Copilot Credits exports ingested alongside conversation data, with the option to automate file landing in your own architecture.
 
@@ -29,6 +32,7 @@ If none of these apply, use **[Dataverse Direct](SETUP-Dataverse.md)** or **[CSV
 
 ## Before you start
 
+✅ The [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded and extracted
 ✅ A **Fabric workspace** with Fabric capacity assigned (a trial capacity is enough to evaluate)
 ✅ A **Lakehouse** created in that workspace
 ✅ Permission to **create and run notebooks** in that workspace
@@ -76,13 +80,14 @@ Application permissions can take a few minutes to become active.
 
 ## Step 1 — Get the template and notebooks
 
-You'll need three files:
+Download and extract the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip). Keep its folder structure intact. You'll use these files:
 
-| File | What it does |
+| Package location | What it does |
 |---|---|
-| `ESS - Fabric V2.pbit` | The dashboard template — imports the Lakehouse SQL analytics endpoint and preserves decimal Copilot Credits |
-| `Copilot_Agent_Transcript_Parser.ipynb` | Notebook that parses conversation transcripts into the `agent_sessions` and `agent_catalogue` Delta tables |
-| `Copilot_Credit_Consumption_Ingester.ipynb` | Optional notebook that ingests Power Platform admin center reports into `credit_consumption_tenant`, `credit_consumption_agent`, and `credit_consumption_user` |
+| `ESS - Fabric V2.pbit` | Dashboard template that imports the Lakehouse SQL analytics endpoint and preserves decimal Copilot Credits |
+| `Fabric/notebooks/Copilot_Agent_Transcript_Parser.ipynb` | Required notebook that parses conversation transcripts and writes the eight transcript-derived Delta tables |
+| `Fabric/notebooks/Copilot_Credit_Consumption_Ingester.ipynb` | Optional notebook that ingests Power Platform admin center reports into the three credit-consumption tables |
+| `SampleData/agent-registry.csv` | Fabricated starter registry to copy and replace with customer identifiers |
 
 > Both notebooks are adapted from the community, MIT-licensed **[StudioLens-for-Copilot-Studio](https://github.com/Keithland89/StudioLens-for-Copilot-Studio)** project by **Keithland89** — see [Attribution & license ↓](#attribution--license).
 
@@ -155,9 +160,13 @@ Credit quantities are decimals (for example, `113.89` and `150.94`), and `Agent 
 4. Confirm `agent_sessions`, `agent_catalogue`, `user_feedback`, and all three `credit_consumption_*` Delta tables appear under your Lakehouse's **Tables** list.
 5. *(Recommended for production)* Schedule the notebooks (or wrap them in a Fabric pipeline). If credits must be hands-off, separately implement and schedule the Power Platform admin center export-landing step before the credit notebook.
 
+> ✅ **Recommended transcript schedule:** Run the transcript parser daily with `LOOKBACK_DAYS = 7` and `WRITE_MODE = 'merge'`. The overlap safely updates recent records and tolerates short missed-run periods. Monitor failures so the gap never reaches the Dataverse retention boundary.
+
 > ⚠️ **Rolling snapshots are not transactions.** The agent and user reports overlap when the same lookback is downloaded repeatedly. Use the default `overwrite` mode for a current snapshot. If you intentionally use `append`, `LoadDate` is snapshot-history metadata; measures must select/deduplicate snapshots and must not sum overlapping windows as transaction history.
 
 > 💡 **Transcript history is protected by default.** The transcript parser uses `WRITE_MODE = 'merge'` for its bounded seven-day Dataverse pull. It rejects `overwrite` with a nonzero lookback because that combination would discard older Delta history. For an intentional full replacement, set both `LOOKBACK_DAYS = 0` and `WRITE_MODE = 'overwrite'`.
+
+> ⚠️ **No backfill after deletion.** Merge mode preserves only records that reached the Lakehouse. Deploy and schedule ingestion before the required Dataverse history expires.
 
 > 💡 **Native analytics signals are preserved.** `messageReaction.value.reaction` supplies transcript thumbs, and `SessionInfo.outcome`/`outcomeReason` remain authoritative. Conversations without `SessionInfo` are labeled `Engaged-Unclassified` rather than assumed resolved.
 
@@ -237,5 +246,5 @@ This path adapts the community, MIT-licensed **[StudioLens-for-Copilot-Studio](h
 ## Need more help?
 
 - 🐛 [Open an issue](https://github.com/microsoft/ESS/issues)
-- 📘 Not sure this is the right path? See [Choose your path ↗](README.md#quick-start--choose-your-path)
+- 📘 Not sure this is the right path? See [Choose your path ↗](README.md#choose-your-path)
 - 📖 The **Metric Glossary** page (inside the dashboard) has every measure's definition

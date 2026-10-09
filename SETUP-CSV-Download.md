@@ -1,11 +1,14 @@
-# Step-by-Step Setup Guide
+# Step-by-Step Setup Guide — CSV Upload
 
 Get the **ESS Insights dashboard** running on your own Copilot Studio agent data. Allow about **20–30 minutes** for the first setup; later transcript refreshes are much faster.
+
+> **Choose this path for:** evaluation, one-time snapshots, offline copies, or controlled sharing. For scheduled production reporting from one environment, use [Dataverse Direct](SETUP-Dataverse.md). [Compare all paths](README.md#choose-your-path).
 
 ---
 
 ## Before you start
 
+✅ The [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded, extracted, and kept in its original folder structure
 ✅ **Power BI Desktop** installed — [download free](https://powerbi.microsoft.com/desktop/)
 ✅ **Python 3.10 or later** installed — used by the local registry tool and optional feedback/topic tools; no packages are required
 ✅ **Bot Transcript Viewer** security role on the Dataverse environment that hosts your ESS agent — an admin must grant this. [Microsoft's how-to](https://learn.microsoft.com/en-us/microsoft-copilot-studio/admin-share-bots#assign-the-bot-transcript-viewer-security-role-during-agent-sharing)
@@ -47,7 +50,9 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 > 💡 **Default window is last 30 days.** Want more? Your admin can change the retention period in the environment settings before you export.
 
-❌ **Transcripts aren't written for these environments:** Dataverse for Teams, Dataverse developer environments, or Microsoft 365 Copilot agents. Confirm your ESS agent runs in a standard Dataverse production/sandbox environment, otherwise the export will be empty.
+> ⚠️ **Each export is a snapshot, not a cumulative transaction file.** Once Dataverse deletes an older transcript, a later export cannot include it. If you retain weekly exports, add an export date and coverage period, and do not sum overlapping conversation or user totals.
+
+❌ **Transcripts aren't written for these environments:** Dataverse for Teams or Microsoft 365 Copilot environments. Developer environments contain only the maker's own conversations and are suitable for demos, not multi-user reporting. Use a standard Dataverse production, sandbox, or default environment for customer reporting.
 
 ---
 
@@ -109,19 +114,16 @@ Do not load the raw Microsoft 365 export directly. Rows with blank Agent ID cann
 
 ---
 
-## Step 4 — Download & open the template
+## Step 4 — Build the registry and open the included template
 
 1. **Build the required agent registry**
    - Follow [Agent registry and reporting scope](AGENT-REGISTRY.md).
    - Use the transcript file from Step 1 to find the agent's `BotId`.
    - Generate `agent-registry.json`.
 
-2. **Download the .pbit**
-   - In this repo, click **[`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit)**
-   - Click **Download raw file** (top-right of the file preview)
-
-3. **Open it**
-   - Double-click the downloaded `.pbit` — it opens in Power BI Desktop and shows a parameter prompt
+2. **Open the template**
+   - Open the extracted `ESS-main` folder.
+   - Double-click **`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`**. It opens in Power BI Desktop and shows a parameter prompt.
 
 ---
 
@@ -214,7 +216,7 @@ Save this as a sticky note:
 | 2 | Export HR roster (optional) | HR system or Entra/Graph | 2 min |
 | 3 | Download 30-day User-Level Credit Consumption CSV (optional) | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → Licensing → Copilot Studio → Summary → Download report | 2 min |
 | 4 | Export and prepare Microsoft 365 Product Feedback (optional) | Microsoft 365 admin center → Health → Product feedback | 5–10 min |
-| 5 | Download & open `.pbit` | This repo | 1 min |
+| 5 | Open the included `.pbit` | Extracted `ESS-main` folder | 1 min |
 | 6 | Paste file paths and optional JSON into the parameter prompt | Power BI Desktop | 1 min |
 | 7 | Validate conversations, users, and optional feedback | Report pages | 2 min |
 | 8 | Publish to workspace or export PDF | Power BI Service | 2 min |
@@ -228,6 +230,7 @@ Save this as a sticky note:
 | `M Engine error: Token Identifier expected` on open | CSV opened in Excel before loading; Excel corrupted the JSON | Re-export from Dataverse, do **not** open in Excel |
 | Can't find `ConversationTranscript` table in Power Apps | Missing **Bot Transcript Viewer** security role | Ask your admin to grant it — Environment Maker isn't enough |
 | Empty CSV after export | Agent runs in Teams/Developer/M365 Copilot env (transcripts aren't written) | Move agent to standard Dataverse production/sandbox env |
+| Users or conversations disappear from a later weekly export | Older transcripts aged out of Dataverse, or the exports cover different windows | Confirm the retention period and coverage dates; do not treat rolling exports as cumulative history |
 | Power BI hangs or runs out of memory on load | Very large transcript file (>500 MB) | Apply a date filter at the Dataverse export step to narrow the window |
 | `Users by Organization` shows everyone as `(Blank)` | Org Data UPN column doesn't match transcripts | Confirm column is named `UserPrincipalName` and values are full UPNs (`user@contoso.com`) |
 | `Users by Country` chart shows "Something's wrong with one or more fields" | Org Data CSV missing the `Country` column | Add a `Country` column (can be empty), or download the latest `.pbit` from this repo |

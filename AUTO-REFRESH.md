@@ -45,6 +45,8 @@ The Dataverse Direct template connects the service **directly to your Dataverse 
 
 > 💡 Because the lookback filter runs on Dataverse, you can safely schedule frequent refreshes even on large environments — keep the window as narrow as your reporting needs allow.
 
+> ⚠️ **Scheduled refresh is not historical storage.** It re-queries Dataverse and therefore reflects only records still retained there. Extend Dataverse transcript retention for the reporting period you need; records deleted before a refresh cannot be restored by Power BI.
+
 ---
 
 ## Path B — CSV hosted on SharePoint / OneDrive

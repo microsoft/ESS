@@ -22,11 +22,12 @@ Blank, disabled, unrelated, or ambiguous Product Feedback identifiers never ente
 
 ## Before you start
 
-1. Download and unzip this repository.
-2. Create a customer-controlled folder such as `C:\AgentData`.
-3. Copy [`SampleData/agent-registry.csv`](SampleData/agent-registry.csv) into that folder.
-4. Rename the copy `agent-registry.csv`.
-5. Open the copied file in Excel or a text editor. It is safe to edit this file in Excel; do not open the raw conversation transcript CSV in Excel.
+1. [Download the complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) and select **Extract All**.
+2. Open the extracted `ESS-main` folder. Keep `tools/agent_registry.py` and `SampleData/agent-registry.csv` in their original locations.
+3. Create a customer-controlled folder such as `C:\AgentData`.
+4. Copy [`SampleData/agent-registry.csv`](SampleData/agent-registry.csv) into that folder.
+5. Rename the copy `agent-registry.csv`.
+6. Open the copied file in Excel or a text editor. It is safe to edit this file in Excel; do not open the raw conversation transcript CSV in Excel.
 
 You will replace the fabricated example values with your own agent identifiers.
 
@@ -143,7 +144,7 @@ Column rules:
 
 ## Step 7 - Build and validate the registry
 
-1. Open the unzipped ESS repository folder in File Explorer.
+1. Open the extracted `ESS-main` folder in File Explorer.
 2. Click the address bar, type `powershell`, and press **Enter**.
 3. Confirm Python:
 
