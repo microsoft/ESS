@@ -4,6 +4,16 @@
 
 Topic overrides apply to every agent included in the current report scope. For substantially different agent domains, use **Selected Agents** while reviewing candidates or maintain a shared taxonomy whose rules are valid across all included agents.
 
+## Download the tuner
+
+[Download the complete ESS package as a ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip), select **Extract All**, and run the commands in this guide from the extracted `ESS-main` folder. The package includes:
+
+- `tools/ess_topic_tuner.py`;
+- `tools/topic_classifier.py`; and
+- `taxonomy/topics-taxonomy.csv`.
+
+> Do not download `ess_topic_tuner.py` by itself. It imports the companion classifier and loads the shared taxonomy using repository-relative paths.
+
 ## What it produces
 
 | File | Purpose | Contains transcript text? |
@@ -20,7 +30,7 @@ Topic overrides apply to every agent included in the current report scope. For s
 
 You need:
 
-- the ESS repository downloaded and unzipped;
+- the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded and extracted;
 - a raw Dataverse `ConversationTranscript` CSV;
 - Python 3.10 or later; and
 - an approved customer-controlled output folder.
