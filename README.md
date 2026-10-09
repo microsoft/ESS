@@ -20,10 +20,107 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 
 ---
 
-> ### 🚀 New here? Start in 3 steps
-> **1.** [Pick your path](#quick-start--choose-your-path) → **2.** [Get your data and build the agent registry](#get-your-data-files) → **3.** Open the `.pbit`, provide the documented inputs, and validate the report.
+> ### 🚀 New here? Start in 4 steps
+> **1.** [Download all files](#download-the-complete-self-service-package) → **2.** [Choose your path](#choose-your-path) → **3.** Follow that path's setup guide → **4.** Build the required agent registry, open the matching `.pbit`, and validate the report.
 >
-> **Jump to:** [Choose your path](#quick-start--choose-your-path) · [Get your data files](#get-your-data-files) · [What you get](#what-you-get) · [Before you start](#before-you-start) · [Troubleshooting](#validation--troubleshooting) · [Full setup guides ↗](#quick-start--choose-your-path)
+> **Jump to:** [Download all files](#download-the-complete-self-service-package) · [Choose your path](#choose-your-path) · [Common prerequisites](#common-prerequisites) · [Get your data](#get-your-data-files) · [Troubleshooting](#validation--troubleshooting)
+
+---
+
+## Download the complete self-service package
+
+[**Download ESS Insights as a ZIP**](https://github.com/microsoft/ESS/archive/refs/heads/main.zip), select **Extract All**, and open the extracted `ESS-main` folder. Keep the folder structure intact.
+
+| Included content | Location |
+|---|---|
+| Power BI templates | Repository root (`*.pbit`) |
+| Customer-run Python tools | `tools/` |
+| Shared topic taxonomy | `taxonomy/` |
+| Fabric notebooks | `Fabric/notebooks/` |
+| Fabricated validation data | `SampleData/` |
+| Setup and troubleshooting guides | Repository root (`*.md`) |
+
+> Run every documented Python command from the extracted `ESS-main` folder. Do not download a Python entry-point file by itself: some tools import companion files or load repository-relative configuration.
+
+### Which local tools do I run?
+
+| Tool | When to use it | Customer output |
+|---|---|---|
+| [`tools/agent_registry.py`](AGENT-REGISTRY.md) | **Required** for every template path | Validated `agent-registry.json` for CSV/Dataverse, or validated registry CSV for Fabric |
+| [`tools/ess_topic_tuner.py`](TOPIC-TUNER.md) | Optional, when native and built-in topics leave important conversations uncategorized | Reviewed customer topic overrides |
+| [`tools/ess_feedback_normalizer.py`](FEEDBACK-INGESTION.md) | Optional, when loading Microsoft 365 Product Feedback or Monitor reaction exports | Agent-scoped feedback CSV/JSON plus an audit report |
+
+All three tools run locally with Python 3.10 or later and require no package installation.
+
+---
+
+## Choose your path
+
+All three paths use the same ESS reporting model and require an [agent registry](AGENT-REGISTRY.md). Choose how transcripts should reach the report and whether you need an independent historical store.
+
+<table>
+<tr>
+<td width="33%" valign="top">
+
+### 🟢 Evaluate or share a snapshot
+**CSV Upload**
+
+Best for a first evaluation, a one-time export, an offline copy, or sharing a controlled snapshot. You manually export `ConversationTranscript` again whenever you want newer data.
+
+➡️ **[Start with CSV Upload](SETUP-CSV-Download.md)**
+
+</td>
+<td width="33%" valign="top">
+
+### 🔵 Monitor one environment
+**Dataverse Direct — recommended**
+
+Best production default for one supported Dataverse environment. Power BI connects cloud-to-cloud and can refresh on a schedule without a gateway.
+
+Extend Dataverse retention for the reporting period you need; report refresh does not archive deleted records.
+
+➡️ **[Start with Dataverse Direct](SETUP-Dataverse.md)**
+
+</td>
+<td width="33%" valign="top">
+
+### 🟣 Preserve or consolidate at scale
+**Fabric Lakehouse — advanced**
+
+Use when you need independently governed history, multiple Dataverse environments in one report, very large-scale ingestion, or Lakehouse-based credit analytics.
+
+Fabric preserves only records ingested before Dataverse deletes them and requires more administration.
+
+➡️ **[Start with Fabric Lakehouse](SETUP-Fabric.md)**
+
+</td>
+</tr>
+</table>
+
+> 🧪 **Just exploring?** Start with **CSV Upload** and the fabricated files in [`SampleData`](SampleData/). No customer data is required.
+
+<details>
+<summary><strong>Compare all three paths</strong></summary>
+
+| | 🟢 **CSV Upload** | 🔵 **Dataverse Direct** | 🟣 **Fabric Lakehouse** |
+|---|---|---|---|
+| **Best for** | Evaluation, snapshots, demos, controlled sharing | Ongoing production reporting for one environment | Durable governed history, multiple environments, or very large scale |
+| **How transcripts load** | Manual Dataverse CSV export | Native Power BI Dataverse connector | Scheduled notebook writes Delta tables |
+| **Typical setup** | 20–30 minutes | 15–25 minutes | 30–60+ minutes plus administrator setup |
+| **Refresh** | Replace the CSV and refresh | Schedule Power BI refresh | Schedule notebook ingestion, then semantic-model refresh |
+| **Power BI gateway** | None for SharePoint/OneDrive; required for local or network paths | None | None for the Lakehouse SQL analytics endpoint |
+| **Primary access** | Dataverse transcript read/export access | Bot Transcript Viewer | Fabric access plus a Dataverse application user |
+| **Historical behavior** | Snapshot contains only records retained when exported | Queries only records still retained in Dataverse | Merge preserves records already ingested into Delta |
+| **Template** | `ESS Dashboard - Dynamic Topics (CSV) V18.pbit` | `ESS Dashboard - Dynamic Topics (Dataverse) V19.pbit` | `ESS - Fabric V2.pbit` |
+
+</details>
+
+### After you choose
+
+1. Follow the selected setup guide above.
+2. Complete the required [agent registry](AGENT-REGISTRY.md) before loading customer data.
+3. Add [private topic overrides](TOPIC-TUNER.md) only when native and built-in topics leave important conversations uncategorized.
+4. Add [Microsoft 365 feedback](FEEDBACK-INGESTION.md) only when cross-channel reactions are needed.
 
 ---
 
@@ -113,11 +210,12 @@ The built-in taxonomy is intentionally conservative. Auto-discovered Fabric labe
 
 ---
 
-## Before you start
+## Common prerequisites
 
-Quick checklist — confirm all four before your working session. Click each item for details.
+Confirm the common requirements below before following the guide for your selected path. Fabric has additional prerequisites in its own guide.
 
 - [ ] **Power BI Desktop installed** (Windows) — [details ↓](#1-power-bi-desktop-installed)
+- [ ] **Complete ESS package downloaded and extracted** — [download ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip)
 - [ ] **Python 3.10 or later installed** for the local registry, feedback, and optional topic tools — [download Python](https://www.python.org/downloads/windows/)
 - [ ] **Bot Transcript Viewer** role assigned (minimum) on the agent's Dataverse environment — [details ↓](#data-inputs)
 - [ ] **Agent environment is Production, Sandbox, or Default** *(not Teams or M365 Copilot)* — [details ↓](#2-supported-environment-types)
@@ -135,7 +233,7 @@ Quick checklist — confirm all four before your working session. Click each ite
 ### 1. Power BI Desktop installed
 
 - **Required.** The `.pbit` template opens in Power BI Desktop on **Windows only**. Mac users need a Windows VM or Parallels.
-- **Download:** [Download PowerBI for free](https://www.microsoft.com/en-us/download/details.aspx?id=58494&msockid=2488193a4d40616c33750f9a4c3760f0)(Download PBI) (free) or install from the Microsoft Store.
+- **Download:** [Download Power BI Desktop](https://www.microsoft.com/en-us/download/details.aspx?id=58494) (free) or install it from the Microsoft Store.
 - **Version:** Any release from the last 6 months. The template uses standard connectors only.
 
 ### 2. Supported environment types
@@ -206,51 +304,11 @@ By default, Dataverse **automatically deletes conversation transcripts after 30 
 
 ---
 
-## Quick start — choose your path
-
-This dashboard ships in **two flavors**. Pick the one that matches how you want to refresh your data:
-
-| | 📄 **CSV Upload** | 🔌 **Dataverse Direct** |
-|---|---|---|
-| **How it loads data** | You export `ConversationTranscript` to CSV, then point the template at the file | The template connects live to your Dataverse environment via the native Power BI connector |
-| **First setup time** | ~20–30 min | ~15–25 min |
-| **Refresh** | Re-export the CSV, drop it at the same path, click Refresh | One click — pulls live from Dataverse |
-| **Power BI Service refresh** | **No Gateway** if the CSV is hosted on SharePoint/OneDrive; local/network paths need a Gateway | **No Gateway** — cloud-to-cloud |
-| **Who can run it** | Anyone who can run the Dataverse export | Anyone with the **Bot Transcript Viewer** role on the environment |
-| **Lookback control** | Whatever the export window allows (default 30 days) | Parameter — pull 30 / 90 / 365 days at will |
-| **Best for** | One-off snapshots, demos, sharing with people outside the tenant | Production dashboards, scheduled refresh, ongoing monitoring |
-| **Get the template** | [`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) | [`ESS Dashboard - Dynamic Topics (Dataverse) V19.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V19.pbit) |
-| **Setup guide** | 📘 **[Written Setup Guide — CSV Upload](./SETUP-CSV-Download.md)** | 📘 **[Written Setup Guide — Dataverse Direct](./SETUP-Dataverse.md)** |
-
-> 💡 **Not sure?** If this is your first time exploring the dashboard, start with **CSV Upload**. The setup guide walks through the transcript export, required agent registry, optional topic tuning, and optional Microsoft 365 Product Feedback. Move to **Dataverse Direct** once you're ready for scheduled transcript refresh.
-
-> 🔄 **Want it to update itself?** See **[Set up automatic (scheduled) refresh ↗](AUTO-REFRESH.md)** — gateway‑free for Dataverse Direct and for SharePoint/OneDrive‑hosted CSVs.
-
-### 🧱 Need more than CSV or Dataverse Direct? — Fabric Auto-Refresh (add-on)
-
-Not a third default choice — an optional add-on for teams that have outgrown the two paths above. Use it only if: you're consolidating **multiple Dataverse environments** into one dashboard, you're hitting **refresh limits at very large scale**, or you want **built-in Copilot credit-consumption analytics** and automatic offline topic identification.
-
-| | 🧱 **Fabric Auto-Refresh** |
-|---|---|
-| **How it loads data** | Notebooks land conversation data into a Fabric Lakehouse; the supplied template imports it through the Lakehouse SQL analytics endpoint |
-| **Setup time** | Meaningfully longer than either path above, first time through — realistically **30–60+ minutes of hands-on work**: create/configure the Fabric workspace and Lakehouse, import/configure the notebooks, land the three [Power Platform admin center](https://admin.powerplatform.microsoft.com) exports, and run the initial ingestion. Transcript ingestion can be scheduled later; credit refresh remains manual unless you separately implement and validate an export-landing pipeline |
-| **Refresh** | Transcript ingestion can be scheduled. Credit exports must first be landed under `Files/credit_consumption`; manual upload works now, while automated landing is an architecture option (no flow is included in this repo) |
-| **Power BI Service refresh** | The supplied template uses **Import mode through the Lakehouse SQL analytics endpoint**. Schedule semantic-model refresh after the notebooks run; no on-premises gateway is required. This template does not offer selectable Direct Lake or DirectQuery modes |
-| **Who can run it** | A higher bar than the other two paths: Fabric workspace access with permission to create/run notebooks and create a Lakehouse, **plus** — for the live Dataverse pull this path is built around — an Entra app registration added as a Dataverse **Application User** with Read access on Conversation Transcript in every environment being ingested. Setting that up typically needs an Entra or Dataverse admin, not just the report owner |
-| **Lookback control** | A `LOOKBACK_DAYS` parameter in the transcript-parser CONFIG cell (default `7`; `0` = full history). The default `WRITE_MODE = 'merge'` safely preserves older history. `overwrite` is allowed only with `LOOKBACK_DAYS = 0` for an intentional full snapshot |
-| **Best for** | Consolidating **multiple Dataverse environments** into one dashboard, refresh performance at **very large scale** where live Dataverse queries run slow or time out, or wanting **Copilot credit-consumption analytics** and automatic topic identification; credit-file landing is manual unless you add automation |
-| **Get the template** | [`ESS - Fabric V2.pbit`](./ESS%20-%20Fabric%20V2.pbit) |
-| **Setup guide** | 📘 **[Written Setup Guide — Fabric](./SETUP-Fabric.md)** |
-
-> Most customers should keep using CSV Upload or Dataverse Direct above. See **[SETUP-Fabric.md](./SETUP-Fabric.md)** for the full "is this path right for you?" checklist before starting.
-
----
-
 ## Get your data files
 
 **This is the part most people ask about: where do I actually go to get each file?** Below is the exact click-path for every input, and which template needs it. Each row links to the full step-by-step (with every menu spelled out) in the setup guide for your path.
 
-> 📌 **The only difference between the two templates:** the **CSV Upload** template needs a **transcript CSV** you export yourself; the **Dataverse Direct** template pulls transcripts **live** and only needs your **environment URL**. Org Data and the Power Platform admin center User-Level Credit Consumption input work with both.
+> 📌 **CSV versus Dataverse Direct:** CSV Upload needs a transcript file you export yourself; Dataverse Direct needs the environment URL and pulls retained transcripts through the native connector. Both accept the same Org Data, agent registry, feedback, and User-Level Credit Consumption inputs. Fabric uses the separate Lakehouse inputs listed below.
 
 ### 📄 CSV Upload — get these files
 
@@ -272,15 +330,15 @@ Not a third default choice — an optional add-on for teams that have outgrown t
 | 3 | **Copilot Credits** | Optional | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → **Licensing ▸ Copilot Studio ▸ Summary ▸ Download report ▸ User-Level Credit Consumption**; select **30 days** | [📘 Dataverse guide — Step 3](./SETUP-Dataverse.md) |
 | 4 | **Normalized feedback events** | Optional | [admin.microsoft.com](https://admin.microsoft.com) → **Health ▸ Product feedback ▸ Export to CSV**, then filter it locally with the agent registry and `tools/ess_feedback_normalizer.py` | [📘 Feedback guide — exact export and load steps](./FEEDBACK-INGESTION.md) |
 
-### 🧱 Fabric Auto-Refresh — get these files
+### 🧱 Fabric Lakehouse — get these files
 
 > 💡 **New to Fabric?** A **Fabric workspace** is just a project folder in the Power BI/Fabric service. A **Lakehouse** is a storage location inside that workspace where the notebooks below will save your conversation data. A **notebook** is a small, pre-written program — you don't need to know how to code to run it, just how to click "Run all cells."
 
 | # | File | Required? | Where to get it | Full steps |
 |---|---|---|---|---|
-| 1 | **`ESS - Fabric V2.pbit`** (the dashboard template) | ✅ **Required** | Download from this repo's root folder | [📘 Fabric guide — Step 1](./SETUP-Fabric.md) |
-| 2 | **`Copilot_Agent_Transcript_Parser.ipynb`** (notebook — parses conversation transcripts) | ✅ **Required** | Download from [`Fabric/notebooks/`](./Fabric/notebooks/) in this repo | [📘 Fabric guide — Step 1](./SETUP-Fabric.md) |
-| 3 | **`Copilot_Credit_Consumption_Ingester.ipynb`** (notebook — ingests Copilot credit usage) | Optional | Download from [`Fabric/notebooks/`](./Fabric/notebooks/) in this repo | [📘 Fabric guide — Step 1](./SETUP-Fabric.md) |
+| 1 | **`ESS - Fabric V2.pbit`** (the dashboard template) | ✅ **Required** | Included in the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) root | [📘 Fabric guide — Step 1](./SETUP-Fabric.md) |
+| 2 | **`Copilot_Agent_Transcript_Parser.ipynb`** (notebook — parses conversation transcripts) | ✅ **Required** | Included under `Fabric/notebooks/` | [📘 Fabric guide — Step 1](./SETUP-Fabric.md) |
+| 3 | **`Copilot_Credit_Consumption_Ingester.ipynb`** (notebook — ingests Copilot credit usage) | Optional | Included under `Fabric/notebooks/` | [📘 Fabric guide — Step 1](./SETUP-Fabric.md) |
 | 4 | **A Fabric workspace with a Lakehouse** | ✅ **Required** | Create one in the [Microsoft Fabric portal](https://app.fabric.microsoft.com/) — a trial capacity is enough to evaluate | [📘 Fabric guide — Before you start](./SETUP-Fabric.md#before-you-start) |
 | 5 | **Normalized feedback events** | Optional | Export Microsoft 365 **Health ▸ Product feedback**, filter it locally with the agent registry, and upload the prepared CSV to `Files/feedback` | [📘 Feedback guide — exact export and load steps](./FEEDBACK-INGESTION.md) |
 
@@ -310,10 +368,10 @@ Credit fields are decimal values (for example, `113.89`), and live `Agent Id` va
 
 The Power Platform admin center exports provide observed credits at environment-day, agent-window, and user-agent-window grain. They provide no conversation/session ID, so credits can be matched to ESS by bare `Agent Id` and, where present, normalized `User Email`, but not observed per conversation, resolved conversation, topic, or outcome. For modeled analysis, preserve the exported aggregate as the control total, place blank-email rows in an unmatched bucket, and allocate each user-agent snapshot across in-scope resolved conversations using a documented rule (for example equal share, or proportional transcript diagnostic cost). Reconcile allocated values back to each exported control total and label every conversation/topic/outcome value **modeled allocation**, never billing-observed.
 
-**Next:** complete the [agent registry guide](AGENT-REGISTRY.md), download the matching `.pbit` from [Choose your path](#quick-start--choose-your-path), and follow that template's setup guide. Do not use the fabricated sample registry with customer data.
+**Next:** complete the [agent registry guide](AGENT-REGISTRY.md), open the matching `.pbit` from the extracted package, and follow the setup guide linked under [Choose your path](#choose-your-path). Do not use the fabricated sample registry with customer data.
 → **[Full CSV setup guide](./SETUP-CSV-Download.md)** · **[Full Dataverse setup guide](./SETUP-Dataverse.md)** · **[Full Fabric setup guide](./SETUP-Fabric.md)**
 
-> 🔑 **Can't find the ConversationTranscript table, or transcripts come back empty?** You're almost certainly missing the **Bot Transcript Viewer** security role (Environment Maker is *not* enough), or your agent runs in an unsupported environment (Teams / M365 Copilot). See [Before you start](#before-you-start) and [Prerequisites — details](#prerequisites--details).
+> 🔑 **Can't find the ConversationTranscript table, or transcripts come back empty?** You're almost certainly missing the **Bot Transcript Viewer** security role (Environment Maker is *not* enough), or your agent runs in an unsupported environment (Teams / M365 Copilot). See [Common prerequisites](#common-prerequisites) and [Prerequisites — details](#prerequisites--details).
 
 ---
 

@@ -19,7 +19,7 @@ Microsoft documentation:
 
 You need:
 
-- the ESS repository downloaded and unzipped;
+- the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded and extracted;
 - Python 3.10 or later;
 - an administrator or reader account that can open **Product feedback** in the Microsoft 365 admin center;
 - `agent-registry.csv` with the ESS agent's `M365Title` alias; and
@@ -29,9 +29,11 @@ All Microsoft 365 administrators and readers can view and export Product feedbac
 
 > The export can contain comments, prompts, responses, user identifiers, and diagnostics. Store it only in an approved customer-controlled location. The preparation script runs locally and makes no network calls.
 
+> Keep the package structure intact and run the command from the extracted `ESS-main` folder. Do not download `ess_feedback_normalizer.py` by itself; it imports `tools/agent_registry.py`.
+
 ## Step 1 - Confirm Python
 
-1. Open the unzipped ESS repository folder in File Explorer.
+1. Open the extracted `ESS-main` folder in File Explorer.
 2. Click the address bar, type `powershell`, and press **Enter**. A PowerShell window opens in the correct folder.
 3. Run:
 

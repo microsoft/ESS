@@ -2,12 +2,15 @@
 
 Get the **ESS Insights dashboard** running on your own Copilot Studio agent data, connected directly to Dataverse. Allow about **15–25 minutes** for the first setup.
 
-> 💡 **Which version is this?** This is the **Dataverse Direct** template. It pulls `conversationtranscript` rows straight from the Dataverse environment that hosts your agent. If you'd rather work with a one-time CSV export, use the [CSV Upload guide](./SETUP-CSV-Download.md) instead.
+> **Choose this path for:** ongoing production reporting from one supported Dataverse environment. This is the recommended default when you want scheduled refresh without Fabric. For a one-time snapshot, use [CSV Upload](SETUP-CSV-Download.md). [Compare all paths](README.md#choose-your-path).
+
+> ⚠️ Extend Dataverse transcript retention to the history period you need; the report lookback parameter cannot restore records that Dataverse has deleted.
 
 ---
 
 ## Before you start
 
+✅ The [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded, extracted, and kept in its original folder structure
 ✅ **Power BI Desktop** installed — [download free](https://powerbi.microsoft.com/desktop/)
 ✅ **Python 3.10 or later** installed — used by the local registry tool and optional feedback/topic tools; no packages are required
 ✅ **Bot Transcript Viewer** security role on the Dataverse environment that hosts your ESS agent — an admin must grant this. [Microsoft's how-to](https://learn.microsoft.com/en-us/microsoft-copilot-studio/admin-share-bots#assign-the-bot-transcript-viewer-security-role-during-agent-sharing)
@@ -85,11 +88,11 @@ Do not load the raw Microsoft 365 export directly or infer ESS from `App = M365 
 
 ---
 
-## Step 4 — Download & open the template
+## Step 4 — Build the registry and open the included template
 
 1. Follow [Agent registry and reporting scope](AGENT-REGISTRY.md) to find the agent ID, create `agent-registry.csv`, and generate `agent-registry.json`.
-2. In this repo, click **[`ESS Dashboard - Dynamic Topics (Dataverse) V19.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V19.pbit)** → **Download raw file**.
-3. Double-click the downloaded `.pbit` — it opens in Power BI Desktop and shows a parameter prompt.
+2. Open the extracted `ESS-main` folder.
+3. Double-click **`ESS Dashboard - Dynamic Topics (Dataverse) V19.pbit`**. It opens in Power BI Desktop and shows a parameter prompt.
 
 ---
 
@@ -98,7 +101,7 @@ Do not load the raw Microsoft 365 export directly or infer ESS from `App = M365 
 | Parameter | Required? | Example value |
 |---|---|---|
 | **Dataverse Environment URL** | ✅ Yes | `https://orgabc12345.crm.dynamics.com` |
-| **Transcript Lookback Days** | Optional — leave blank for 90 | `30`, `60`, `180` |
+| **Transcript Lookback Days** | Optional — leave blank for 90; limited to retained Dataverse rows | `30`, `60`, `180` |
 | **Org Data File** | ⭐ Recommended | `/Users/<you>/Documents/AgentData/OrgData.csv` |
 | **Agent Credits  (optional)** | Optional | `C:\Users\<you>\Documents\AgentData\EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv` |
 | **Agent Scope Mode** | ✅ Yes | `ESS Safe` (default), `Selected Agents`, or `All Agents` |
@@ -120,6 +123,8 @@ For the smallest working configuration, provide:
 Leave Org Data, credits, topic overrides, and feedback blank for the first load. Sign in to Dataverse, confirm **Total Conversations** is non-zero, then add optional inputs one at a time.
 
 > 💡 **Lookback Days** controls how far back the connector pulls transcripts. The filter runs **server-side** on Dataverse, so a smaller window = faster refresh. Default is 90 days.
+
+> ⚠️ **Lookback is not retention.** Entering `90`, `180`, or `365` does not recover transcripts already removed by the Dataverse retention job. Confirm and extend retention before the required history ages out.
 
 > 💡 **Agent scope.** `ESS Safe` includes only enabled registry agents marked as ESS. `Selected Agents` uses the registry's `Selected` flag. `All Agents` explicitly includes every transcript agent while Product Feedback remains registry-mapped. Generate the JSON from the customer-controlled CSV as described in [Agent registry and reporting scope](AGENT-REGISTRY.md).
 
@@ -186,7 +191,7 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 | 2 | Export HR roster (optional) | M365 Admin Center | 2 min |
 | 3 | Download 30-day User-Level Credit Consumption CSV (optional) | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → Licensing → Copilot Studio → Summary → Download report | 2 min |
 | 4 | Export and prepare Microsoft 365 Product Feedback (optional) | Microsoft 365 admin center → Health → Product feedback | 5–10 min |
-| 5 | Download & open `.pbit` | This repo | 1 min |
+| 5 | Open the included `.pbit` | Extracted `ESS-main` folder | 1 min |
 | 6 | Paste environment URL, registry, and optional JSON into the prompt | Power BI Desktop | 1 min |
 | 7 | Sign in to Dataverse | Authentication dialog | 1 min |
 | 8 | Validate conversations, users, and optional feedback | Report pages | 2 min |
@@ -201,6 +206,7 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 | `We couldn't authenticate with the credentials provided` | Account lacks Bot Transcript Viewer, or wrong env URL | Confirm role in Power Platform Admin Center → environment → Settings → Users + permissions → Security roles |
 | `The remote name could not be resolved` / `Invalid URL` | Trailing slash or typo | Re-copy from Power Apps → ⚙️ → Session details |
 | Refresh succeeds but **Total Conversations = 0** | Teams/Developer/M365 Copilot env (transcripts not written), or empty lookback | Move agent to a standard production/sandbox Dataverse env; widen Lookback Days |
+| Users or conversations disappear between weekly exports | Older transcripts aged out of Dataverse, or exports used different windows | Confirm the configured retention period and compare the same retained date range; extend retention prospectively |
 | Refresh is very slow (5+ min) | Lookback too wide | Lower Lookback Days |
 | `Users by Organization` all `(Blank)` | Org Data UPN doesn't match transcripts | Confirm `UserPrincipalName` column with full UPNs |
 | `Access to the resource is forbidden` | Account lacks Dataverse read access | Grant **Bot Transcript Viewer** in the target environment; Power Platform Administrator or Environment Maker alone is insufficient |
@@ -218,9 +224,9 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 |---|---|---|
 | Setup time | ~10 min | ~5 min |
 | Refresh | Re-export CSV, drop at path, click Refresh | One click — Refresh pulls live |
-| Service refresh | Needs **Gateway** | **No Gateway** — cloud-to-cloud |
+| Service refresh | No gateway when hosted on SharePoint/OneDrive; local paths need a gateway | **No Gateway** — cloud-to-cloud |
 | Tenant access | Anyone who can run the export | Bot Transcript Viewer on the env |
-| Lookback control | Whatever the export window allows (default 30 days) | Parameter — pull 30 / 90 / 365 at will |
+| Lookback control | Whatever the export and retention window still contain | Parameter queries available Dataverse rows; it does not override retention |
 | Best for | One-off snapshots, demos, sharing outside tenant | Production dashboards, scheduled refresh |
 
 ---

@@ -121,6 +121,7 @@ Run `Copilot_Agent_Transcript_Parser.ipynb`. The notebook reads only rows where 
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| `python: can't open file 'tools\ess_topic_tuner.py'` | PowerShell is open in the wrong folder, or only the script was downloaded | Open PowerShell from the extracted `ESS-main` folder and keep the complete package structure intact |
 | PowerShell says `python` is not recognized | Python is not installed or not on PATH | Install Python 3.10+ with **Add Python to PATH**, then reopen PowerShell |
 | `Input file not found` | The transcript path is incomplete or mistyped | In File Explorer, Shift+right-click the file and select **Copy as path**, then paste that path after `--input` |
 | No candidate rules are produced | Repeated terms did not meet `--min-frequency`, or conversations already have native/derived topics | Review the privacy report; if appropriate, rerun with a lower value such as `3` |
