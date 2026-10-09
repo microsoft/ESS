@@ -1,0 +1,74 @@
+Locale,Vertical,CanonicalTopic,Keywords,Exclusions,Priority
+*,ESS Agent,Agent Help & Capabilities,employee self-service agent|employee self service|self-service agent|what can you do|how do you work|example prompts|agent capabilities,,95
+*,IT,IT Ticketing & Incidents,it ticket|support ticket|service ticket|ticket|tickets|incident|incidents|service desk|help desk|helpdesk|servicenow|service now|open tickets|my tickets,,95
+*,IT,Accounts & Password,password|passkey|password reset|reset my password|unlock account|locked out|mfa|multi-factor authentication|authenticator|sign in|signin|login|credentials,,90
+*,IT,Access & Permissions,request access|grant access|permissions|permission|admin rights|security group|distribution group|shared drive access|application access,,86
+*,IT,Enterprise Apps & Systems,workday|concur|sap|oracle|ariba|virtual desktop|power platform|copilot studio|enterprise application,,82
+*,IT,Software & Downloads,software|application install|install application|install software|software license|application license|download software|microsoft 365|office 365|adobe|docusign,,78
+*,IT,Device & Hardware,laptop|desktop computer|computer replacement|monitor|printer|keyboard|mouse|headset|webcam|hardware|company phone|mobile device|intune|company portal,,80
+*,IT,Network & Connectivity,vpn|wifi|wi-fi|network connection|internet connection|proxy|remote access|network outage|connectivity,,80
+*,IT,Productivity How-To,excel help|in excel|freeze panes|taskbar|write an email|format a document|microsoft office help,,60
+*,HR,Benefits & Retirement,benefits|health insurance|medical plan|dental plan|vision plan|insurance coverage|401k|pension|hsa|fsa|open enrollment|beneficiary|cobra,,90
+*,HR,Disability & Leave of Absence,short term disability|long term disability|leave of absence|fmla|workers compensation|workers comp|jury duty|bereavement leave,,88
+*,HR,Payroll & Compensation,payroll|paycheck|pay date|payday|salary|direct deposit|w-2|w2|paystub|pay stub|compensation|bonus|tax withholding,,88
+*,HR,Time Off & Attendance,pto|vacation|holiday|sick day|sick leave|time off|annual leave|attendance|timesheet|time sheet|time entry|parental leave|maternity leave|paternity leave,,86
+*,HR,Policy & Handbook,hr policy|employee policy|handbook|code of conduct|remote work policy|dress code|employment verification|company policy,,74
+*,HR,Onboarding & Offboarding,onboarding|new hire|orientation|first day|offboarding|resignation|last day|exit process|termination process,,80
+*,HR,Learning & Development,training|course|learning|mentorship|tuition reimbursement|education reimbursement|professional development|certification program,,72
+*,HR,Recruiting & Referrals,employee referral|job posting|open position|recruiting|resume|candidate|hiring process,,68
+*,Facilities,Building & Access,building access|badge access|door access|access card|security pass|visitor access|office entry|turnstile,,84
+*,Facilities,Room & Desk Booking,book a room|reserve a room|meeting room|conference room|desk booking|hot desk|workspace reservation|parking reservation,,80
+*,Facilities,Maintenance & Repair,facilities maintenance|maintenance request|facility repair|broken equipment|leak|hvac|heating|cooling|lighting|plumbing|cleaning request,,76
+*,Facilities,Office Info & Locations,office address|office location|office hours|office amenities|cafeteria|mail room|directions to the office|corporate address,,68
+*,Facilities,"Health, Safety & Field",health and safety|workplace safety|field safety|safety guidance|emergency action plan|tick bite|ticks|mosquito|repellent|sunscreen|uv protection|thunderstorm|ppe|personal protective equipment|workplace injury,ticket|tickets,92
+*,Finance,Project & Billing Codes,billing code|charge code|project code|phase and task|rate code|rate sheet|project cost|billing category,,78
+*,Finance,Expenses & Reimbursement,expense|expenses|expense report|reimbursement|receipt|mileage|corporate card|company credit card|per diem,,86
+*,Finance,Procurement & Vendors,procurement|purchase order|purchase orders|po|ariba|vendor|supplier|requisition|purchasing|invoice approval,,88
+*,Finance,Travel,travel booking|travel policy|business travel|flight|hotel booking|rental car|itinerary|per diem|visa,,76
+*,Finance,Accounting & Tax,accounting|tax form|w-9|w9|invoice|accounts payable|accounts receivable|certificate of insurance,,70
+*,Legal,Contracts & Agreements,contract|agreement|nda|confidentiality agreement|clause|change order|proposal review|signature request,,80
+*,Legal,Insurance & Certifications,professional liability|additional insured|liability policy|certificate of insurance|state certification|licensed to work,,74
+*,Legal,Compliance & Ethics,anti-corruption|ethics|code of conduct|compliance|legal hold|governance|conflict of interest,,72
+*,Knowledge,Org Chart & Directory,org chart|organization chart|reports to|who reports|direct report|leadership team|contact for|who do i contact|department leader|business partner,,66
+*,Knowledge,Company Records & Data,company records|file storage|legacy data|legacy file|where is the data|upload documents|document repository|resume template|project writeup,,64
+*,Knowledge,Definitions & Abbreviations,stand for|abbreviation|definition|what does this mean|what is the meaning,,45
+*,General,Greeting & Smalltalk,hello|hi there|good morning|good afternoon|good evening|thank you|thanks|goodbye|how are you,,10
+*,General,Agent Handoff & Escalation,live agent|human agent|talk to someone|representative|escalate|transfer me|speak to a person,,70
+es,IT,IT Ticketing & Incidents,ticket de soporte|tickets de soporte|incidente|incidentes|mesa de ayuda|service desk|mis tickets|ticket abierto,,95
+es,IT,Accounts & Password,contraseña|restablecer contraseña|reiniciar contraseña|cuenta bloqueada|autenticador|iniciar sesión|mfa,,90
+es,IT,Access & Permissions,solicitar acceso|conceder acceso|permisos|derechos de administrador|grupo de seguridad,,86
+es,IT,Device & Hardware,portátil|computadora|ordenador|monitor|impresora|teclado|ratón|auriculares|cámara web|hardware,,80
+es,IT,Network & Connectivity,vpn|wifi|red corporativa|conexión a internet|acceso remoto|problema de red,,80
+es,HR,Benefits & Retirement,beneficios|seguro médico|seguro dental|plan médico|pensión|inscripción abierta,,90
+es,HR,Payroll & Compensation,nómina|salario|pago|cheque de pago|depósito directo|compensación|bonificación,,88
+es,HR,Time Off & Attendance,vacaciones|días libres|permiso|baja por enfermedad|tiempo libre|asistencia|hoja de horas|licencia parental,,86
+es,HR,Policy & Handbook,política de recursos humanos|manual del empleado|código de conducta|política de trabajo remoto,,74
+es,HR,Onboarding & Offboarding,incorporación|nuevo empleado|primer día|orientación|salida de empleado|renuncia,,80
+es,Facilities,Building & Access,acceso al edificio|tarjeta de acceso|credencial|acceso a la oficina|visitante,,84
+es,Facilities,Room & Desk Booking,reservar una sala|sala de reuniones|sala de conferencias|reservar escritorio|espacio de trabajo,,80
+es,Facilities,"Health, Safety & Field",salud y seguridad|seguridad laboral|seguridad en campo|equipo de protección personal|epp|plan de emergencia|lesión laboral,ticket|tickets,92
+es,Finance,Expenses & Reimbursement,gasto|gastos|informe de gastos|reembolso|recibo|kilometraje|tarjeta corporativa,,86
+es,Finance,Procurement & Vendors,compras|orden de compra|órdenes de compra|proveedor|requisición|ariba|po,,88
+es,Finance,Travel,viaje de negocios|reserva de viaje|vuelo|hotel|coche de alquiler|itinerario|visa,,76
+es,Legal,Contracts & Agreements,contrato|acuerdo|acuerdo de confidencialidad|cláusula|firma,,80
+es,General,Greeting & Smalltalk,hola|buenos días|buenas tardes|buenas noches|gracias|adiós,,10
+es,General,Agent Handoff & Escalation,agente humano|hablar con una persona|representante|escalar|transferir,,70
+zh,IT,IT Ticketing & Incidents,工单|支持工单|服务工单|事件|帮助台|服务台,,95
+zh,IT,Accounts & Password,密码|重置密码|忘记密码|账户锁定|身份验证器|登录|多重身份验证,,90
+zh,IT,Access & Permissions,申请访问权限|授予访问权限|权限|管理员权限|安全组,,86
+zh,IT,Device & Hardware,笔记本电脑|台式电脑|显示器|打印机|键盘|鼠标|耳机|摄像头|硬件|公司手机,,80
+zh,IT,Network & Connectivity,虚拟专用网络|无线网络|公司网络|互联网连接|远程访问|网络中断,,80
+zh,HR,Benefits & Retirement,员工福利|医疗保险|牙科保险|养老金|开放注册|保险范围,,90
+zh,HR,Payroll & Compensation,工资单|薪资|发薪日|工资|直接存款|奖金|薪酬,,88
+zh,HR,Time Off & Attendance,年假|休假|病假|请假|休息日|考勤|工时表|育儿假,,86
+zh,HR,Policy & Handbook,人力资源政策|员工手册|行为准则|远程工作政策|公司政策,,74
+zh,HR,Onboarding & Offboarding,入职|新员工|第一天|员工离职|辞职|离职流程,,80
+zh,Facilities,Building & Access,大楼门禁|门禁卡|工牌|办公室门禁|访客通行,,84
+zh,Facilities,Room & Desk Booking,预订会议室|会议室|预订工位|共享工位|工作区预订,,80
+zh,Facilities,"Health, Safety & Field",健康与安全|工作场所安全|现场安全|个人防护装备|安全指南|应急行动计划|工伤,,92
+zh,Finance,Expenses & Reimbursement,费用|报销|费用报销|收据|里程|公司卡|差旅补贴,,86
+zh,Finance,Procurement & Vendors,采购|采购订单|供应商|请购单|订单审批|ariba|po,,88
+zh,Finance,Travel,商务旅行|差旅预订|航班|酒店预订|租车|行程|签证,,76
+zh,Legal,Contracts & Agreements,合同|协议|保密协议|条款|签名,,80
+zh,General,Greeting & Smalltalk,你好|早上好|下午好|晚上好|谢谢|再见,,10
+zh,General,Agent Handoff & Escalation,人工客服|转人工|与真人交谈|代表|升级处理,,70

@@ -1,12 +1,13 @@
 # Step-by-Step Setup Guide
 
-Get the **ESS Insights dashboard** running on your own Copilot Studio agent data in about **10 minutes**.
+Get the **ESS Insights dashboard** running on your own Copilot Studio agent data. Allow about **20–30 minutes** for the first setup; later transcript refreshes are much faster.
 
 ---
 
 ## Before you start
 
 ✅ **Power BI Desktop** installed — [download free](https://powerbi.microsoft.com/desktop/)
+✅ **Python 3.10 or later** installed — used by the local registry tool and optional feedback/topic tools; no packages are required
 ✅ **Bot Transcript Viewer** security role on the Dataverse environment that hosts your ESS agent — an admin must grant this. [Microsoft's how-to](https://learn.microsoft.com/en-us/microsoft-copilot-studio/admin-share-bots#assign-the-bot-transcript-viewer-security-role-during-agent-sharing)
 ✅ A folder you'll use to store the CSVs (e.g. `Documents/AgentData`)
 
@@ -94,15 +95,32 @@ For a 30-day lookback the generated names are `EntitlementConsumptionTenantDetai
 
 > CSV V18 matches credits to ESS by `Agent Id` and joins organization data through `User Email`. The Power Platform admin center export has no conversation ID, so cost per resolved conversation, net value, and ROI are labeled modeled allocations.
 
+### Optional — Include Microsoft 365 Copilot feedback
+
+Use this when employees access the Copilot Studio agent from Microsoft 365 Copilot and you want those thumbs-up/down reactions in the report.
+
+1. Complete the [agent registry guide](AGENT-REGISTRY.md), including the agent's `M365Title` (`T_...`) alias.
+2. In the [Microsoft 365 admin center](https://admin.microsoft.com), select **Health → Product feedback → Export to CSV**. The download is tenant-wide, even if the page is filtered.
+3. Run the local preparation command in [Microsoft 365 Copilot feedback: export, prepare, and load](FEEDBACK-INGESTION.md). It filters the tenant export to approved registry agents and creates `feedback-events.json`.
+4. Review `feedback-events.audit.json`; do not continue if the expected ESS row is missing.
+5. In Step 5 below, paste the complete contents of `feedback-events.json` into **Feedback Events JSON (optional)**.
+
+Do not load the raw Microsoft 365 export directly. Rows with blank Agent ID cannot be safely attributed to ESS and are excluded.
+
 ---
 
 ## Step 4 — Download & open the template
 
-1. **Download the .pbit**
-   - In this repo, click **[`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20(CSV)%20V18.pbit)**
+1. **Build the required agent registry**
+   - Follow [Agent registry and reporting scope](AGENT-REGISTRY.md).
+   - Use the transcript file from Step 1 to find the agent's `BotId`.
+   - Generate `agent-registry.json`.
+
+2. **Download the .pbit**
+   - In this repo, click **[`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit)**
    - Click **Download raw file** (top-right of the file preview)
 
-2. **Open it**
+3. **Open it**
    - Double-click the downloaded `.pbit` — it opens in Power BI Desktop and shows a parameter prompt
 
 ---
@@ -113,15 +131,39 @@ In the parameter prompt, paste the **full absolute path** to each CSV from Steps
 
 | Parameter | Required? | Example value |
 |---|---|---|
-| **Transcript File** | ✅ Yes | `/Users/<you>/Documents/AgentData/ConversationTranscripts.csv` |
+| **Copilot Studio Transcript** | ✅ Yes | `C:\Users\<you>\Documents\AgentData\ConversationTranscripts.csv` |
 | **Org Data File** | ⭐ Recommended | `/Users/<you>/Documents/AgentData/OrgData.csv` |
-| **Agent Credits File** | Optional | `…/EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv` |
+| **Agent Credits  (optional)** | Optional | `C:\Users\<you>\Documents\AgentData\EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv` |
+| **Agent Scope Mode** | ✅ Yes | `ESS Safe` (default), `Selected Agents`, or `All Agents` |
+| **Agent Registry JSON** | Required for ESS Safe / Selected Agents | Paste the full contents of `agent-registry.json` |
+| **Customer Topic Overrides JSON (optional)** | Optional | Paste the full contents of `customer-topic-overrides.json` |
+| **Feedback Events JSON (optional)** | Optional | Paste the full contents of `feedback-events.json` from `ess_feedback_normalizer.py` |
 
 Click **Load**.
+
+### Minimum successful first run
+
+For the smallest working configuration, provide:
+
+1. **Copilot Studio Transcript** — the untouched CSV from Step 1.
+2. **Agent Scope Mode** — `ESS Safe`.
+3. **Agent Registry JSON** — the complete contents of the JSON generated in Step 4.
+
+Leave Org Data, credits, topic overrides, and feedback blank for the first load. After the report opens and **Total Conversations** is non-zero, add optional inputs one at a time and refresh after each addition. This makes any input error easy to identify.
 
 > 💡 **Leaving an optional field blank is fine.** The template loads cleanly and the relevant pages just stay empty until you add the data.
 
 > ⚠️ **Use forward slashes on Mac, backslashes on Windows.** Wrap paths in nothing — just paste the raw path.
+
+> 💡 **Agent scope.** `ESS Safe` includes only enabled registry agents marked as ESS. `Selected Agents` uses the registry's `Selected` flag. `All Agents` is explicit opt-in and preserves unmapped transcript/credit agents with diagnostic keys; Product Feedback still requires a registry match. See [Agent registry and reporting scope](AGENT-REGISTRY.md).
+
+> 💡 **Topic classification.** Native Copilot Studio topics are preserved. Rows without a native topic use the shared customer-neutral English, Spanish, and Chinese taxonomy in `taxonomy/topics-taxonomy.csv`. Complete-word matching, scoring, exclusions, and ambiguity handling prevent partial-word collisions and leave low-signal prompts as **Other / Uncategorized**.
+
+> Need customer-specific topics? Run the [Private topic tuner](TOPIC-TUNER.md), review the generated candidates, then paste its approved JSON into the optional parameter. No new template release is required.
+
+> Microsoft 365 Copilot Chat reactions aren't stored in Dataverse transcripts. Follow [Cross-channel feedback ingestion](FEEDBACK-INGESTION.md) to normalize Product Feedback or Monitor exports, then paste the resulting JSON here. This avoids cross-source privacy conflicts.
+
+> Parent/child attribution requires **Include node-level details in transcripts**. When connected-agent traces are present, the Improvement Opportunities Fix-It Queue shows every participating child and its completion state. See [Parent and child agent attribution](CHILD-AGENT-ATTRIBUTION.md).
 
 ### Validate with fabricated sample data
 
@@ -130,8 +172,11 @@ The repository's [`SampleData`](./SampleData/) folder contains a matching, fully
 - `SampleData/ConversationTranscripts.csv`
 - `SampleData/OrgData.csv`
 - `SampleData/EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv`
+- `SampleData/agent-registry.json`
+- `SampleData/feedback-events.csv`
+- `SampleData/feedback-events.json`
 
-The expected validation totals are **168 conversations**, **25 users**, **109 resolved conversations**, **1,651.75 observed credits**, and **516.89 observed billable credits**.
+Use `ESS Safe` and paste `agent-registry.json`. The expected validation totals are **168 conversations**, **25 users**, **109 resolved conversations**, **1,651.75 observed credits**, and **516.89 observed billable credits**. With the contents of `feedback-events.json` pasted into the parameter, the unified table has **56 feedback events**: **41 thumbs up** and **15 thumbs down** after one exact duplicate is removed.
 
 ---
 
@@ -168,10 +213,11 @@ Save this as a sticky note:
 | 1 | Export `ConversationTranscript` table | Power Apps → Tables | 5 min |
 | 2 | Export HR roster (optional) | HR system or Entra/Graph | 2 min |
 | 3 | Download 30-day User-Level Credit Consumption CSV (optional) | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → Licensing → Copilot Studio → Summary → Download report | 2 min |
-| 4 | Download & open `.pbit` | This repo | 1 min |
-| 5 | Paste file paths into parameter prompt | Power BI Desktop | 1 min |
-| 6 | Validate Total Users + Total Conversations | Adoption page | 1 min |
-| 7 | Publish to workspace or export PDF | Power BI Service | 2 min |
+| 4 | Export and prepare Microsoft 365 Product Feedback (optional) | Microsoft 365 admin center → Health → Product feedback | 5–10 min |
+| 5 | Download & open `.pbit` | This repo | 1 min |
+| 6 | Paste file paths and optional JSON into the parameter prompt | Power BI Desktop | 1 min |
+| 7 | Validate conversations, users, and optional feedback | Report pages | 2 min |
+| 8 | Publish to workspace or export PDF | Power BI Service | 2 min |
 
 ---
 
@@ -186,6 +232,7 @@ Save this as a sticky note:
 | `Users by Organization` shows everyone as `(Blank)` | Org Data UPN column doesn't match transcripts | Confirm column is named `UserPrincipalName` and values are full UPNs (`user@contoso.com`) |
 | `Users by Country` chart shows "Something's wrong with one or more fields" | Org Data CSV missing the `Country` column | Add a `Country` column (can be empty), or download the latest `.pbit` from this repo |
 | Observed Credit Leaderboard is blank | User-Level Credit Consumption file is missing or no `Agent Id` matches the transcripts | Use the 30-day Power Platform admin center User-Level export and verify it covers the same ESS agent |
+| Microsoft 365 feedback is missing | Raw tenant export was not normalized, Agent ID is blank, or the `M365Title` registry alias does not match | Follow the feedback guide, review `feedback-events.audit.json`, and paste the newly generated JSON parameter |
 | Total Users count seems too low | Same employee shows as both UPN and Entra Object ID in transcripts | Already handled — the model cross-walks both identities automatically |
 | Repeat-usage rate is 0% | Period too short — everyone is a first-time user | Widen the date filter or wait for more data |
 

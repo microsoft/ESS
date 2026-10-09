@@ -1,0 +1,4 @@
+RegistryVersion,AgentKey,AgentLabel,IsEss,Selected,Enabled,EnvironmentKey,EnvironmentName,EnvironmentUrl,AliasType,AliasValue
+1,ess-synthetic,ESS Employee Self-Service Agent,true,true,true,synthetic,Synthetic Validation,,TranscriptId,f1d40245-f319-4e2d-8023-9e7b6f6456ac
+1,ess-synthetic,ESS Employee Self-Service Agent,true,true,true,synthetic,Synthetic Validation,,CreditId,f1d40245-f319-4e2d-8023-9e7b6f6456ac
+1,ess-synthetic,ESS Employee Self-Service Agent,true,true,true,synthetic,Synthetic Validation,,M365Title,T_synthetic-ess-agent
