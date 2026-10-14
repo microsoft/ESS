@@ -169,7 +169,7 @@ The command stops with a clear error for invalid booleans, unknown alias types, 
 
 ### Registry with several environments
 
-Fabric can use the full master CSV. CSV V18 and Dataverse V19 report one environment per refresh, so create a filtered JSON file:
+Fabric can use the full master CSV. CSV V18 and Dataverse V20 report one environment per refresh, so create a filtered JSON file:
 
 ```powershell
 python tools\agent_registry.py `
@@ -183,7 +183,7 @@ Replace `production-us` with the exact `EnvironmentKey` in your CSV.
 
 ## Step 8 - Load the registry
 
-### CSV V18 and Dataverse V19
+### CSV V18 and Dataverse V20
 
 1. Open the report in Power BI Desktop.
 2. Select **Home → Transform data → Edit parameters**.

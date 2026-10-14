@@ -34,6 +34,7 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 | Included content | Location |
 |---|---|
 | Power BI templates | Repository root (`*.pbit`) |
+| Archived template backups | `archive/` |
 | Customer-run Python tools | `tools/` |
 | Shared topic taxonomy | `taxonomy/` |
 | Fabric notebooks | `Fabric/notebooks/` |
@@ -47,10 +48,15 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 | Tool | When to use it | Customer output |
 |---|---|---|
 | [`tools/agent_registry.py`](AGENT-REGISTRY.md) | **Required** for every template path | Validated `agent-registry.json` for CSV/Dataverse, or validated registry CSV for Fabric |
+| [`tools/build_service_refresh_template.py`](SETUP-Dataverse.md#step-4--build-the-registry-and-service-refresh-template) | **Required** for Dataverse Direct scheduled refresh | Environment-specific PBIT with a static Dataverse endpoint |
 | [`tools/ess_topic_tuner.py`](TOPIC-TUNER.md) | Optional, when native and built-in topics leave important conversations uncategorized | Reviewed customer topic overrides |
 | [`tools/ess_feedback_normalizer.py`](FEEDBACK-INGESTION.md) | Optional, when loading Microsoft 365 Product Feedback or Monitor reaction exports | Agent-scoped feedback CSV/JSON plus an audit report |
 
-All three tools run locally with Python 3.10 or later and require no package installation.
+All four tools run locally with Python 3.10 or later and require no package installation.
+
+> The original parameter-driven Dataverse V19 template is retained at
+> `archive/ESS Dashboard - Dynamic Topics (Dataverse) V19 - Dynamic Sources Backup.pbit`.
+> It remains useful for Desktop/manual refresh and future template adjustments, but should not be published directly when scheduled Service refresh is required.
 
 ---
 
@@ -75,7 +81,7 @@ Best for a first evaluation, a one-time export, an offline copy, or sharing a co
 ### 🔵 Monitor one environment
 **Dataverse Direct — recommended**
 
-Best production default for one supported Dataverse environment. Power BI connects cloud-to-cloud and can refresh on a schedule without a gateway.
+Best production default for one supported Dataverse environment. The setup tool generates an environment-specific template so Power BI can refresh cloud-to-cloud without a gateway.
 
 Extend Dataverse retention for the reporting period you need; report refresh does not archive deleted records.
 
@@ -111,7 +117,7 @@ Fabric preserves only records ingested before Dataverse deletes them and require
 | **Power BI gateway** | None for SharePoint/OneDrive; required for local or network paths | None | None for the Lakehouse SQL analytics endpoint |
 | **Primary access** | Dataverse transcript read/export access | Bot Transcript Viewer | Fabric access plus a Dataverse application user |
 | **Historical behavior** | Snapshot contains only records retained when exported | Queries only records still retained in Dataverse | Merge preserves records already ingested into Delta |
-| **Template** | `ESS Dashboard - Dynamic Topics (CSV) V18.pbit` | `ESS Dashboard - Dynamic Topics (Dataverse) V19.pbit` | `ESS - Fabric V2.pbit` |
+| **Template** | `ESS Dashboard - Dynamic Topics (CSV) V18.pbit` | Service-refresh PBIT generated from `ESS Dashboard - Dynamic Topics (Dataverse) V20.pbit` | `ESS - Fabric V2.pbit` |
 
 </details>
 
@@ -125,7 +131,7 @@ Fabric preserves only records ingested before Dataverse deletes them and require
 ---
 
 <details open>
-<summary><strong>🆕 What's new in CSV V18 / Dataverse V19</strong></summary>
+<summary><strong>🆕 What's new in CSV V18 / Dataverse V20</strong></summary>
 
 - **Safer multilingual topic classification** — native Copilot Studio topics remain authoritative. Conversations without a native topic use customer-neutral English, Spanish, and Chinese rules with word-boundary matching, scoring, exclusions, confidence, and ambiguity handling. This prevents partial-word collisions such as `tick` matching `ticket`.
 
@@ -141,13 +147,15 @@ Fabric preserves only records ingested before Dataverse deletes them and require
 
 - **Agent filtering on Improvement Opportunities** — the Dataverse Direct edition now includes an Agent slicer so multi-agent environments can isolate improvement opportunities for a single agent.
 
-- **Validated Copilot Studio credits** — CSV V18 and Dataverse V19 now accept the 30-day **User-Level Credit Consumption** export from the [Power Platform admin center](https://admin.powerplatform.microsoft.com). Credits match ESS through `Agent Id`; organization attribution uses `User Email`.
+- **Validated Copilot Studio credits** — CSV V18 and Dataverse V20 Desktop/manual refresh accept the 30-day **User-Level Credit Consumption** export from the [Power Platform admin center](https://admin.powerplatform.microsoft.com). Credits match ESS through `Agent Id`; organization attribution uses `User Email`.
+
+- **Power BI Service refresh builder** — `build_service_refresh_template.py` fixes the Dataverse endpoint in an environment-specific PBIT and removes dormant file/web connectors that otherwise trigger `DynamicDataSourcesIsNotSupportedForRefresh`.
 
 - **Clear observed-versus-modeled labeling** — total and billable credits are observed Power Platform admin center values. Cost, cost per resolved conversation, net value, and ROI are modeled because the export provides no conversation or topic ID.
 
 - **Fabric V2 decimal-credit support** — preserves fractional Copilot Credits and validates the three Power Platform admin center export schemas before writing the Lakehouse tables.
 
-Dataverse Direct V19 and CSV Upload V18 are cumulative — both include every improvement from the earlier releases.
+Dataverse Direct V20 and CSV Upload V18 are cumulative — both include every improvement from the earlier releases.
 
 </details>
 
@@ -362,7 +370,7 @@ The environment file is daily (`Usage Date`) and contains: `BillingPlan Id`, `Bi
 
 Credit fields are decimal values (for example, `113.89`), and live `Agent Id` values are bare GUIDs. Agent and user files are aggregate snapshots for the selected lookback and have no activity date. `User Email` can be blank; retain those rows as **unmatched identity**. Do not append overlapping snapshots as transactions.
 
-> **Compatibility:** CSV V18 and Dataverse V19 accept the **30-day User-Level Credit Consumption** CSV directly. Fabric V2 uses all three Power Platform admin center exports. The separate **M365 Copilot Credits report** is a narrower source for metered declarative agents in M365 Copilot Chat and is not the recommended ESS source.
+> **Compatibility:** CSV V18 and Dataverse V20 Desktop/manual refresh accept the **30-day User-Level Credit Consumption** CSV directly. Fabric V2 uses all three Power Platform admin center exports. The separate **M365 Copilot Credits report** is a narrower source for metered declarative agents in M365 Copilot Chat and is not the recommended ESS source.
 
 #### Observed credits versus modeled conversation attribution
 
@@ -385,7 +393,7 @@ The [`SampleData`](./SampleData/) folder contains only fabricated `example.com` 
 | [`OrgData.csv`](./SampleData/OrgData.csv) | Matching organization, country, title, display-name, and email attributes |
 | [`EntitlementConsumptionTenantDetailsReport_MCSMessages_30_SYNTHETIC.csv`](./SampleData/EntitlementConsumptionTenantDetailsReport_MCSMessages_30_SYNTHETIC.csv) | Power Platform admin center Environment Consumption Summary shape with daily rows |
 | [`EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30_SYNTHETIC.csv`](./SampleData/EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30_SYNTHETIC.csv) | Power Platform admin center Agent-Level Credit Consumption shape |
-| [`EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv`](./SampleData/EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv) | Power Platform admin center User-Level Credit Consumption shape used directly by CSV V18 and Dataverse V19 |
+| [`EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv`](./SampleData/EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv) | Power Platform admin center User-Level Credit Consumption shape used directly by CSV V18 and Dataverse V20 Desktop/manual refresh |
 | [`feedback-events.csv`](./SampleData/feedback-events.csv) | Two fabricated cross-channel reaction events: one exact duplicate and one unmatched Microsoft 365 Copilot Chat event |
 | [`feedback-events.json`](./SampleData/feedback-events.json) | The same fabricated feedback contract for the gateway-free CSV/Dataverse JSON parameter |
 | [`agent-registry.csv`](./SampleData/agent-registry.csv) | Synthetic cross-source agent aliases for Fabric and local tooling |
@@ -396,7 +404,7 @@ The three consumption files reconcile to **1,651.75 total credits**. The User-Le
 With the sample feedback loaded, the unified feedback table contains **56 events**: the exact duplicate is removed, leaving **41 thumbs up** and **15 thumbs down**.
 
 - **CSV V18 demo:** provide `ConversationTranscripts.csv`, `OrgData.csv`, `agent-registry.json`, and the User-Level consumption file.
-- **Dataverse V19:** provide a live Dataverse URL plus `agent-registry.json`, `OrgData.csv`, and the User-Level consumption file. The signed-in account must have **Bot Transcript Viewer**.
+- **Dataverse V20 Desktop/manual refresh:** provide a live Dataverse URL plus `agent-registry.json`, `OrgData.csv`, and the User-Level consumption file. For Service refresh, generate the environment-specific V20 PBIT; Org Data and Credits file inputs are disabled there.
 - **Fabric V2:** upload `agent-registry.csv` to `Files/config` and exactly one current copy of each consumption file to `Files/credit_consumption`.
 
 ---
@@ -410,7 +418,7 @@ With the sample feedback loaded, the unified feedback table contains **56 events
 |---|---|---|---|
 | **Conversation Transcripts** (Dataverse export from your ESS environment) | ✅ Required | **Bot Transcript Viewer** (minimum, least-privilege) — or any role with Read on the `conversationtranscript` table. **System Administrator** always works. **System Customizer** usually works but isn't guaranteed; assign Bot Transcript Viewer alongside it to be safe. | All adoption, outcomes, time-to-knowledge, and in-conversation thumbs/CSAT feedback |
 | **Org Data** (HR roster CSV: UPN, Department, JobTitle, Country) | ⭐ Recommended | **Global Reader**, **User Administrator**, or **Global Administrator** (Microsoft 365 Admin Center) | "Users by Organization" and "Users by Country" breakouts on every page |
-| **Copilot Credits** | Optional | **Power Platform Administrator** recommended; tenant administrator or Dynamics 365 Administrator also accepted | CSV V18/Dataverse V19 use the 30-day User-Level export; Fabric V2 uses all three Power Platform admin center exports |
+| **Copilot Credits** | Optional | **Power Platform Administrator** recommended; tenant administrator or Dynamics 365 Administrator also accepted | CSV V18 and Dataverse V20 Desktop/manual refresh use the User-Level export; the Service-refresh build disables this file input; Fabric V2 uses all three exports |
 | **Normalized feedback events** | Optional | Feedback export access in the Microsoft 365 admin center; full identity details require **Compliance Administrator** or **Global Administrator** | Microsoft 365 Copilot Chat and Monitor reactions, channel/source attribution, and reconciliation status |
 
 > ⚠️ **`Environment Maker` alone is not enough** to read transcripts. Customers often have this role and assume they're covered — they aren't. Grant **Bot Transcript Viewer** (or higher) explicitly.
