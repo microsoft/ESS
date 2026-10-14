@@ -40,9 +40,9 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 ---
 
-## Step 2 — (Recommended) Export your Org Data ⭐
+## Step 2 — (Desktop/manual refresh only) Export your Org Data
 
-**Outcome:** a CSV that maps each user's UPN to Department, Country, and JobTitle. Unlocks "Users by Organization" and "Users by Country" charts.
+**Outcome:** a CSV that maps each user's UPN to Department, Country, and JobTitle. This optional file works in the reusable Desktop template, but is disabled in the Service-refresh build because file/web paths make the semantic model dynamic.
 
 | Column | Example | Required? |
 |---|---|---|
@@ -63,16 +63,16 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 ---
 
-## Step 3 — (Optional) Download Copilot Credits reports
+## Step 3 — (Desktop/manual refresh or Fabric only) Download Copilot Credits reports
 
 1. Sign in to the [Power Platform admin center](https://admin.powerplatform.microsoft.com) as a tenant administrator, Power Platform Administrator, or Dynamics 365 Administrator. **Power Platform Administrator** is the recommended least-privilege role.
 2. Go to **Licensing → Copilot Studio → Summary → Download report**.
 3. Set **Usage type** to `Copilot Credits`; choose a `30`, `60`, `90`, or `180` day lookback.
-4. For Dataverse V19, download **User-Level Credit Consumption** with a **30-day** lookback. Fabric V2 additionally uses the Environment and Agent reports.
+4. For Dataverse V20 Desktop/manual refresh, download **User-Level Credit Consumption** with a **30-day** lookback. Fabric V2 additionally uses the Environment and Agent reports.
 
 At 30 days the generated names are `EntitlementConsumptionTenantDetailsReport_MCSMessages_30.csv`, `EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30.csv`, and `EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv`. The environment export is daily by `Usage Date`; agent and user exports are aggregate snapshots without an activity date. Credit values are decimals, agent IDs are bare GUIDs, and blank `User Email` values are unmatched identities—not rows to discard.
 
-> Dataverse V19 matches credits to ESS by `Agent Id` and joins organization data through `User Email`. The Power Platform admin center export has no conversation ID, so cost per resolved conversation, net value, and ROI are labeled modeled allocations.
+> Dataverse V20 matches credits to ESS by `Agent Id` and joins organization data through `User Email`. The Service-refresh build disables this file source; use Fabric when credits must refresh automatically.
 
 ### Optional — Include Microsoft 365 Copilot feedback
 
@@ -88,11 +88,23 @@ Do not load the raw Microsoft 365 export directly or infer ESS from `App = M365 
 
 ---
 
-## Step 4 — Build the registry and open the included template
+## Step 4 — Build the registry and Service-refresh template
 
 1. Follow [Agent registry and reporting scope](AGENT-REGISTRY.md) to find the agent ID, create `agent-registry.csv`, and generate `agent-registry.json`.
 2. Open the extracted `ESS-main` folder.
-3. Double-click **`ESS Dashboard - Dynamic Topics (Dataverse) V19.pbit`**. It opens in Power BI Desktop and shows a parameter prompt.
+3. In that folder, open PowerShell and run:
+
+   ```powershell
+   python tools\build_service_refresh_template.py `
+     --input "ESS Dashboard - Dynamic Topics (Dataverse) V20.pbit" `
+     --environment-url "https://orgabc12345.crm.dynamics.com" `
+     --output "ESS Dashboard - Dynamic Topics (Dataverse) V20 - Service Refresh.pbit"
+   ```
+
+4. Replace the example URL with the Instance URL from Step 1.
+5. Double-click the generated **`ESS Dashboard - Dynamic Topics (Dataverse) V20 - Service Refresh.pbit`**.
+
+The generated PBIT embeds one static Dataverse endpoint, which Power BI Service can identify during scheduled refresh. Re-run the command to target another environment.
 
 ---
 
@@ -102,8 +114,8 @@ Do not load the raw Microsoft 365 export directly or infer ESS from `App = M365 
 |---|---|---|
 | **Dataverse Environment URL** | ✅ Yes | `https://orgabc12345.crm.dynamics.com` |
 | **Transcript Lookback Days** | Optional — leave blank for 90; limited to retained Dataverse rows | `30`, `60`, `180` |
-| **Org Data File** | ⭐ Recommended | `/Users/<you>/Documents/AgentData/OrgData.csv` |
-| **Agent Credits  (optional)** | Optional | `C:\Users\<you>\Documents\AgentData\EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv` |
+| **Org Data File** | Not present in Service-refresh build | Use the reusable Desktop template or Fabric |
+| **Agent Credits  (optional)** | Not present in Service-refresh build | Use the reusable Desktop template or Fabric |
 | **Agent Scope Mode** | ✅ Yes | `ESS Safe` (default), `Selected Agents`, or `All Agents` |
 | **Agent Registry JSON** | Required for ESS Safe / Selected Agents | Paste the full contents of `agent-registry.json` |
 | **Customer Topic Overrides JSON (optional)** | Optional | Paste the full contents of `customer-topic-overrides.json` |
@@ -120,7 +132,7 @@ For the smallest working configuration, provide:
 3. **Agent Scope Mode** — `ESS Safe`.
 4. **Agent Registry JSON** — the complete contents of the JSON generated in Step 4.
 
-Leave Org Data, credits, topic overrides, and feedback blank for the first load. Sign in to Dataverse, confirm **Total Conversations** is non-zero, then add optional inputs one at a time.
+Leave topic overrides and feedback blank for the first load. Sign in to Dataverse and confirm **Total Conversations** is non-zero.
 
 > 💡 **Lookback Days** controls how far back the connector pulls transcripts. The filter runs **server-side** on Dataverse, so a smaller window = faster refresh. Default is 90 days.
 
@@ -177,7 +189,7 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 | **Publish to Power BI Service** | **Home → Publish**. **No Gateway required** — cloud-to-cloud |
 | **Schedule refresh** | Service: dataset → **Settings → Scheduled refresh**. Bind Dataverse credentials (OAuth2 / Organizational) first. Step‑by‑step: **[AUTO-REFRESH.md](./AUTO-REFRESH.md)** |
 | **Export to PDF** | **File → Export → Export to PDF** |
-| **Switch environments** | **Transform data → Edit Parameters → Dataverse Environment URL** → re-auth via Data source settings |
+| **Switch environments** | Re-run `build_service_refresh_template.py` with the new URL, open the generated PBIT, and publish it |
 
 > 💡 **No Gateway** is the headline benefit. Cloud Power BI Service talks directly to cloud Dataverse — schedule hourly if you want.
 
@@ -188,10 +200,10 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 | Step | What | Where | Time |
 |---|---|---|---|
 | 1 | Copy Environment URL | Power Apps → ⚙️ → Session details | 1 min |
-| 2 | Export HR roster (optional) | M365 Admin Center | 2 min |
-| 3 | Download 30-day User-Level Credit Consumption CSV (optional) | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → Licensing → Copilot Studio → Summary → Download report | 2 min |
+| 2 | Export HR roster (optional; Desktop/manual refresh only) | M365 Admin Center | 2 min |
+| 3 | Download User-Level Credit Consumption CSV (optional; Desktop/manual refresh or Fabric only) | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → Licensing → Copilot Studio → Summary → Download report | 2 min |
 | 4 | Export and prepare Microsoft 365 Product Feedback (optional) | Microsoft 365 admin center → Health → Product feedback | 5–10 min |
-| 5 | Open the included `.pbit` | Extracted `ESS-main` folder | 1 min |
+| 5 | Build and open the environment-specific Service-refresh PBIT | PowerShell in the extracted `ESS-main` folder | 1–2 min |
 | 6 | Paste environment URL, registry, and optional JSON into the prompt | Power BI Desktop | 1 min |
 | 7 | Sign in to Dataverse | Authentication dialog | 1 min |
 | 8 | Validate conversations, users, and optional feedback | Report pages | 2 min |
@@ -208,13 +220,13 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 | Refresh succeeds but **Total Conversations = 0** | Teams/Developer/M365 Copilot env (transcripts not written), or empty lookback | Move agent to a standard production/sandbox Dataverse env; widen Lookback Days |
 | Users or conversations disappear between weekly exports | Older transcripts aged out of Dataverse, or exports used different windows | Confirm the configured retention period and compare the same retained date range; extend retention prospectively |
 | Refresh is very slow (5+ min) | Lookback too wide | Lower Lookback Days |
-| `Users by Organization` all `(Blank)` | Org Data UPN doesn't match transcripts | Confirm `UserPrincipalName` column with full UPNs |
+| `Users by Organization` all `(Blank)` | Expected in the Service-refresh build; its Org Data file source is disabled | Use the reusable Desktop/manual-refresh template or enrich through Fabric |
 | `Access to the resource is forbidden` | Account lacks Dataverse read access | Grant **Bot Transcript Viewer** in the target environment; Power Platform Administrator or Environment Maker alone is insufficient |
-| Observed Credit Leaderboard is blank | User-Level Credit Consumption file is missing or no `Agent Id` matches Dataverse `BotId` | Use the 30-day Power Platform admin center User-Level export for the same ESS agent |
+| Observed Credit Leaderboard is blank | Expected in the Service-refresh build; its credits file source is disabled | Use the reusable Desktop/manual-refresh template or Fabric credit ingestion |
 | Microsoft 365 feedback is missing | Raw tenant export was not normalized, Agent ID is blank, or the `M365Title` registry alias does not match | Follow the feedback guide, review `feedback-events.audit.json`, and paste the newly generated JSON parameter |
 | Total Users too low | Same employee as both UPN and Entra Object ID | Already handled by the model |
 | Repeat-usage rate is 0% | Lookback too short | Widen to 60 or 90 days |
-| Need to switch environment | Cached credential points at old env | **File → Options → Data source settings → Clear Permissions** |
+| Need to switch environment | The Service-refresh connector is fixed to the build-time URL | Re-run `build_service_refresh_template.py` with the new URL and publish the new report |
 
 ---
 

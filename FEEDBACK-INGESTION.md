@@ -110,7 +110,7 @@ The command creates three files:
 | File | Use |
 |---|---|
 | `feedback-events.csv` | Upload to Fabric |
-| `feedback-events.json` | Paste into CSV V18 or Dataverse V19 |
+| `feedback-events.json` | Paste into CSV V18 or Dataverse V20 |
 | `feedback-events.audit.json` | Review before loading |
 
 The tool:
@@ -139,7 +139,7 @@ If the command says no rows matched, do not switch to `All Agents` to bypass the
 
 ## Step 6 - Load the prepared output
 
-### CSV V18 and Dataverse V19
+### CSV V18 and Dataverse V20
 
 1. Open the report in Power BI Desktop.
 2. Select **Home → Transform data → Edit parameters**.
@@ -172,7 +172,7 @@ The Product feedback export is a snapshot, not a real-time connection.
 1. Export the latest Product feedback CSV.
 2. Replace `C:\AgentData\ProductFeedback.csv`.
 3. Run the same preparation command.
-4. Replace the JSON parameter in CSV V18/Dataverse V19, or replace the Fabric CSV.
+4. Replace the JSON parameter in CSV V18/Dataverse V20, or replace the Fabric CSV.
 5. Refresh the report.
 
 For an automated Fabric deployment, schedule the approved export and Lakehouse landing process separately. This repository does not include a process that signs in to the Microsoft 365 admin center or downloads the export automatically.

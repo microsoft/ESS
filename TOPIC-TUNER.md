@@ -103,7 +103,7 @@ Do not share these files outside the customer environment without customer revie
 
 ## 4. Apply without a template release
 
-### CSV V18 and Dataverse V19
+### CSV V18 and Dataverse V20
 
 Open **Transform data → Edit parameters** and paste the full contents of `customer-topic-overrides.json` into **Customer Topic Overrides JSON (optional)**. Refresh the model. Because the override is a parameter, it does not add a second data source or create a Formula Firewall dependency.
 

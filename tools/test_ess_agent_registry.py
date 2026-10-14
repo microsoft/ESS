@@ -29,7 +29,7 @@ class AgentRegistryTests(unittest.TestCase):
     def test_direct_pbit_patch_is_idempotent_and_canonical(self) -> None:
         names = (
             "ESS Dashboard - Dynamic Topics (CSV) V18.pbit",
-            "ESS Dashboard - Dynamic Topics (Dataverse) V19.pbit",
+            "ESS Dashboard - Dynamic Topics (Dataverse) V20.pbit",
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
