@@ -1,6 +1,8 @@
 # Agent registry and reporting scope
 
-The agent registry is a small customer-controlled CSV that tells ESS Insights which identifiers belong to the same Copilot Studio agent. It prevents feedback or credit usage from another tenant agent from entering ESS totals.
+The agent registry is optional advanced configuration that tells ESS Insights which identifiers belong to the same Copilot Studio agent across systems.
+
+Dataverse V21 does not require a registry for transcript or Power Platform consumption reporting. It derives agents from `BotId`/`BotName`, matches consumption by Agent GUID, and exposes a synchronized Agent filter in the report. Use a registry only when you need Microsoft 365 `T_...` feedback attribution, custom labels, or cross-environment identity mapping. Fabric continues to use the registry for governed ingestion.
 
 | Source | Alias type | Example |
 |---|---|---|
@@ -14,7 +16,7 @@ The registry contains identifiers and display labels only. It does not contain p
 
 | Mode | Use it when | Behavior |
 |---|---|---|
-| **ESS Safe** | You want only ESS agents | Includes enabled rows where `IsEss=true`; this is the recommended default |
+| **ESS Safe** | Advanced registry-controlled ESS-only scope | Includes enabled rows where `IsEss=true` |
 | **Selected Agents** | You want a chosen set of agents | Includes enabled rows where `Selected=true` |
 | **All Agents** | You intentionally want every transcript and credit agent | Includes known and unknown transcript/credit agents; Product Feedback still requires a registry match |
 
@@ -45,7 +47,7 @@ Do not reuse an `AgentKey` for a different agent later.
 
 ## Step 2 - Find the transcript identifier
 
-At least one `TranscriptId` or `TranscriptSchema` row is required for **ESS Safe** and **Selected Agents**.
+At least one `TranscriptId` or `TranscriptSchema` row is required only when using the advanced **ESS Safe** or **Selected Agents** registry scopes.
 
 ### If you use the CSV template
 
@@ -169,7 +171,7 @@ The command stops with a clear error for invalid booleans, unknown alias types, 
 
 ### Registry with several environments
 
-Fabric can use the full master CSV. CSV V18 and Dataverse V20 report one environment per refresh, so create a filtered JSON file:
+Fabric can use the full master CSV. CSV V18 and Dataverse V21 report one environment per refresh, so create a filtered JSON file:
 
 ```powershell
 python tools\agent_registry.py `
@@ -183,7 +185,7 @@ Replace `production-us` with the exact `EnvironmentKey` in your CSV.
 
 ## Step 8 - Load the registry
 
-### CSV V18 and Dataverse V20
+### CSV V18
 
 1. Open the report in Power BI Desktop.
 2. Select **Home → Transform data → Edit parameters**.
@@ -194,7 +196,17 @@ Replace `production-us` with the exact `EnvironmentKey` in your CSV.
 
 `ESS Safe` and `Selected Agents` stop with an error when the registry is blank or no transcript agent matches. `All Agents` permits unmapped transcript and credit agents but still excludes unregistered Product Feedback.
 
-If Power BI shows `Agent Registry JSON must contain enabled TranscriptId or TranscriptSchema aliases for the selected scope`, the Dataverse URL was accepted but the registry was not. Open the generated `agent-registry.json` in Notepad and paste the complete JSON array into **Agent Registry JSON**; do not enter the CSV path or JSON file path.
+### Dataverse V21
+
+No registry is required for normal transcript and consumption reporting. Use the synchronized **Agent** slicer in the report filter drawer. Advanced registry values can be embedded when building a controlled template for Microsoft 365 feedback attribution.
+
+```powershell
+python tools\build_service_refresh_template.py `
+  --input "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit" `
+  --environment-url "https://orgabc12345.crm.dynamics.com" `
+  --agent-registry-json "C:\AgentData\agent-registry.json" `
+  --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Service Refresh.pbit"
+```
 
 ### Fabric V2
 

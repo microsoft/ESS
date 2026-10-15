@@ -11,7 +11,7 @@ from build_service_refresh_template import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "ESS Dashboard - Dynamic Topics (Dataverse) V20.pbit"
+SOURCE = ROOT / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
 
 
 class ServiceRefreshTemplateTests(unittest.TestCase):
@@ -91,6 +91,40 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             self.assertNotIn(
                 "Agent Credits  (optional)",
                 model_parameters,
+            )
+
+    def test_embeds_optional_validated_registry(self):
+        environment_url = "https://orgexample.crm.dynamics.com"
+        registry_json = (
+            '[{"RegistryVersion":"1","AgentKey":"employee-self-service",'
+            '"AgentLabel":"Employee Self-Service","IsEss":true,'
+            '"Selected":true,"Enabled":true,"EnvironmentKey":"",'
+            '"EnvironmentName":"","EnvironmentUrl":"","AliasType":'
+            '"M365Title","AliasValue":"T_example"}]'
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "service-refresh.pbit"
+            build_package(
+                SOURCE,
+                output,
+                environment_url,
+                registry_json,
+            )
+            with zipfile.ZipFile(output) as package:
+                schema = json.loads(
+                    package.read("DataModelSchema").decode("utf-16-le")
+                )
+            expressions = {
+                item["name"]: item
+                for item in schema["model"]["expressions"]
+            }
+            registry_expression = expressions[
+                "Agent Registry JSON"
+            ]["expression"]
+            self.assertIn("T_example", registry_expression)
+            self.assertNotIn(
+                "IsParameterQuery=true",
+                registry_expression,
             )
 
 

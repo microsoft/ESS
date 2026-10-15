@@ -29,7 +29,7 @@ class AgentRegistryTests(unittest.TestCase):
     def test_direct_pbit_patch_is_idempotent_and_canonical(self) -> None:
         names = (
             "ESS Dashboard - Dynamic Topics (CSV) V18.pbit",
-            "ESS Dashboard - Dynamic Topics (Dataverse) V20.pbit",
+            "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit",
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
@@ -52,6 +52,28 @@ class AgentRegistryTests(unittest.TestCase):
                 self.assertEqual(len(expressions), len(set(expressions)))
                 for expected in ("Agent Scope Mode", "Agent Registry JSON", "AgentRegistry"):
                     self.assertEqual(1, expressions.count(expected))
+                expression_map = {
+                    item["name"]: item["expression"]
+                    for item in model["expressions"]
+                }
+                if "Dataverse" in name:
+                    self.assertEqual(
+                        '"All Agents"',
+                        expression_map["Agent Scope Mode"],
+                    )
+                    self.assertEqual(
+                        "null",
+                        expression_map["Agent Registry JSON"],
+                    )
+                else:
+                    self.assertIn(
+                        '"ESS Safe" meta',
+                        expression_map["Agent Scope Mode"],
+                    )
+                    self.assertIn(
+                        "IsParameterQuery=true",
+                        expression_map["Agent Registry JSON"],
+                    )
 
                 tables = {table["name"]: table for table in model["tables"]}
                 for table_name in ("Agent Performance", "AgentCredits", "ConversationFeedback"):
@@ -103,6 +125,18 @@ class AgentRegistryTests(unittest.TestCase):
 
                 query_names = [query["name"] for query in unapplied["queries"]]
                 self.assertEqual(len(query_names), len(set(query_names)))
+                query_metadata = {
+                    query["name"]: query
+                    for query in unapplied["queries"]
+                }
+                self.assertEqual(
+                    "Dataverse" in name,
+                    query_metadata["Agent Scope Mode"]["isHidden"],
+                )
+                self.assertEqual(
+                    "Dataverse" in name,
+                    query_metadata["Agent Registry JSON"]["isHidden"],
+                )
                 queries = {
                     query["name"]: (
                         "\n".join(query["text"])
@@ -126,6 +160,22 @@ class AgentRegistryTests(unittest.TestCase):
                     queries["Agent Performance"],
                 )
                 self.assertIn("BotSchemaName", queries["Agent Performance"])
+                self.assertIn(
+                    '"raw:agent:"',
+                    queries["Agent Performance"],
+                )
+                self.assertIn(
+                    '"raw:agent:"',
+                    queries["AgentCredits"],
+                )
+                self.assertNotIn(
+                    '"raw:transcript:"',
+                    queries["Agent Performance"],
+                )
+                self.assertNotIn(
+                    '"raw:credit:"',
+                    queries["AgentCredits"],
+                )
                 self.assertIn(
                     "No credit agents matched the selected Agent Registry scope",
                     queries["AgentCredits"],

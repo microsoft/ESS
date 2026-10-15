@@ -1,6 +1,6 @@
 # Parent and child agent attribution
 
-Child-agent reporting isn't limited to the Fabric path. CSV V18, Dataverse V20, and Fabric V2 all read `ConnectedAgentInitializeTraceData` and `ConnectedAgentCompletedTraceData` when those events are present in enhanced Copilot Studio transcripts.
+Child-agent reporting isn't limited to the Fabric path. CSV V18, Dataverse V21, and Fabric V2 all read `ConnectedAgentInitializeTraceData` and `ConnectedAgentCompletedTraceData` when those events are present in enhanced Copilot Studio transcripts.
 
 ## Required transcript setting
 
@@ -8,7 +8,7 @@ In Copilot Studio, open the agent's **Settings → Advanced → Conversation tra
 
 Without connected-agent trace events, the report can't infer which child agent participated.
 
-## CSV V18 and Dataverse V20
+## CSV V18 and Dataverse V21
 
 Each conversation in `Agent Performance` includes:
 
