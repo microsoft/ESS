@@ -54,6 +54,8 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 
 All four tools run locally with Python 3.10 or later and require no package installation.
 
+> **Before clicking Load in CSV V18 or Dataverse V20:** the default `ESS Safe` scope requires the complete contents of a validated `agent-registry.json` in **Agent Registry JSON**. The Dataverse URL alone is not sufficient.
+
 > The original parameter-driven Dataverse V19 template is retained at
 > `archive/ESS Dashboard - Dynamic Topics (Dataverse) V19 - Dynamic Sources Backup.pbit`.
 > It remains useful for Desktop/manual refresh and future template adjustments, but should not be published directly when scheduled Service refresh is required.
