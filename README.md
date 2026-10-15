@@ -48,7 +48,7 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 | Tool | When to use it | Customer output |
 |---|---|---|
 | [`tools/agent_registry.py`](AGENT-REGISTRY.md) | Optional advanced identity mapping for Fabric or exported Microsoft 365 feedback | Validated agent registry |
-| [`tools/build_service_refresh_template.py`](SETUP-Dataverse.md#step-4--build-the-registry-and-service-refresh-template) | **Required** for Dataverse Direct scheduled refresh | Environment-specific PBIT with a static Dataverse endpoint |
+| [`tools/build_service_refresh_template.py`](SETUP-Dataverse.md#step-4--build-the-service-refresh-template) | **Required** for Dataverse Direct scheduled refresh | Environment-specific PBIT with a static Dataverse endpoint |
 | [`tools/ess_topic_tuner.py`](TOPIC-TUNER.md) | Optional, when native and built-in topics leave important conversations uncategorized | Reviewed customer topic overrides |
 | [`tools/ess_feedback_normalizer.py`](FEEDBACK-INGESTION.md) | Optional, when loading Microsoft 365 Product Feedback or Monitor reaction exports | Agent-scoped feedback CSV/JSON plus an audit report |
 
