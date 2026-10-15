@@ -52,7 +52,7 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 | [`tools/ess_topic_tuner.py`](TOPIC-TUNER.md) | Optional, when native and built-in topics leave important conversations uncategorized | Reviewed customer topic overrides |
 | [`tools/ess_feedback_normalizer.py`](FEEDBACK-INGESTION.md) | Optional, when loading Microsoft 365 Product Feedback or Monitor reaction exports | Agent-scoped feedback CSV/JSON plus an audit report |
 
-All four tools run locally with Python 3.10 or later and require no package installation.
+All four tools run locally with **Python 3.10 or later** and require no package installation. Windows customers can use the built-in **Windows PowerShell 5.1** or **PowerShell 7**; PowerShell 7 is not required. Install Python with **Add Python to PATH** selected, then run each command from the extracted `ESS-main` folder.
 
 > The original parameter-driven Dataverse V19 template is retained at
 > `archive/ESS Dashboard - Dynamic Topics (Dataverse) V19 - Dynamic Sources Backup.pbit`.
@@ -229,7 +229,8 @@ Confirm the common requirements below before following the guide for your select
 
 - [ ] **Power BI Desktop installed** (Windows) — [details ↓](#1-power-bi-desktop-installed)
 - [ ] **Complete ESS package downloaded and extracted** — [download ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip)
-- [ ] **Python 3.10 or later installed** for the local registry, feedback, and optional topic tools — [download Python](https://www.python.org/downloads/windows/)
+- [ ] **Python 3.10 or later installed with Add Python to PATH selected** — no `pip` packages are required; [download Python](https://www.python.org/downloads/windows/)
+- [ ] **Windows PowerShell 5.1 or PowerShell 7 available** — the built-in Windows PowerShell is supported; PowerShell 7 is optional
 - [ ] **Bot Transcript Viewer** role assigned (minimum) on the agent's Dataverse environment — [details ↓](#data-inputs)
 - [ ] **Agent environment is Production, Sandbox, or Default** *(not Teams or M365 Copilot)* — [details ↓](#2-supported-environment-types)
 - [ ] **Agent configured to capture transcripts + node-level details** — [details ↓](#3-agent-configuration)
