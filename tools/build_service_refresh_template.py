@@ -13,6 +13,8 @@ import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
 
+from agent_registry import load_registry
+
 
 M_TYPE_BY_TABULAR_TYPE = {
     "string": "nullable text",
@@ -25,6 +27,7 @@ M_TYPE_BY_TABULAR_TYPE = {
 }
 
 ENVIRONMENT_PARAMETER = "Dataverse Environment URL (required)"
+REGISTRY_EXPRESSION = "Agent Registry JSON"
 DISABLED_FILE_PARAMETERS = (
     "Org Data File",
     "Agent Credits  (optional)",
@@ -175,6 +178,7 @@ def update_parameter_metadata(
     schema: dict,
     changes: dict,
     environment_url: str,
+    registry_json: str | None,
 ) -> None:
     parameter_expression = (
         f"{m_text(environment_url)} meta "
@@ -200,6 +204,18 @@ def update_parameter_metadata(
     environment_query["text"] = [parameter_expression]
     environment_query["description"] = description
     environment_query["resultType"] = "Text"
+    if registry_json is not None:
+        registry_expression = m_text(registry_json)
+        registry = schema_expressions[REGISTRY_EXPRESSION]
+        registry["expression"] = registry_expression
+        registry["description"] = (
+            "Embedded advanced agent mapping generated from a validated "
+            "agent-registry.json file."
+        )
+        registry_query = queries[REGISTRY_EXPRESSION]
+        registry_query["text"] = [registry_expression]
+        registry_query["description"] = registry["description"]
+        registry_query["isHidden"] = True
 
     schema["model"]["expressions"] = [
         item
@@ -239,6 +255,7 @@ def build_package(
     input_path: Path,
     output_path: Path,
     environment_url: str,
+    registry_json: str | None = None,
 ) -> None:
     with zipfile.ZipFile(input_path, "r") as source:
         entries = source.infolist()
@@ -259,7 +276,12 @@ def build_package(
         environment_url,
     )
     update_unapplied_changes(changes, query_expressions)
-    update_parameter_metadata(schema, changes, environment_url)
+    update_parameter_metadata(
+        schema,
+        changes,
+        environment_url,
+        registry_json,
+    )
 
     payloads["DataModelSchema"] = json.dumps(
         schema,
@@ -302,13 +324,48 @@ def main() -> None:
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--environment-url", required=True)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--agent-registry-json",
+        type=Path,
+        help=(
+            "Optional validated agent-registry.json to embed for advanced "
+            "Microsoft 365 feedback or custom identity mapping."
+        ),
+    )
     args = parser.parse_args()
 
     environment_url = normalize_environment_url(args.environment_url)
+    registry_json = None
+    if args.agent_registry_json:
+        rows = load_registry(args.agent_registry_json)
+        registry_json = json.dumps(
+            [
+                {
+                    key: row[key]
+                    for key in (
+                        "RegistryVersion",
+                        "AgentKey",
+                        "AgentLabel",
+                        "IsEss",
+                        "Selected",
+                        "Enabled",
+                        "EnvironmentKey",
+                        "EnvironmentName",
+                        "EnvironmentUrl",
+                        "AliasType",
+                        "AliasValue",
+                    )
+                }
+                for row in rows
+            ],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
     build_package(
         args.input.resolve(),
         args.output.resolve(),
         environment_url,
+        registry_json,
     )
     print(f"Built Service-refresh template: {args.output.resolve()}")
 

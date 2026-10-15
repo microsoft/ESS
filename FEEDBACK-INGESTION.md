@@ -110,7 +110,7 @@ The command creates three files:
 | File | Use |
 |---|---|
 | `feedback-events.csv` | Upload to Fabric |
-| `feedback-events.json` | Paste into CSV V18 or Dataverse V20 |
+| `feedback-events.json` | Paste into CSV V18 or Dataverse V21 |
 | `feedback-events.audit.json` | Review before loading |
 
 The tool:
@@ -139,7 +139,7 @@ If the command says no rows matched, do not switch to `All Agents` to bypass the
 
 ## Step 6 - Load the prepared output
 
-### CSV V18 and Dataverse V20
+### CSV V18
 
 1. Open the report in Power BI Desktop.
 2. Select **Home → Transform data → Edit parameters**.
@@ -149,6 +149,20 @@ If the command says no rows matched, do not switch to `All Agents` to bypass the
 6. Open the **Agent Feedback** page and confirm the totals and verdicts are plausible.
 
 The report combines exported events with reactions already present in transcripts. When an exported event has the same exact conversation, agent, and verdict as a transcript reaction, the exported event replaces the duplicate. An agent-matched event without a conversation ID remains visible at agent level but is not guessed onto a conversation.
+
+### Dataverse V21
+
+Build the environment-specific template with the validated registry embedded:
+
+```powershell
+python tools\build_service_refresh_template.py `
+  --input "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit" `
+  --environment-url "https://orgabc12345.crm.dynamics.com" `
+  --agent-registry-json "C:\AgentData\agent-registry.json" `
+  --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Service Refresh.pbit"
+```
+
+Open the generated template, paste `feedback-events.json` into **Feedback Events JSON (optional)**, and refresh. The embedded registry maps Microsoft 365 `T_...` title IDs to the same Agent filter used by transcript rows.
 
 ### Fabric V2
 
@@ -172,7 +186,7 @@ The Product feedback export is a snapshot, not a real-time connection.
 1. Export the latest Product feedback CSV.
 2. Replace `C:\AgentData\ProductFeedback.csv`.
 3. Run the same preparation command.
-4. Replace the JSON parameter in CSV V18/Dataverse V20, or replace the Fabric CSV.
+4. Replace the JSON parameter in CSV V18/Dataverse V21, or replace the Fabric CSV. Rebuild the V21 template only when the registry mapping itself changes.
 5. Refresh the report.
 
 For an automated Fabric deployment, schedule the approved export and Lakehouse landing process separately. This repository does not include a process that signs in to the Microsoft 365 admin center or downloads the export automatically.

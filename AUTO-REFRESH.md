@@ -12,7 +12,7 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 > ✅ **Start here:** For hands‑off, production dashboards, **Dataverse Direct (Path A)** is the simplest — no file hosting, no gateway. If you must stay on CSV, **host it on SharePoint/OneDrive (Path B)** so the cloud can refresh it without a gateway.
 
-> **Why this matters for refresh:** Power BI Service rejects the reusable Dataverse template because its environment and optional file URLs are dynamic. Before publishing Dataverse V20, generate an environment-specific Service-refresh PBIT as shown below.
+> **Why this matters for refresh:** Power BI Service rejects the reusable Dataverse template because its environment and optional file URLs are dynamic. Before publishing Dataverse V21, generate an environment-specific Service-refresh PBIT as shown below.
 
 > 🆕 **Already need more than this?** Path A and Path B above already give you gateway‑free, cloud‑to‑cloud scheduled refresh — most customers don't need anything else. If you're consolidating multiple Dataverse environments into one dashboard, hitting refresh limits at very large scale, or want [Power Platform admin center](https://admin.powerplatform.microsoft.com) credit-consumption analytics alongside conversation data (with a separate file-landing step), see **[SETUP-Fabric.md ↗](SETUP-Fabric.md)**.
 
@@ -36,12 +36,12 @@ The Dataverse Direct Service-refresh build connects the service **directly to on
 
    ```powershell
    python tools\build_service_refresh_template.py `
-     --input "ESS Dashboard - Dynamic Topics (Dataverse) V20.pbit" `
+     --input "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit" `
      --environment-url "https://orgabc12345.crm.dynamics.com" `
-     --output "ESS Dashboard - Dynamic Topics (Dataverse) V20 - Service Refresh.pbit"
+     --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Service Refresh.pbit"
    ```
 
-2. Open the generated PBIT, provide the registry and other JSON parameters, load it successfully in Desktop, and **Publish** it to your workspace.
+2. Open the generated PBIT, confirm the environment URL, provide any optional topic/feedback JSON, load it successfully in Desktop, and **Publish** it to your workspace.
 3. In the service, open the **semantic model → Settings**.
 4. Expand **Data source credentials** and click **Edit credentials** on the Dataverse source:
    - **Authentication method:** `OAuth2`
@@ -56,7 +56,7 @@ The Dataverse Direct Service-refresh build connects the service **directly to on
 
 > ⚠️ **Scheduled refresh is not historical storage.** It re-queries Dataverse and therefore reflects only records still retained there. Extend Dataverse transcript retention for the reporting period you need; records deleted before a refresh cannot be restored by Power BI.
 
-> ⚠️ **Org Data and Agent Credits file parameters are disabled in the Service-refresh build.** File and web path branches make the entire semantic model dynamic even when left blank. Use JSON-based registry/topic/feedback inputs, the Desktop/manual-refresh V20 template for file overlays, or Fabric for automated organization and credit enrichment.
+> ⚠️ **Org Data and Agent Credits file parameters are disabled in the Service-refresh build.** File and web path branches make the entire semantic model dynamic even when left blank. Use topic/feedback JSON inputs, the Desktop/manual-refresh V21 template for file overlays, or Fabric for automated organization and credit enrichment.
 
 ---
 
@@ -90,7 +90,7 @@ You can get **gateway‑free cloud refresh** with the CSV Upload template *if th
 
 > 🔁 **Keep the URL stable.** Refresh follows the *path*, not the file. Overwrite the existing file (same name, same folder) rather than uploading a date‑stamped copy, or the schedule will keep reading the old file.
 
-> ⚠️ **Source-file automation isn't included.** This repository doesn't include or validate a Power Automate package or scheduled Dataverse CSV export. For supported hands-off transcript refresh, use **Dataverse V20**. If you build a custom file-landing process, validate its permissions, schema preservation, overwrite behavior, and failure monitoring before production use.
+> ⚠️ **Source-file automation isn't included.** This repository doesn't include or validate a Power Automate package or scheduled Dataverse CSV export. For supported hands-off transcript refresh, use **Dataverse V21**. If you build a custom file-landing process, validate its permissions, schema preservation, overwrite behavior, and failure monitoring before production use.
 
 ---
 
@@ -112,7 +112,7 @@ If the parameter points at a **local file** (`C:\Data\…`) or a **network share
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | The reusable Dataverse V20 PBIT or another parameter-built source was published directly. | Generate and publish the environment-specific PBIT with `tools\build_service_refresh_template.py`. |
+| **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | The reusable Dataverse V21 PBIT or another parameter-built source was published directly. | Generate and publish the environment-specific PBIT with `tools\build_service_refresh_template.py`. |
 | **“We couldn't authenticate with the credentials provided.”** | Credentials not bound, or account lacks access. | **dataset → Settings → Data source credentials → Edit credentials**; sign in with an account that has Bot Transcript Viewer (Dataverse) or library read (SharePoint). |
 | **Scheduled refresh option is greyed out.** | Credentials for one or more sources not yet set. | Edit credentials on **every** listed source first, then the schedule unlocks. |
 | **Refresh succeeds but data is stale.** | New export saved under a new name/path. | Overwrite the file at the **same URL/path** the parameter points to. |

@@ -12,7 +12,7 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 ✅ The [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded, extracted, and kept in its original folder structure
 ✅ **Power BI Desktop** installed — [download free](https://powerbi.microsoft.com/desktop/)
-✅ **Python 3.10 or later** installed — used by the local registry tool and optional feedback/topic tools; no packages are required
+✅ **Python 3.10 or later** installed — used to build the Service-refresh template and by optional feedback/topic tools; no packages are required
 ✅ **Bot Transcript Viewer** security role on the Dataverse environment that hosts your ESS agent — an admin must grant this. [Microsoft's how-to](https://learn.microsoft.com/en-us/microsoft-copilot-studio/admin-share-bots#assign-the-bot-transcript-viewer-security-role-during-agent-sharing)
 ✅ The **Environment URL** of the Dataverse env that hosts your ESS agent (Step 1 below)
 ✅ A folder for the optional Org Data / Feedback / Credits CSVs (e.g. `Documents/AgentData`)
@@ -68,17 +68,17 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 1. Sign in to the [Power Platform admin center](https://admin.powerplatform.microsoft.com) as a tenant administrator, Power Platform Administrator, or Dynamics 365 Administrator. **Power Platform Administrator** is the recommended least-privilege role.
 2. Go to **Licensing → Copilot Studio → Summary → Download report**.
 3. Set **Usage type** to `Copilot Credits`; choose a `30`, `60`, `90`, or `180` day lookback.
-4. For Dataverse V20 Desktop/manual refresh, download **User-Level Credit Consumption** with a **30-day** lookback. Fabric V2 additionally uses the Environment and Agent reports.
+4. For Dataverse V21 Desktop/manual refresh, download **User-Level Credit Consumption** with a **30-day** lookback. Fabric V2 additionally uses the Environment and Agent reports.
 
 At 30 days the generated names are `EntitlementConsumptionTenantDetailsReport_MCSMessages_30.csv`, `EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30.csv`, and `EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv`. The environment export is daily by `Usage Date`; agent and user exports are aggregate snapshots without an activity date. Credit values are decimals, agent IDs are bare GUIDs, and blank `User Email` values are unmatched identities—not rows to discard.
 
-> Dataverse V20 matches credits to ESS by `Agent Id` and joins organization data through `User Email`. The Service-refresh build disables this file source; use Fabric when credits must refresh automatically.
+> Dataverse V21 matches credits to ESS by `Agent Id` and joins organization data through `User Email`. The Service-refresh build disables this file source; use Fabric when credits must refresh automatically.
 
 ### Optional — Include Microsoft 365 Copilot feedback
 
 Microsoft 365 Copilot Chat reactions are not stored in Dataverse transcripts. To include them:
 
-1. Complete the [agent registry guide](AGENT-REGISTRY.md), including the agent's `M365Title` (`T_...`) alias.
+1. For advanced Microsoft 365 feedback attribution, complete the [agent registry guide](AGENT-REGISTRY.md), including the agent's `M365Title` (`T_...`) alias.
 2. In the [Microsoft 365 admin center](https://admin.microsoft.com), select **Health → Product feedback → Export to CSV**. The file is tenant-wide, even if the page is filtered.
 3. Follow [Microsoft 365 Copilot feedback: export, prepare, and load](FEEDBACK-INGESTION.md) to filter the export locally and create `feedback-events.json`.
 4. Review `feedback-events.audit.json`; do not continue if the expected ESS row is missing.
@@ -88,40 +88,34 @@ Do not load the raw Microsoft 365 export directly or infer ESS from `App = M365 
 
 ---
 
-## Step 4 — Build the registry and Service-refresh template
+## Step 4 — Build the Service-refresh template
 
-1. Follow [Agent registry and reporting scope](AGENT-REGISTRY.md) to find the ESS agent's GUID or schema name.
-2. For one ESS agent, create `C:\AgentData\agent-registry.csv` with exactly one header row and one data row:
-
-   ```csv
-   RegistryVersion,AgentKey,AgentLabel,IsEss,Selected,Enabled,EnvironmentKey,EnvironmentName,EnvironmentUrl,AliasType,AliasValue
-   1,employee-self-service,Employee Self-Service,true,true,true,,,,TranscriptId,PASTE-AGENT-GUID-HERE
-   ```
-
-   Use `TranscriptSchema` instead of `TranscriptId` only when Copilot Studio provides a schema-style identifier rather than a GUID.
-3. Open the extracted `ESS-main` folder in PowerShell and generate the required JSON:
-
-   ```powershell
-   python tools\agent_registry.py `
-     --input "C:\AgentData\agent-registry.csv" `
-     --output-json "C:\AgentData\agent-registry.json" `
-     --scope-mode "ESS Safe"
-   ```
-
-4. Do not open the report until the command succeeds and creates `agent-registry.json`.
-5. In the same PowerShell window, build the Service-refresh template:
+1. Open the extracted `ESS-main` folder in PowerShell.
+2. Build the environment-specific template:
 
    ```powershell
    python tools\build_service_refresh_template.py `
-     --input "ESS Dashboard - Dynamic Topics (Dataverse) V20.pbit" `
+     --input "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit" `
      --environment-url "https://orgabc12345.crm.dynamics.com" `
-     --output "ESS Dashboard - Dynamic Topics (Dataverse) V20 - Service Refresh.pbit"
+     --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Service Refresh.pbit"
    ```
 
-6. Replace the example URL with the Instance URL from Step 1.
-7. Double-click the generated **`ESS Dashboard - Dynamic Topics (Dataverse) V20 - Service Refresh.pbit`**.
+3. Replace the example URL with the Instance URL from Step 1.
+4. Double-click the generated **`ESS Dashboard - Dynamic Topics (Dataverse) V21 - Service Refresh.pbit`**.
 
 The generated PBIT embeds one static Dataverse endpoint, which Power BI Service can identify during scheduled refresh. Re-run the command to target another environment.
+
+If you completed the optional Microsoft 365 Product Feedback steps, embed the validated registry so `T_...` feedback IDs map to the report's Agent filter:
+
+```powershell
+python tools\build_service_refresh_template.py `
+  --input "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit" `
+  --environment-url "https://orgabc12345.crm.dynamics.com" `
+  --agent-registry-json "C:\AgentData\agent-registry.json" `
+  --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Service Refresh.pbit"
+```
+
+Do not add `--agent-registry-json` for normal transcript and consumption reporting; it is needed only for advanced cross-channel identity mapping.
 
 ---
 
@@ -133,14 +127,10 @@ The generated PBIT embeds one static Dataverse endpoint, which Power BI Service 
 | **Transcript Lookback Days** | Optional — leave blank for 90; limited to retained Dataverse rows | `30`, `60`, `180` |
 | **Org Data File** | Not present in Service-refresh build | Use the reusable Desktop template or Fabric |
 | **Agent Credits  (optional)** | Not present in Service-refresh build | Use the reusable Desktop template or Fabric |
-| **Agent Scope Mode** | ✅ Yes | `ESS Safe` (default), `Selected Agents`, or `All Agents` |
-| **Agent Registry JSON** | Required for ESS Safe / Selected Agents | Paste the full contents of `agent-registry.json` |
 | **Customer Topic Overrides JSON (optional)** | Optional | Paste the full contents of `customer-topic-overrides.json` |
 | **Feedback Events JSON (optional)** | Optional | Paste the full contents of `feedback-events.json` from `ess_feedback_normalizer.py` |
 
 Click **Load**.
-
-> **Do not click Load with `ESS Safe` selected until you paste the complete contents of `agent-registry.json` into Agent Registry JSON.** Entering only the Dataverse URL produces the `Agent Registry JSON must contain enabled TranscriptId or TranscriptSchema aliases` error.
 
 ### Minimum successful first run
 
@@ -148,16 +138,13 @@ For the smallest working configuration, provide:
 
 1. **Dataverse Environment URL (required)** — the Instance URL from Step 1.
 2. **Transcript Lookback Days (defaults to 90 days if left blank)** — leave blank for the default or enter a whole number.
-3. **Agent Scope Mode** — `ESS Safe`.
-4. **Agent Registry JSON** — the complete contents of the JSON generated in Step 4.
-
 Leave topic overrides and feedback blank for the first load. Sign in to Dataverse and confirm **Total Conversations** is non-zero.
 
 > 💡 **Lookback Days** controls how far back the connector pulls transcripts. The filter runs **server-side** on Dataverse, so a smaller window = faster refresh. Default is 90 days.
 
 > ⚠️ **Lookback is not retention.** Entering `90`, `180`, or `365` does not recover transcripts already removed by the Dataverse retention job. Confirm and extend retention before the required history ages out.
 
-> 💡 **Agent scope.** `ESS Safe` includes only enabled registry agents marked as ESS. `Selected Agents` uses the registry's `Selected` flag. `All Agents` explicitly includes every transcript agent while Product Feedback remains registry-mapped. Generate the JSON from the customer-controlled CSV as described in [Agent registry and reporting scope](AGENT-REGISTRY.md).
+> 💡 **Agent filter.** V21 loads the transcript agents found in the environment. Open **All filters** on any analytical page and choose an Agent; the selection is synchronized across pages.
 
 ---
 
@@ -223,7 +210,7 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 | 3 | Download User-Level Credit Consumption CSV (optional; Desktop/manual refresh or Fabric only) | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → Licensing → Copilot Studio → Summary → Download report | 2 min |
 | 4 | Export and prepare Microsoft 365 Product Feedback (optional) | Microsoft 365 admin center → Health → Product feedback | 5–10 min |
 | 5 | Build and open the environment-specific Service-refresh PBIT | PowerShell in the extracted `ESS-main` folder | 1–2 min |
-| 6 | Paste environment URL, registry, and optional JSON into the prompt | Power BI Desktop | 1 min |
+| 6 | Confirm the environment URL and optional JSON inputs | Power BI Desktop | 1 min |
 | 7 | Sign in to Dataverse | Authentication dialog | 1 min |
 | 8 | Validate conversations, users, and optional feedback | Report pages | 2 min |
 | 9 | Publish | Power BI Service | 2 min |
@@ -234,7 +221,6 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Agent Registry JSON must contain enabled TranscriptId or TranscriptSchema aliases for the selected scope` | `ESS Safe` or `Selected Agents` is selected, but Agent Registry JSON is blank, invalid, or has no enabled transcript alias | Run `tools\agent_registry.py`, open the generated `agent-registry.json` in Notepad, and paste its entire JSON array—not the CSV path—into **Agent Registry JSON** |
 | `We couldn't authenticate with the credentials provided` | Account lacks Bot Transcript Viewer, or wrong env URL | Confirm role in Power Platform Admin Center → environment → Settings → Users + permissions → Security roles |
 | `The remote name could not be resolved` / `Invalid URL` | Trailing slash or typo | Re-copy from Power Apps → ⚙️ → Session details |
 | Refresh succeeds but **Total Conversations = 0** | Teams/Developer/M365 Copilot env (transcripts not written), or empty lookback | Move agent to a standard production/sandbox Dataverse env; widen Lookback Days |
