@@ -13,6 +13,7 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 ✅ The [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded, extracted, and kept in its original folder structure
 ✅ **Power BI Desktop** installed — [download free](https://powerbi.microsoft.com/desktop/)
 ✅ **Python 3.10 or later** installed — used to build the Service-refresh template and by optional feedback/topic tools; no packages are required
+✅ **Windows PowerShell 5.1 or PowerShell 7** — the built-in Windows PowerShell is supported; PowerShell 7 is not required
 ✅ **Bot Transcript Viewer** security role on the Dataverse environment that hosts your ESS agent — an admin must grant this. [Microsoft's how-to](https://learn.microsoft.com/en-us/microsoft-copilot-studio/admin-share-bots#assign-the-bot-transcript-viewer-security-role-during-agent-sharing)
 ✅ The **Environment URL** of the Dataverse env that hosts your ESS agent (Step 1 below)
 ✅ A folder for the optional Org Data / Feedback / Credits CSVs (e.g. `Documents/AgentData`)
@@ -91,7 +92,14 @@ Do not load the raw Microsoft 365 export directly or infer ESS from `App = M365 
 ## Step 4 — Build the Service-refresh template
 
 1. Open the extracted `ESS-main` folder in PowerShell.
-2. Build the environment-specific template:
+2. Confirm Python is installed and available:
+
+   ```powershell
+   python --version
+   ```
+
+   The result must be Python 3.10 or later. If `python` is not recognized, install Python with **Add Python to PATH** selected, close PowerShell, and reopen it from the extracted `ESS-main` folder. Do not install any `pip` packages.
+3. Build the environment-specific template:
 
    ```powershell
    python tools\build_service_refresh_template.py `
@@ -100,8 +108,8 @@ Do not load the raw Microsoft 365 export directly or infer ESS from `App = M365 
      --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Service Refresh.pbit"
    ```
 
-3. Replace the example URL with the Instance URL from Step 1.
-4. Double-click the generated **`ESS Dashboard - Dynamic Topics (Dataverse) V21 - Service Refresh.pbit`**.
+4. Replace the example URL with the Instance URL from Step 1.
+5. Double-click the generated **`ESS Dashboard - Dynamic Topics (Dataverse) V21 - Service Refresh.pbit`**.
 
 The generated PBIT embeds one static Dataverse endpoint, which Power BI Service can identify during scheduled refresh. Re-run the command to target another environment.
 
