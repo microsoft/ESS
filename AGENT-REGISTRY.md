@@ -194,6 +194,8 @@ Replace `production-us` with the exact `EnvironmentKey` in your CSV.
 
 `ESS Safe` and `Selected Agents` stop with an error when the registry is blank or no transcript agent matches. `All Agents` permits unmapped transcript and credit agents but still excludes unregistered Product Feedback.
 
+If Power BI shows `Agent Registry JSON must contain enabled TranscriptId or TranscriptSchema aliases for the selected scope`, the Dataverse URL was accepted but the registry was not. Open the generated `agent-registry.json` in Notepad and paste the complete JSON array into **Agent Registry JSON**; do not enter the CSV path or JSON file path.
+
 ### Fabric V2
 
 1. Open the Lakehouse attached to both notebooks.

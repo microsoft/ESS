@@ -90,9 +90,26 @@ Do not load the raw Microsoft 365 export directly or infer ESS from `App = M365 
 
 ## Step 4 — Build the registry and Service-refresh template
 
-1. Follow [Agent registry and reporting scope](AGENT-REGISTRY.md) to find the agent ID, create `agent-registry.csv`, and generate `agent-registry.json`.
-2. Open the extracted `ESS-main` folder.
-3. In that folder, open PowerShell and run:
+1. Follow [Agent registry and reporting scope](AGENT-REGISTRY.md) to find the ESS agent's GUID or schema name.
+2. For one ESS agent, create `C:\AgentData\agent-registry.csv` with exactly one header row and one data row:
+
+   ```csv
+   RegistryVersion,AgentKey,AgentLabel,IsEss,Selected,Enabled,EnvironmentKey,EnvironmentName,EnvironmentUrl,AliasType,AliasValue
+   1,employee-self-service,Employee Self-Service,true,true,true,,,,TranscriptId,PASTE-AGENT-GUID-HERE
+   ```
+
+   Use `TranscriptSchema` instead of `TranscriptId` only when Copilot Studio provides a schema-style identifier rather than a GUID.
+3. Open the extracted `ESS-main` folder in PowerShell and generate the required JSON:
+
+   ```powershell
+   python tools\agent_registry.py `
+     --input "C:\AgentData\agent-registry.csv" `
+     --output-json "C:\AgentData\agent-registry.json" `
+     --scope-mode "ESS Safe"
+   ```
+
+4. Do not open the report until the command succeeds and creates `agent-registry.json`.
+5. In the same PowerShell window, build the Service-refresh template:
 
    ```powershell
    python tools\build_service_refresh_template.py `
@@ -101,8 +118,8 @@ Do not load the raw Microsoft 365 export directly or infer ESS from `App = M365 
      --output "ESS Dashboard - Dynamic Topics (Dataverse) V20 - Service Refresh.pbit"
    ```
 
-4. Replace the example URL with the Instance URL from Step 1.
-5. Double-click the generated **`ESS Dashboard - Dynamic Topics (Dataverse) V20 - Service Refresh.pbit`**.
+6. Replace the example URL with the Instance URL from Step 1.
+7. Double-click the generated **`ESS Dashboard - Dynamic Topics (Dataverse) V20 - Service Refresh.pbit`**.
 
 The generated PBIT embeds one static Dataverse endpoint, which Power BI Service can identify during scheduled refresh. Re-run the command to target another environment.
 
@@ -122,6 +139,8 @@ The generated PBIT embeds one static Dataverse endpoint, which Power BI Service 
 | **Feedback Events JSON (optional)** | Optional | Paste the full contents of `feedback-events.json` from `ess_feedback_normalizer.py` |
 
 Click **Load**.
+
+> **Do not click Load with `ESS Safe` selected until you paste the complete contents of `agent-registry.json` into Agent Registry JSON.** Entering only the Dataverse URL produces the `Agent Registry JSON must contain enabled TranscriptId or TranscriptSchema aliases` error.
 
 ### Minimum successful first run
 
@@ -215,6 +234,7 @@ Then check the **Metric Glossary** page (📖) — it defines the metrics used a
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| `Agent Registry JSON must contain enabled TranscriptId or TranscriptSchema aliases for the selected scope` | `ESS Safe` or `Selected Agents` is selected, but Agent Registry JSON is blank, invalid, or has no enabled transcript alias | Run `tools\agent_registry.py`, open the generated `agent-registry.json` in Notepad, and paste its entire JSON array—not the CSV path—into **Agent Registry JSON** |
 | `We couldn't authenticate with the credentials provided` | Account lacks Bot Transcript Viewer, or wrong env URL | Confirm role in Power Platform Admin Center → environment → Settings → Users + permissions → Security roles |
 | `The remote name could not be resolved` / `Invalid URL` | Trailing slash or typo | Re-copy from Power Apps → ⚙️ → Session details |
 | Refresh succeeds but **Total Conversations = 0** | Teams/Developer/M365 Copilot env (transcripts not written), or empty lookback | Move agent to a standard production/sandbox Dataverse env; widen Lookback Days |
