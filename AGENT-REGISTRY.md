@@ -162,16 +162,19 @@ Column rules:
 Only CSV V18 requires this manual conversion to `agent-registry.json`. Dataverse guided setup accepts the reviewed CSV or JSON and validates it for you. Fabric reads and validates `agent-registry.csv` directly.
 
 1. Open the extracted `ESS-main` folder in File Explorer.
-2. Click the address bar, type `powershell`, and press **Enter**.
-3. Confirm Python:
+2. Press **Alt+D** to select the File Explorer address bar. The complete folder path should become highlighted.
+3. Type `powershell.exe` exactly, including `.exe`, and press **Enter**. Do not use the search box or select an address suggestion.
+4. Confirm that a PowerShell terminal window opens and its prompt ends with `\ESS-main>`.
+5. Confirm Python and the script path:
 
 ```powershell
 python --version
+Test-Path .\tools\agent_registry.py
 ```
 
-Python 3.10 or later is sufficient and no packages need to be installed. If `python` is not recognized, install Python from [python.org](https://www.python.org/downloads/windows/), select **Add Python to PATH**, reopen PowerShell, and retry.
+Python 3.10 or later is sufficient, `Test-Path` must return `True`, and no packages need to be installed. If `python` is not recognized, install Python from [python.org](https://www.python.org/downloads/windows/), select **Add Python to PATH**, reopen PowerShell, and retry.
 
-4. Run:
+6. Run:
 
 ```powershell
 python tools\agent_registry.py `

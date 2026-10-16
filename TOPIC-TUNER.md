@@ -45,14 +45,19 @@ Do not open or save the transcript CSV in Excel. Excel can corrupt the JSON in i
 
 ### Step 2 - Create the topic-rule files
 
-Open the extracted `ESS-main` folder in File Explorer. Select the address bar, type `powershell`, and press **Enter**. Then run:
+1. Open the extracted `ESS-main` folder in File Explorer. Confirm that the file list includes the `tools` folder and `START-HERE-DATAVERSE.cmd`.
+2. Press **Alt+D** to select the File Explorer address bar. The complete folder path should become highlighted.
+3. Type `powershell.exe` exactly, including `.exe`, and press **Enter**. Do not use the **Search ESS-main** box or select an address suggestion.
+4. Confirm that a PowerShell terminal window opens and its prompt ends with `\ESS-main>`. If another File Explorer folder opens, return to `ESS-main` and repeat steps 2-3 using `powershell.exe`.
+5. Run:
 
 ```powershell
 python --version
+Test-Path .\tools\ess_topic_tuner.py
 python tools\ess_topic_tuner.py --input "C:\AgentData\ConversationTranscripts.csv" --output-dir "C:\AgentData\topic-review" --min-frequency 5
 ```
 
-Python must report version 3.10 or later. The second command creates `C:\AgentData\topic-review` and the six files described below.
+Python must report version 3.10 or later, and `Test-Path` must return `True`. The final command creates `C:\AgentData\topic-review` and the six files described below.
 
 Open `topic-learning-audit.csv` and check `Status`:
 
@@ -138,15 +143,18 @@ Use the transcript export steps in [CSV setup - Step 1](SETUP-CSV-Download.md#st
 
 ### Confirm Python
 
-1. Open the unzipped ESS repository folder in File Explorer.
-2. Click the address bar, type `powershell`, and press **Enter**.
-3. Run:
+1. Open the unzipped `ESS-main` folder in File Explorer and confirm that the file list includes the `tools` folder.
+2. Press **Alt+D** to select the address bar. The complete folder path should become highlighted.
+3. Type `powershell.exe` exactly, including `.exe`, and press **Enter**. Do not use the search box or select an address suggestion.
+4. Confirm that a PowerShell terminal window opens and its prompt ends with `\ESS-main>`.
+5. Run:
 
 ```powershell
 python --version
+Test-Path .\tools\ess_topic_tuner.py
 ```
 
-The expected result is `Python 3.10` or later. If Windows says that Python is not recognized, install Python from [python.org](https://www.python.org/downloads/windows/), select **Add Python to PATH** during setup, close PowerShell, and repeat these steps.
+The expected results are `Python 3.10` or later and `True`. If `Test-Path` returns `False`, the terminal is not open in the complete extracted package. If Windows says that Python is not recognized, install Python from [python.org](https://www.python.org/downloads/windows/), select **Add Python to PATH** during setup, close PowerShell, and repeat these steps.
 
 No Python packages need to be installed.
 
@@ -231,6 +239,7 @@ Run `Copilot_Agent_Transcript_Parser.ipynb`. The notebook reads only rows where 
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| Typing `powershell` opens another File Explorer folder such as `Documents\PowerShell` | File Explorer interpreted the text as a folder name instead of the PowerShell executable | Return to the extracted `ESS-main` folder, press **Alt+D**, type `powershell.exe` including `.exe`, and press **Enter** without selecting a suggestion |
 | `python: can't open file 'tools\ess_topic_tuner.py'` | PowerShell is open in the wrong folder, or only the script was downloaded | Open PowerShell from the extracted `ESS-main` folder and keep the complete package structure intact |
 | PowerShell says `python` is not recognized | Python is not installed or not on PATH | Install Python 3.10+ with **Add Python to PATH**, then reopen PowerShell |
 | `Input file not found` | The transcript path is incomplete or mistyped | In File Explorer, Shift+right-click the file and select **Copy as path**, then paste that path after `--input` |
