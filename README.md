@@ -4,7 +4,7 @@
 
 A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with a 9-page executive dashboard that answers the questions HR, IT, and the executive sponsor will actually ask after launch.
 
-> 📊 **Primary data source:** This report leverages the **`ConversationTranscript` Dataverse table** that Copilot Studio writes for supported agent channels. Microsoft 365 Copilot Chat reactions require the optional [cross-channel feedback export path](FEEDBACK-INGESTION.md), because Microsoft Copilot agents don't write Dataverse conversation transcripts.
+> 📊 **Primary data source:** This report leverages the **`ConversationTranscript` Dataverse table** that Copilot Studio writes for supported agent channels. Microsoft 365 Copilot Chat reactions require the optional [cross-channel feedback export path](FEEDBACK-INGESTION.md), because those reactions are not stored in the Dataverse transcripts.
 
 > 💡 Built for ESS, but works for **any Copilot Studio agent** — the same template will load and analyze transcripts from any agent (HR, IT, sales enablement, custom). See [Customize for your agent](#customize-for-your-agent).
 
@@ -21,9 +21,9 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 ---
 
 > ### 🚀 New here? Start in 4 steps
-> **1.** [Download all files](#download-the-complete-self-service-package) → **2.** [Choose your path](#choose-your-path) → **3.** Follow that path's setup guide → **4.** Open the generated `.pbit` and validate the report.
+> **1.** [Download the package](#download-the-complete-self-service-package) → **2.** [Choose one path](#choose-your-path) → **3.** Follow only that path's guide → **4.** Open its Power BI template and validate the report.
 >
-> **Jump to:** [Download all files](#download-the-complete-self-service-package) · [Choose your path](#choose-your-path) · [Common prerequisites](#common-prerequisites) · [Get your data](#get-your-data-files) · [Troubleshooting](#validation--troubleshooting)
+> **Jump to:** [Download the package](#download-the-complete-self-service-package) · [Choose your path](#choose-your-path) · [Common prerequisites](#common-prerequisites) · [Troubleshooting](#validation--troubleshooting)
 
 ---
 
@@ -31,43 +31,13 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 
 [**Download ESS Insights as a ZIP**](https://github.com/microsoft/ESS/archive/refs/heads/main.zip), select **Extract All**, and open the extracted `ESS-main` folder. Keep the folder structure intact.
 
-| Included content | Location |
-|---|---|
-| Power BI templates | Repository root (`*.pbit`) |
-| Archived template backups | `archive/` |
-| Customer-run Python tools | `tools/` |
-| Shared topic taxonomy | `taxonomy/` |
-| Fabric notebooks | `Fabric/notebooks/` |
-| Fabricated validation data | `SampleData/` |
-| Setup and troubleshooting guides | Repository root (`*.md`) |
-
-> **Dataverse users do not need to write Python commands.** Double-click `START-HERE-DATAVERSE.cmd`; the guided setup checks the information and files you select. The documented Python commands remain available for administrators who prefer automation.
-
-### Which local tools do I run?
-
-| Tool | When to use it | Customer output |
-|---|---|---|
-| `START-HERE-DATAVERSE.cmd` | **Recommended first step** for Dataverse Direct; asks plain-language questions and opens file pickers | Validated Desktop PBIT plus saved setup choices |
-| `BUILD-SERVICE-REFRESH.cmd` | Run after the Desktop result is validated | Dataverse-only PBIT suitable for Power BI Service refresh |
-| [`tools/agent_registry.py`](AGENT-REGISTRY.md) | Recommended for stable friendly agent labels; required for exported Microsoft 365 feedback | Validated agent registry |
-| [`tools/build_service_refresh_template.py`](SETUP-Dataverse.md#step-4--create-the-validated-desktop-template) | Runs behind the guided launchers; advanced administrators can call it directly | Contract-validated Desktop PBIT or environment-specific Service PBIT |
-| [`tools/ess_topic_tuner.py`](TOPIC-TUNER.md) | Optional, when customer-specific topic learning is needed | Out-of-fold-validated customer rules plus unresolved review candidates |
-| [`tools/ess_feedback_normalizer.py`](FEEDBACK-INGESTION.md) | Optional, when loading Microsoft 365 Product Feedback or Monitor reaction exports | Agent-scoped feedback CSV/JSON plus an audit report |
-
-The local tools use Python 3.10 or later and require no package installation. The Dataverse launchers check for Python and explain how to install it; no programming knowledge is required.
-
-> The original parameter-driven Dataverse V19 template is retained at
-> `archive/ESS Dashboard - Dynamic Topics (Dataverse) V19 - Dynamic Sources Backup.pbit`.
-> It remains useful for Desktop/manual refresh and future template adjustments, but should not be published directly when scheduled Service refresh is required.
->
-> The registry-scoped Dataverse V20 template is retained at
-> `archive/ESS Dashboard - Dynamic Topics (Dataverse) V20 - Registry Scope Backup.pbit`.
+**Download the ZIP only once. Do not download `.cmd` or `.py` files separately.** Every required template, launcher, notebook, and helper is already in the package. After extraction, choose one path below; its guide identifies exactly what to open and where to export any required data.
 
 ---
 
 ## Choose your path
 
-All three paths use the same ESS reporting model. Dataverse V21 discovers agents from the loaded transcripts and exposes a synchronized **Agent** filter. Use an [agent registry](AGENT-REGISTRY.md) when you need stable business-friendly labels, credit-ID validation, or Microsoft 365 feedback attribution.
+All three paths use the same ESS reporting model. Dataverse V21 discovers agents from the loaded transcripts and exposes a synchronized **Agent** filter. Its basic setup does not require an agent registry; the selected setup guide explains if and when one is needed.
 
 <table>
 <tr>
@@ -129,9 +99,8 @@ Fabric preserves only records ingested before Dataverse deletes them and require
 ### After you choose
 
 1. Follow the selected setup guide above.
-2. Use the in-report **Agent** filter to focus the analysis after loading.
-3. Add [private adaptive topic rules](TOPIC-TUNER.md) only when customer-specific topic coverage is needed.
-4. Add [Microsoft 365 feedback](FEEDBACK-INGESTION.md) only when cross-channel reactions are needed.
+2. Complete the guide's minimum first run before adding optional data.
+3. Use the in-report **Agent** filter to focus the analysis after loading.
 
 ---
 
@@ -140,9 +109,9 @@ Fabric preserves only records ingested before Dataverse deletes them and require
 
 - **Safer multilingual topic classification** — native Copilot Studio topics remain authoritative. Conversations without a native topic use customer-neutral English, Spanish, and Chinese rules with word-boundary matching, scoring, exclusions, confidence, and ambiguity handling. This prevents partial-word collisions such as `tick` matching `ticket`.
 
-- **Private customer-specific learning without template releases** — [`ess_topic_tuner.py`](tools/ess_topic_tuner.py) learns from native topic evidence across every user turn and auto-enables only rules that pass support, cross-topic precision, and deterministic conversation-level out-of-fold validation. It emits no full prompts. Ambiguous, unsupported, or unvalidated discoveries remain disabled for local review. See the [Private adaptive topic tuner guide](TOPIC-TUNER.md).
+- **Private customer-specific learning without template releases** — the optional [Private adaptive topic tuner guide](TOPIC-TUNER.md) explains how to learn reviewed local rules from native topic evidence. It emits no full prompts, and ambiguous or weak discoveries remain disabled.
 
-- **Cross-channel reaction reporting** — transcript reactions and normalized Microsoft 365 Product Feedback or Copilot Studio Monitor exports now combine into one deduplicated feedback table with channel, source, agent, conversation-match status, and verdict. The [Microsoft 365 feedback guide](FEEDBACK-INGESTION.md) includes the exact admin-center export path, safe Agent ID setup, local preparation command, audit checks, and load steps for every template.
+- **Cross-channel reaction reporting** — transcript reactions and normalized Microsoft 365 Product Feedback or Copilot Studio Monitor exports combine into one deduplicated feedback table. The optional [Microsoft 365 feedback guide](FEEDBACK-INGESTION.md) owns the export, preparation, audit, and load steps.
 
 - **Agent filtering without setup JSON** — Dataverse V21 loads the agents found in the selected environment and provides one synchronized Agent slicer across the analytical pages. Transcript and Power Platform consumption rows use the same GUID-based key automatically.
 
@@ -156,9 +125,7 @@ Fabric preserves only records ingested before Dataverse deletes them and require
 
 - **Validated Copilot Studio credits** — CSV V18 and Dataverse V21 Desktop/manual refresh accept the 30-day **User-Level Credit Consumption** export from the [Power Platform admin center](https://admin.powerplatform.microsoft.com). Credits match ESS through `Agent Id`; organization attribution uses `User Email`.
 
-- **One validated Dataverse builder** — `build_service_refresh_template.py` validates every supplied contract and supports two explicit modes: `desktop-validation` preserves and prefills local Org/Credits sources, while `service-refresh` fixes the Dataverse endpoint and removes file/web connectors that would block scheduled refresh.
-
-- **Guided Dataverse setup** — double-click launchers collect the Environment URL, open file pickers for optional inputs, save the choices, and generate the correct Desktop or Service template without requiring the customer to compose Python commands.
+- **Guided Dataverse setup** — the Dataverse guide tells customers when to use each included double-click launcher. No command line or individual tool download is required.
 
 - **Clear observed-versus-modeled labeling** — total and billable credits are observed Power Platform admin center values. Cost, cost per resolved conversation, net value, and ROI are modeled because the export provides no conversation or topic ID.
 
@@ -233,8 +200,7 @@ Confirm the common requirements below before following the guide for your select
 
 - [ ] **Power BI Desktop installed** (Windows) — [details ↓](#1-power-bi-desktop-installed)
 - [ ] **Complete ESS package downloaded and extracted** — [download ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip)
-- [ ] **Python 3.10 or later installed** for the local setup tools — [download Python](https://www.python.org/downloads/windows/). No programming is required; the Dataverse launcher runs it for you.
-- [ ] **Bot Transcript Viewer** role assigned (minimum) on the agent's Dataverse environment — [details ↓](#data-inputs)
+- [ ] **Bot Transcript Viewer** role assigned (minimum) on the agent's Dataverse environment — the selected setup guide shows where it is needed
 - [ ] **Agent environment is Production, Sandbox, or Default** *(not Teams or M365 Copilot)* — [details ↓](#2-supported-environment-types)
 - [ ] **Agent configured to capture transcripts + node-level details** — [details ↓](#3-agent-configuration)
 
@@ -321,77 +287,6 @@ By default, Dataverse **automatically deletes conversation transcripts after 30 
 
 ---
 
-## Get your data files
-
-**This is the part most people ask about: where do I actually go to get each file?** Below is the exact click-path for every input, and which template needs it. Each row links to the full step-by-step (with every menu spelled out) in the setup guide for your path.
-
-> 📌 **CSV versus Dataverse Direct:** CSV Upload needs a transcript file you export yourself; Dataverse Direct needs the environment URL and pulls retained transcripts through the native connector. Dataverse Desktop validation accepts Org Data and User-Level Credit Consumption; its production Service-refresh build intentionally omits those local file connectors. Both accept embedded registry, topic, and feedback JSON. Fabric is the automated multi-source path.
-
-### 📄 CSV Upload — get these files
-
-| # | File | Required? | Where to get it — exact path | Full steps |
-|---|---|---|---|---|
-| 1 | **Conversation Transcripts** | ✅ **Required** | [make.powerapps.com](https://make.powerapps.com) → switch to your agent's environment (top-right selector) → **Tables** → **All** → search `conversation` → open **ConversationTranscript** → **Export ▸ Export data** → **Download exported data** → unzip the CSV | [📘 CSV guide — Step 1](./SETUP-CSV-Download.md) |
-| 2 | **Org Data** (HR roster) | ⭐ Recommended | Export from HR, Viva Insights, Microsoft Graph, or a configured Entra/M365 view that actually includes `UserPrincipalName` plus the desired Department/Country/JobTitle fields. The default Active users export may contain only basic identity fields. | [📘 CSV guide — Step 2](./SETUP-CSV-Download.md) |
-| 3 | **Copilot Credits** | Optional | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → **Licensing ▸ Copilot Studio ▸ Summary ▸ Download report ▸ User-Level Credit Consumption**; select **30 days** | [📘 CSV guide — Step 3](./SETUP-CSV-Download.md) |
-| 4 | **Normalized feedback events** | Optional | [admin.microsoft.com](https://admin.microsoft.com) → **Health ▸ Product feedback ▸ Export to CSV**, then filter it locally with the agent registry and `tools/ess_feedback_normalizer.py` | [📘 Feedback guide — exact export and load steps](./FEEDBACK-INGESTION.md) |
-
-> ⚠️ **Do not open the transcript CSV in Excel** — Excel corrupts the JSON in the `Content` column and the template fails to load with an `M Engine error`. Load it straight into Power BI.
-
-### 🔌 Dataverse Direct — get these inputs
-
-| # | Input | Required? | Where to get it — exact path | Full steps |
-|---|---|---|---|---|
-| 1 | **Dataverse Environment URL** *(no file — pulls transcripts live)* | ✅ **Required** | [make.powerapps.com](https://make.powerapps.com) → switch to your agent's environment → **⚙️ (gear) ▸ Session details** → copy **Instance url** (e.g. `https://orgabc12345.crm.dynamics.com`) | [📘 Dataverse guide — Step 1](./SETUP-Dataverse.md) |
-| 2 | **Org Data** (HR roster) | ⭐ Recommended for Desktop validation | Export from HR, Viva Insights, Microsoft Graph, or a configured Entra/M365 view that includes `UserPrincipalName` and the desired organization attributes. Do not assume the default Active users export includes them. | [📘 Dataverse guide — Step 2](./SETUP-Dataverse.md) |
-| 3 | **Copilot Credits** | Optional | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → **Licensing ▸ Copilot Studio ▸ Summary ▸ Download report ▸ User-Level Credit Consumption**; select **30 days** | [📘 Dataverse guide — Step 3](./SETUP-Dataverse.md) |
-| 4 | **Normalized feedback events** | Optional | [admin.microsoft.com](https://admin.microsoft.com) → **Health ▸ Product feedback ▸ Export to CSV**, then filter it locally with the agent registry and `tools/ess_feedback_normalizer.py` | [📘 Feedback guide — exact export and load steps](./FEEDBACK-INGESTION.md) |
-
-### 🧱 Fabric Lakehouse — get these files
-
-> 💡 **New to Fabric?** A **Fabric workspace** is just a project folder in the Power BI/Fabric service. A **Lakehouse** is a storage location inside that workspace where the notebooks below will save your conversation data. A **notebook** is a small, pre-written program — you don't need to know how to code to run it, just how to click "Run all cells."
-
-| # | File | Required? | Where to get it | Full steps |
-|---|---|---|---|---|
-| 1 | **`ESS - Fabric V2.pbit`** (the dashboard template) | ✅ **Required** | Included in the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) root | [📘 Fabric guide — Step 1](./SETUP-Fabric.md) |
-| 2 | **`Copilot_Agent_Transcript_Parser.ipynb`** (notebook — parses conversation transcripts) | ✅ **Required** | Included under `Fabric/notebooks/` | [📘 Fabric guide — Step 1](./SETUP-Fabric.md) |
-| 3 | **`Copilot_Credit_Consumption_Ingester.ipynb`** (notebook — ingests Copilot credit usage) | Optional | Included under `Fabric/notebooks/` | [📘 Fabric guide — Step 1](./SETUP-Fabric.md) |
-| 4 | **A Fabric workspace with a Lakehouse** | ✅ **Required** | Create one in the [Microsoft Fabric portal](https://app.fabric.microsoft.com/) — a trial capacity is enough to evaluate | [📘 Fabric guide — Before you start](./SETUP-Fabric.md#before-you-start) |
-| 5 | **Normalized feedback events** | Optional | Export Microsoft 365 **Health ▸ Product feedback**, filter it locally with the agent registry, and upload the prepared CSV to `Files/feedback` | [📘 Feedback guide — exact export and load steps](./FEEDBACK-INGESTION.md) |
-
-> ⚠️ **This path is more involved than CSV Upload or Dataverse Direct** — it requires access to a Fabric workspace and running two notebooks (a one-time setup, then optionally scheduled to repeat automatically). If you're not sure you need this, see [Is this path right for you?](./SETUP-Fabric.md#is-this-path-right-for-you) before starting.
-
-### Copilot credit exports — validated source and contract
-
-Use the [Power Platform admin center](https://admin.powerplatform.microsoft.com) → **Licensing → Copilot Studio → Summary → Download report**. This page allows a **tenant administrator**, **Power Platform Administrator**, or **Dynamics 365 Administrator**; use **Power Platform Administrator** as the least-privilege choice for this workflow. In the download panel choose:
-
-- **Usage type:** `Copilot Credits`
-- **Lookback:** `30`, `60`, `90`, or `180` days
-- **Download type:** each of `Environment Consumption Summary`, `Agent-Level Credit Consumption`, and `User-Level Credit Consumption`
-
-At 30 days the files are named:
-
-- `EntitlementConsumptionTenantDetailsReport_MCSMessages_30.csv`
-- `EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30.csv`
-- `EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv`
-
-The environment file is daily (`Usage Date`) and contains: `BillingPlan Id`, `BillingPlan Name`, `Environment Id`, `Environment Name`, `Capacity Type`, `Entitled Quantity`, `Prepaid Consumed Quantity`, `Pay as you go Consumed Quantity`, `Usage Date`. The agent snapshot contains: `Agent Name`, `Agent Id`, `Product`, `AI Feature/Billable Feature`, `Billed credit`, `Non-billed credit`, `Channel`, `Knowledge Sources`, `Tool Used`, `LLM Model`, `Scenario Name`, `Environment Id`, `Environment Name`. The user snapshot contains: `User Id`, `User Email`, `Agent Id`, `Agent Name`, `Billable credit used`, `Credits used`, `M365 Copilot Licensed`.
-
-Credit fields are decimal values (for example, `113.89`), and live `Agent Id` values are bare GUIDs. Agent and user files are aggregate snapshots for the selected lookback and have no activity date. `User Email` can be blank; retain those rows as **unmatched identity**. Do not append overlapping snapshots as transactions.
-
-> **Compatibility:** CSV V18 and Dataverse V21 Desktop/manual refresh accept the **30-day User-Level Credit Consumption** CSV directly. Fabric V2 uses all three Power Platform admin center exports. The separate **M365 Copilot Credits report** is a narrower source for metered declarative agents in M365 Copilot Chat and is not the recommended ESS source.
-
-#### Observed credits versus modeled conversation attribution
-
-The Power Platform admin center exports provide observed credits at environment-day, agent-window, and user-agent-window grain. They provide no conversation/session ID, so credits can be matched to ESS by bare `Agent Id` and, where present, normalized `User Email`, but not observed per conversation, resolved conversation, topic, or outcome. For modeled analysis, preserve the exported aggregate as the control total, place blank-email rows in an unmatched bucket, and allocate each user-agent snapshot across in-scope resolved conversations using a documented rule (for example equal share, or proportional transcript diagnostic cost). Reconcile allocated values back to each exported control total and label every conversation/topic/outcome value **modeled allocation**, never billing-observed.
-
-**Next:** complete the [agent registry guide](AGENT-REGISTRY.md), open the matching `.pbit` from the extracted package, and follow the setup guide linked under [Choose your path](#choose-your-path). Do not use the fabricated sample registry with customer data.
-→ **[Full CSV setup guide](./SETUP-CSV-Download.md)** · **[Full Dataverse setup guide](./SETUP-Dataverse.md)** · **[Full Fabric setup guide](./SETUP-Fabric.md)**
-
-> 🔑 **Can't find the ConversationTranscript table, or transcripts come back empty?** You're almost certainly missing the **Bot Transcript Viewer** security role (Environment Maker is *not* enough), or your agent runs in an unsupported environment (Teams / M365 Copilot). See [Common prerequisites](#common-prerequisites) and [Prerequisites — details](#prerequisites--details).
-
----
-
 ## Synthetic sample data
 
 The [`SampleData`](./SampleData/) folder contains only fabricated `example.com` users and synthetic GUIDs. It is safe for demos and validates the same contracts used by the release templates:
@@ -418,28 +313,6 @@ With the sample feedback loaded, the unified feedback table contains **56 events
 
 ---
 
-## Data inputs
-
-<details>
-<summary><strong>Click to expand — required & optional files, roles, and what each unlocks</strong></summary>
-
-| File | Required? | Required role(s) | Unlocks |
-|---|---|---|---|
-| **Conversation Transcripts** (Dataverse export from your ESS environment) | ✅ Required | **Bot Transcript Viewer** (minimum, least-privilege) — or any role with Read on the `conversationtranscript` table. **System Administrator** always works. **System Customizer** usually works but isn't guaranteed; assign Bot Transcript Viewer alongside it to be safe. | All adoption, outcomes, time-to-knowledge, and in-conversation thumbs/CSAT feedback |
-| **Org Data** (HR roster CSV: UPN plus available Department, JobTitle, Country) | ⭐ Recommended | Depends on source: HR/Viva/Graph administrator, or an M365 role that can export the configured view | Organization breakouts for the attributes actually present; missing optional attributes remain blank |
-| **Copilot Credits** | Optional | **Power Platform Administrator** recommended; tenant administrator or Dynamics 365 Administrator also accepted | CSV V18 and Dataverse V21 Desktop/manual refresh use the User-Level export; the Service-refresh build disables this file input; Fabric V2 uses all three exports |
-| **Normalized feedback events** | Optional | Feedback export access in the Microsoft 365 admin center; full identity details require **Compliance Administrator** or **Global Administrator** | Microsoft 365 Copilot Chat and Monitor reactions, channel/source attribution, and reconciliation status |
-
-> ⚠️ **`Environment Maker` alone is not enough** to read transcripts. Customers often have this role and assume they're covered — they aren't. Grant **Bot Transcript Viewer** (or higher) explicitly.
-
-> 💡 Roles are assigned in **Power Platform Admin Center → Environment → Settings → Users + permissions → Security roles** (Dataverse / Copilot Studio roles) or **Microsoft 365 Admin Center → Roles** (M365 roles). Extending Dataverse retention (see [Prerequisites §4](#4-dataverse-retention-window)) requires **System Administrator** on the environment.
-
-> The template **will load and render every page without errors** even if you provide only the required transcripts file. Optional pages and breakouts will show blank where data is missing — by design, so you can start with the minimum and add more later.
-
-</details>
-
----
-
 ## Validation & troubleshooting
 
 <details>
@@ -451,7 +324,7 @@ With the sample feedback loaded, the unified feedback table contains **56 events
 | Total Users count looks wrong | Same employee appears under both UPN and Entra Object ID in your transcripts | This is handled automatically — both identities are cross-walked in the model |
 | "Users by Organization" chart shows only (Blank) | Org Data file not loaded, or UPN format doesn't match | Set the **Org Data File** parameter (Transform data → Edit Parameters); ensure the column is named `UserPrincipalName` |
 | Country or Job Title is blank | The selected Org Data export did not include that optional attribute | Use HR, Viva Insights, Microsoft Graph, or a configured Entra/M365 export that includes the field; the report remains valid without it |
-| Observed Credit Leaderboard is blank | The export has no `Agent Id` matching the selected agent/registry `CreditId`, or the Service-refresh build was used | Check the builder warning and the export's `Agent Id`; use Desktop validation for the local file or Fabric for automated enrichment |
+| Observed Credit Leaderboard is blank | The export has no `Agent Id` matching the selected agent/registry `CreditId`, or the Service-refresh build was used | Check the launcher's setup results and the export's `Agent Id`; use Desktop validation for the local file or Fabric for automated enrichment |
 | Repeat-usage rate is 0% | Period is too short (everyone is a first-time user) | Widen the date filter, or wait for more data |
 
 Full validation checklist: see the **Validate before sharing** step in either setup guide ([CSV Upload](./SETUP-CSV-Download.md#step-6--validate-before-sharing) &middot; [Dataverse Direct](./SETUP-Dataverse.md#step-7--validate-before-sharing)).

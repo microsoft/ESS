@@ -152,13 +152,12 @@ The report combines exported events with reactions already present in transcript
 
 ### Dataverse V21
 
-Build the Desktop-validation template with both validated JSON files embedded:
+Run `START-HERE-DATAVERSE.cmd` as described in the [Dataverse Direct guide](SETUP-Dataverse.md#step-4--create-the-validated-desktop-template). Answer **Yes** when asked about optional files, then select:
 
-```powershell
-python tools\build_service_refresh_template.py --mode desktop-validation --input "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit" --environment-url "https://orgabc12345.crm.dynamics.com" --agent-registry-json "C:\AgentData\agent-registry.json" --feedback-events-json "C:\AgentData\feedback-events.json" --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Desktop Validation.pbit"
-```
+- `agent-registry.json` under **Agent registry**; and
+- `feedback-events.json` under **Prepared Microsoft 365 feedback**.
 
-Open and refresh the generated template. The builder rejects feedback whose `AgentId` is not an enabled registry `AgentKey`. After validation, rerun with `--mode service-refresh` and a different output name for publication. The embedded registry maps Microsoft 365 `T_...` title IDs to the same Agent filter used by transcript rows.
+Open and refresh the generated Desktop template. The launcher rejects feedback whose `AgentId` is not an enabled registry `AgentKey`. After validation, follow the Dataverse guide's publish step; its second launcher reuses the approved files.
 
 ### Fabric V2
 

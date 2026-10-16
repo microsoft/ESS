@@ -8,9 +8,9 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 ## Before you start
 
-✅ The [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded, extracted, and kept in its original folder structure
+✅ The [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded, extracted, and kept in its original folder structure; do not download individual scripts
 ✅ **Power BI Desktop** installed — [download free](https://powerbi.microsoft.com/desktop/)
-✅ **Python 3.10 or later** installed — used by the local registry tool and optional feedback/topic tools; no packages are required
+✅ **Python 3.10 or later** installed — [download for Windows](https://www.python.org/downloads/windows/); it is used to create the required CSV-path agent registry, and no packages are required
 ✅ **Bot Transcript Viewer** security role on the Dataverse environment that hosts your ESS agent — an admin must grant this. [Microsoft's how-to](https://learn.microsoft.com/en-us/microsoft-copilot-studio/admin-share-bots#assign-the-bot-transcript-viewer-security-role-during-agent-sharing)
 ✅ A folder you'll use to store the CSVs (e.g. `Documents/AgentData`)
 
@@ -117,7 +117,7 @@ Do not load the raw Microsoft 365 export directly. Rows with blank Agent ID cann
 ## Step 4 — Build the registry and open the included template
 
 1. **Build the required agent registry**
-   - Follow [Agent registry and reporting scope](AGENT-REGISTRY.md).
+   - Follow [Agent registry and reporting scope](AGENT-REGISTRY.md#before-you-start). That guide shows how to copy the included starter CSV and run the included validator.
    - Use the transcript file from Step 1 to find the agent's `BotId`.
    - Generate `agent-registry.json`.
 
@@ -215,11 +215,11 @@ Save this as a sticky note:
 | 1 | Export `ConversationTranscript` table | Power Apps → Tables | 5 min |
 | 2 | Export HR roster (optional) | HR system or Entra/Graph | 2 min |
 | 3 | Download 30-day User-Level Credit Consumption CSV (optional) | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → Licensing → Copilot Studio → Summary → Download report | 2 min |
-| 4 | Export and prepare Microsoft 365 Product Feedback (optional) | Microsoft 365 admin center → Health → Product feedback | 5–10 min |
-| 5 | Open the included `.pbit` | Extracted `ESS-main` folder | 1 min |
-| 6 | Paste file paths and optional JSON into the parameter prompt | Power BI Desktop | 1 min |
-| 7 | Validate conversations, users, and optional feedback | Report pages | 2 min |
-| 8 | Publish to workspace or export PDF | Power BI Service | 2 min |
+| 4 | Create `agent-registry.json` | [Agent registry guide](AGENT-REGISTRY.md#step-7---build-and-validate-the-registry) | 5–10 min |
+| 5 | Export and prepare Microsoft 365 Product Feedback (optional) | [Feedback guide](FEEDBACK-INGESTION.md) | 5–10 min |
+| 6 | Open the included `.pbit` | Extracted `ESS-main` folder | 1 min |
+| 7 | Paste file paths and optional JSON into the parameter prompt | Power BI Desktop | 1 min |
+| 8 | Validate, then publish or export PDF | Report pages and Power BI Service | 4 min |
 
 ---
 
