@@ -40,19 +40,7 @@ If none of these apply, use **[Dataverse Direct](SETUP-Dataverse.md)** or **[CSV
 ✅ **Power BI Desktop** installed — [download free](https://powerbi.microsoft.com/desktop/)
 ✅ **Python 3.10 or later** installed locally — [download for Windows](https://www.python.org/downloads/windows/); it is used in the linked agent-registry steps and optional feedback/topic steps, and no packages are required
 
-### Access and roles for this path
-
-Fabric workspace and transcript-ingestion access are required for the first refresh. Add the other access only when you choose to ingest that optional source.
-
-| Input or action | Required? | Access needed |
-|---|---|---|
-| Build and run the Fabric solution | **Required** | **Contributor**, **Member**, or **Admin** in the capacity-backed Fabric workspace. This permits notebook import/run, Lakehouse attachment, SQL analytics endpoint use, and report publication. **Viewer is not sufficient.** |
-| Read each Dataverse transcript source | **Required** | A Dataverse **Application User** for the app registration in every source environment, assigned **Bot Transcript Viewer** or a custom role with organization-level **Read** access to `conversationtranscript`. |
-| Provision the ingestion identity | **Required one-time setup** | An account allowed to create app registrations and credentials in Microsoft Entra ID (or Entra administrator help if tenant policy restricts this), plus a Power Platform/Dataverse admin who can add the Application User and assign its security role. |
-| Users / organization enrichment | Optional; separate ingestion required | The included notebooks do not ingest a Users file. If the customer implements the optional auxiliary organization tables, the export account needs the applicable source access. For **Microsoft 365 admin center → Users → Active users → Export users**, use **Global Reader**, **User Administrator**, or **Global Administrator**. |
-| Environment, Agent-Level, and User-Level Copilot Credits / consumption CSVs | Optional | **Power Platform Administrator** is recommended least privilege; a tenant administrator or **Dynamics 365 Administrator** can also use the download page. |
-| Microsoft 365 Product Feedback export | Optional | An appropriate Microsoft 365 administrator or reader can view and export it. **Compliance Administrator** or **Global Administrator** is needed only to see identity details or delete feedback. |
-| Publish the report | Included in required workspace access | The Fabric workspace **Contributor**, **Member**, or **Admin** role already provides workspace write access; the applicable Power BI license is also required. |
+> 📋 See the landing page's single [required and optional data-access table](README.md#get-your-data-and-confirm-access). This guide repeats each role only where you use it.
 
 ---
 
@@ -225,7 +213,11 @@ For the smallest working configuration:
 
 Add optional feedback and credit inputs only after this first refresh succeeds.
 
-> 💡 **Optional auxiliary tables:** `copilot_org_data`, `copilot_licensed_users`, and `copilot_interactions_parsed` are not produced by the two included notebooks. Fabric V2 treats them as typed-empty optional sources so refresh still succeeds. Populate them only through a separately implemented and validated Lakehouse ingestion process; this repository doesn't provide a local Org Data file parameter or those ingestion artifacts.
+### Optional — Add Users / organization enrichment
+
+`copilot_org_data`, `copilot_licensed_users`, and `copilot_interactions_parsed` are not produced by the two included notebooks. Fabric V2 treats them as typed-empty optional sources so refresh still succeeds.
+
+Populate them only through a separately implemented and validated Lakehouse ingestion process; this repository does not provide a local Org Data file parameter or those ingestion artifacts. If Microsoft 365 **Active users** is the approved source, the exporting account needs **Global Reader**, **User Administrator**, or **Global Administrator**. Other sources such as HR, Viva Insights, or Microsoft Graph use their own access model.
 
 ---
 

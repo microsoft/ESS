@@ -16,17 +16,7 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 > ⚠️ **Environment Maker is NOT enough.** Without the Bot Transcript Viewer role, you won't see the ConversationTranscript table in Step 1.
 
-### Access and roles for this path
-
-The transcript export is the only data access required for the first refresh. Add the other access only when you choose to load that optional file or publish the report.
-
-| Input or action | Required? | Access needed |
-|---|---|---|
-| `ConversationTranscript.csv` | **Required** | **Bot Transcript Viewer** in the agent's Dataverse environment, or a customer-approved custom role with organization-level **Read** access to `conversationtranscript`. A Dataverse admin must assign it. |
-| Users / organization data (`OrgData.csv`) | Optional | For **Microsoft 365 admin center → Users → Active users → Export users**, use **Global Reader**, **User Administrator**, or **Global Administrator**. HR, Viva Insights, Microsoft Graph, and other sources require their own source-specific access. |
-| User-Level Copilot Credits / consumption CSV | Optional | **Power Platform Administrator** is recommended least privilege; a tenant administrator or **Dynamics 365 Administrator** can also use the download page. |
-| Microsoft 365 Product Feedback export | Optional | An appropriate Microsoft 365 administrator or reader can view and export it. **Compliance Administrator** or **Global Administrator** is needed only to see identity details or delete feedback. |
-| Publish the finished report | Optional | An appropriate Power BI workspace role, typically **Contributor** or higher, plus the applicable Power BI license. No Power BI Service role is needed for Desktop-only use. |
+> 📋 See the landing page's single [required and optional data-access table](README.md#get-your-data-and-confirm-access). This guide repeats each role only where you use it.
 
 ---
 

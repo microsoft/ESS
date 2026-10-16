@@ -20,17 +20,7 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 > ⚠️ **Environment Maker is NOT enough.** Without the Bot Transcript Viewer role, the connector signs in successfully but returns zero `conversationtranscript` rows.
 
-### Access and roles for this path
-
-The live transcript connection is the only data access required for the first refresh. Add the other access only when you choose to load that optional file or publish the report.
-
-| Input or action | Required? | Access needed |
-|---|---|---|
-| Live `conversationtranscript` data | **Required** | The Power BI Dataverse sign-in account needs **Bot Transcript Viewer** in the agent's environment, or a customer-approved custom role with organization-level **Read** access to `conversationtranscript`. A Dataverse admin must assign it. |
-| Users / organization data (`OrgData.csv`) | Optional; Desktop validation only | For **Microsoft 365 admin center → Users → Active users → Export users**, use **Global Reader**, **User Administrator**, or **Global Administrator**. HR, Viva Insights, Microsoft Graph, and other sources require their own source-specific access. |
-| User-Level Copilot Credits / consumption CSV | Optional; Desktop validation only | **Power Platform Administrator** is recommended least privilege; a tenant administrator or **Dynamics 365 Administrator** can also use the download page. |
-| Microsoft 365 Product Feedback export | Optional | An appropriate Microsoft 365 administrator or reader can view and export it. **Compliance Administrator** or **Global Administrator** is needed only to see identity details or delete feedback. |
-| Publish and schedule refresh | Optional | An appropriate Power BI workspace role, typically **Contributor** or higher, plus the applicable Power BI license. Dataverse remains authenticated with the account that has transcript access. |
+> 📋 See the landing page's single [required and optional data-access table](README.md#get-your-data-and-confirm-access). This guide repeats each role only where you use it.
 
 ### Plain-language terms
 
@@ -82,7 +72,7 @@ The live transcript connection is the only data access required for the first re
 **Where to get it** (pick one):
 
 - 🅰️ **From HR, Viva Insights, or Microsoft Graph** — preferred when Department, Country, and JobTitle are required.
-- 🅱️ **From the [Microsoft 365 admin center](https://admin.microsoft.com)** — select **Users → Active users → Export users**, then confirm the downloaded header before continuing. The default export can contain only basic identity fields and may omit Department, Country, and JobTitle.
+- 🅱️ **From the [Microsoft 365 admin center](https://admin.microsoft.com)** — sign in with **Global Reader**, **User Administrator**, or **Global Administrator**, select **Users → Active users → Export users**, then confirm the downloaded header before continuing. The default export can contain only basic identity fields and may omit Department, Country, and JobTitle.
 - 🅲 **Skip for now** — the template loads cleanly without it.
 
 `UserPrincipalName`, `UPN`, or `PersonId` is required when the file is supplied. Missing Department, Country, JobTitle, or DisplayName is reported as a warning and renders as blank; it does not invalidate the transcript data.
