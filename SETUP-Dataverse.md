@@ -22,13 +22,15 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 ### Access and roles for this path
 
-| Purpose | Access needed |
-|---|---|
-| Read live transcripts (required) | The Power BI sign-in account needs **Bot Transcript Viewer** in the agent's Dataverse environment, or a customer-approved custom role with organization-level **Read** access to `conversationtranscript`. A Dataverse admin must assign it. |
-| Export organization data (optional) | Depends on the source. For **Microsoft 365 admin center → Active users**, use **Global Reader**, **User Administrator**, or **Global Administrator**. HR, Viva Insights, and Graph sources have their own access requirements. |
-| Download Copilot Credits (optional) | **Power Platform Administrator** is recommended least privilege; a tenant administrator or **Dynamics 365 Administrator** is also accepted by the export page. |
-| Export Microsoft 365 Product Feedback (optional) | A Microsoft 365 administrator or reader account can view and export Product feedback. **Compliance Administrator** or **Global Administrator** is needed only to see identity details or delete feedback. |
-| Publish and schedule refresh (optional) | An appropriate Power BI workspace role, typically **Contributor** or higher, plus the applicable Power BI license. Dataverse remains authenticated with the account that has transcript access. |
+The live transcript connection is the only data access required for the first refresh. Add the other access only when you choose to load that optional file or publish the report.
+
+| Input or action | Required? | Access needed |
+|---|---|---|
+| Live `conversationtranscript` data | **Required** | The Power BI Dataverse sign-in account needs **Bot Transcript Viewer** in the agent's environment, or a customer-approved custom role with organization-level **Read** access to `conversationtranscript`. A Dataverse admin must assign it. |
+| Users / organization data (`OrgData.csv`) | Optional; Desktop validation only | For **Microsoft 365 admin center → Users → Active users → Export users**, use **Global Reader**, **User Administrator**, or **Global Administrator**. HR, Viva Insights, Microsoft Graph, and other sources require their own source-specific access. |
+| User-Level Copilot Credits / consumption CSV | Optional; Desktop validation only | **Power Platform Administrator** is recommended least privilege; a tenant administrator or **Dynamics 365 Administrator** can also use the download page. |
+| Microsoft 365 Product Feedback export | Optional | An appropriate Microsoft 365 administrator or reader can view and export it. **Compliance Administrator** or **Global Administrator** is needed only to see identity details or delete feedback. |
+| Publish and schedule refresh | Optional | An appropriate Power BI workspace role, typically **Contributor** or higher, plus the applicable Power BI license. Dataverse remains authenticated with the account that has transcript access. |
 
 ### Plain-language terms
 

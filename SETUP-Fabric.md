@@ -42,14 +42,17 @@ If none of these apply, use **[Dataverse Direct](SETUP-Dataverse.md)** or **[CSV
 
 ### Access and roles for this path
 
-| Purpose | Access needed |
-|---|---|
-| Build and run the Fabric solution (required) | **Contributor**, **Member**, or **Admin** in the capacity-backed Fabric workspace so you can create/import notebooks, attach a Lakehouse, run notebooks, and use the SQL analytics endpoint. **Viewer** is not sufficient. |
-| Read each Dataverse source (required) | A Dataverse **Application User** for the app registration in every source environment, assigned **Bot Transcript Viewer** or a custom role with organization-level **Read** access to `conversationtranscript`. |
-| Provision the ingestion identity (one-time administrator setup) | An account allowed to create app registrations and credentials in Microsoft Entra ID (or an Entra admin if tenant policy restricts this), plus a Power Platform/Dataverse admin who can add the Application User and assign its security role. |
-| Download Copilot Credits (optional) | **Power Platform Administrator** is recommended least privilege; a tenant administrator or **Dynamics 365 Administrator** is also accepted by the export page. |
-| Export Microsoft 365 Product Feedback (optional) | A Microsoft 365 administrator or reader account can view and export Product feedback. **Compliance Administrator** or **Global Administrator** is needed only to see identity details or delete feedback. |
-| Publish the report (optional) | The Fabric workspace **Contributor**, **Member**, or **Admin** role already satisfies the workspace write requirement; the applicable Power BI license is also required. |
+Fabric workspace and transcript-ingestion access are required for the first refresh. Add the other access only when you choose to ingest that optional source.
+
+| Input or action | Required? | Access needed |
+|---|---|---|
+| Build and run the Fabric solution | **Required** | **Contributor**, **Member**, or **Admin** in the capacity-backed Fabric workspace. This permits notebook import/run, Lakehouse attachment, SQL analytics endpoint use, and report publication. **Viewer is not sufficient.** |
+| Read each Dataverse transcript source | **Required** | A Dataverse **Application User** for the app registration in every source environment, assigned **Bot Transcript Viewer** or a custom role with organization-level **Read** access to `conversationtranscript`. |
+| Provision the ingestion identity | **Required one-time setup** | An account allowed to create app registrations and credentials in Microsoft Entra ID (or Entra administrator help if tenant policy restricts this), plus a Power Platform/Dataverse admin who can add the Application User and assign its security role. |
+| Users / organization enrichment | Optional; separate ingestion required | The included notebooks do not ingest a Users file. If the customer implements the optional auxiliary organization tables, the export account needs the applicable source access. For **Microsoft 365 admin center → Users → Active users → Export users**, use **Global Reader**, **User Administrator**, or **Global Administrator**. |
+| Environment, Agent-Level, and User-Level Copilot Credits / consumption CSVs | Optional | **Power Platform Administrator** is recommended least privilege; a tenant administrator or **Dynamics 365 Administrator** can also use the download page. |
+| Microsoft 365 Product Feedback export | Optional | An appropriate Microsoft 365 administrator or reader can view and export it. **Compliance Administrator** or **Global Administrator** is needed only to see identity details or delete feedback. |
+| Publish the report | Included in required workspace access | The Fabric workspace **Contributor**, **Member**, or **Admin** role already provides workspace write access; the applicable Power BI license is also required. |
 
 ---
 
