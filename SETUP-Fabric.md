@@ -32,13 +32,13 @@ If none of these apply, use **[Dataverse Direct](SETUP-Dataverse.md)** or **[CSV
 
 ## Before you start
 
-✅ The [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded and extracted
+✅ The [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded and extracted; do not download notebooks or scripts individually
 ✅ A **Fabric workspace** with Fabric capacity assigned (a trial capacity is enough to evaluate)
 ✅ A **Lakehouse** created in that workspace
 ✅ Permission to **create and run notebooks** in that workspace
 ✅ A **Microsoft Entra app registration** added as a Dataverse **Application User** (with read access on Conversation Transcript) in every Dataverse environment you're ingesting from — this typically needs a Dataverse or Entra administrator to set up; it's a different, additional requirement from the CSV/Dataverse-Direct paths' simpler Bot Transcript Viewer role
 ✅ **Power BI Desktop** installed — [download free](https://powerbi.microsoft.com/desktop/)
-✅ **Python 3.10 or later** installed locally — used to validate the agent registry and optionally prepare feedback/topic files; no packages are required
+✅ **Python 3.10 or later** installed locally — [download for Windows](https://www.python.org/downloads/windows/); it is used in the linked agent-registry steps and optional feedback/topic steps, and no packages are required
 
 ---
 
@@ -102,7 +102,7 @@ Download and extract the [complete ESS package](https://github.com/microsoft/ESS
 5. Set `TENANT_ID`, `CLIENT_ID`, and `CLIENT_SECRET` from the administrator setup above. For production, replace the literal secret with `notebookutils.credentials.getSecret(...)`.
 6. Leave `LOOKBACK_DAYS = 7` and `WRITE_MODE = 'merge'` for safe incremental refresh. Use `LOOKBACK_DAYS = 0` with `WRITE_MODE = 'overwrite'` only for an intentional full replacement.
 
-Create and validate the [agent registry](AGENT-REGISTRY.md), then upload `agent-registry.csv` to `Files/config/agent-registry.csv`. Set the same `AGENT_SCOPE_MODE` in both notebooks:
+Create and validate the [agent registry](AGENT-REGISTRY.md#before-you-start), then upload `agent-registry.csv` to `Files/config/agent-registry.csv`. The registry guide contains the exact download, edit, and validation steps. Set the same `AGENT_SCOPE_MODE` in both notebooks:
 
 - `ESS Safe` — enabled registry agents marked `IsEss=true` (default);
 - `Selected Agents` — enabled registry agents marked `Selected=true`;

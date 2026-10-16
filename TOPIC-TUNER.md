@@ -125,13 +125,7 @@ Open **Transform data → Edit parameters** and paste the full contents of `cust
 
 ### Dataverse V21
 
-Embed the validated file with the supported builder instead of manually editing the PBIT:
-
-```powershell
-python tools\build_service_refresh_template.py --mode desktop-validation --input "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit" --environment-url "https://orgabc12345.crm.dynamics.com" --topic-overrides-json "C:\AgentData\topic-review\customer-topic-overrides.json" --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Desktop Validation.pbit"
-```
-
-For production scheduled refresh, change `--mode desktop-validation` to `--mode service-refresh`. The builder validates the rule schema and embeds the JSON contents; the PBIT parameter contains JSON, not the file path.
+Run `START-HERE-DATAVERSE.cmd` as described in the [Dataverse Direct guide](SETUP-Dataverse.md#step-4--create-the-validated-desktop-template). Answer **Yes** when asked about optional files and select `customer-topic-overrides.json` under **Approved topic rules**. The launcher validates and embeds the rules. After Desktop validation, the Dataverse guide's second launcher reuses the approved file for the publishable template.
 
 ### Fabric V2
 

@@ -1,6 +1,6 @@
 # Agent registry and reporting scope
 
-The agent registry is optional advanced configuration that tells ESS Insights which identifiers belong to the same Copilot Studio agent across systems.
+The agent registry tells ESS Insights which identifiers belong to the same Copilot Studio agent across systems. It is required for the recommended CSV scope and for Fabric ingestion, but optional for a basic Dataverse Direct setup.
 
 Dataverse V21 does not require a registry for transcript or Power Platform consumption reporting. It derives agents from `BotId`/`BotName`, matches consumption by Agent GUID, and exposes a synchronized Agent filter in the report. Use a registry only when you need Microsoft 365 `T_...` feedback attribution, custom labels, or cross-environment identity mapping. Fabric continues to use the registry for governed ingestion.
 
@@ -11,6 +11,14 @@ Dataverse V21 does not require a registry for transcript or Power Platform consu
 | Microsoft 365 Product Feedback | `M365Title` | Title ID beginning with `T_` |
 
 The registry contains identifiers and display labels only. It does not contain prompts, responses, transcripts, user identities, or credentials.
+
+You need this guide only when:
+
+- **CSV Upload:** you use the recommended `ESS Safe` or `Selected Agents` scope;
+- **Fabric:** the notebooks require the registry for governed agent identity; or
+- **Dataverse Direct:** you want custom labels, Microsoft 365 feedback, or cross-system aliases.
+
+For a basic Dataverse Direct setup, skip this guide.
 
 ## Choose the reporting scope
 
@@ -146,6 +154,8 @@ Column rules:
 
 ## Step 7 - Build and validate the registry
 
+CSV and optional Dataverse registry users complete this step to create `agent-registry.json`. Fabric users can skip to Step 8 because the notebook reads and validates `agent-registry.csv` directly.
+
 1. Open the extracted `ESS-main` folder in File Explorer.
 2. Click the address bar, type `powershell`, and press **Enter**.
 3. Confirm Python:
@@ -200,11 +210,7 @@ Replace `production-us` with the exact `EnvironmentKey` in your CSV.
 
 No registry is required to discover transcript agents in `All Agents` mode. A registry is recommended when the Copilot Studio technical name must display as a stable friendly label, when a credits export must be checked against a known `CreditId`, or when Microsoft 365 feedback uses a `T_...` title ID.
 
-```powershell
-python tools\build_service_refresh_template.py --mode desktop-validation --input "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit" --environment-url "https://orgabc12345.crm.dynamics.com" --agent-registry-json "C:\AgentData\agent-registry.json" --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Desktop Validation.pbit"
-```
-
-After the Desktop result is validated, rerun with `--mode service-refresh` and a different output name for publication. The builder validates and embeds the JSON; `Agent Registry JSON` remains hidden from the normal Power BI parameter dialog.
+Run `START-HERE-DATAVERSE.cmd` as described in the [Dataverse Direct guide](SETUP-Dataverse.md#step-4--create-the-validated-desktop-template). When asked about optional files, select `agent-registry.json` under **Agent registry**. The launcher validates and embeds it. After the Desktop result is validated, the Dataverse guide explains when to run the separate Service launcher.
 
 ### Fabric V2
 
