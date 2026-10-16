@@ -39,7 +39,7 @@ Choose this path when the report will use one Production, Sandbox, or Default Da
 
 **Required access:** Bot Transcript Viewer, or a custom Dataverse role with organization-level Read on `conversationtranscript`. Environment Maker alone is not enough.
 
-**Included files:** `ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit`, `START-HERE-DATAVERSE.cmd`, and `BUILD-SERVICE-REFRESH.cmd`.
+**Included files:** [`ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21.pbit), [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd), and [`BUILD-SERVICE-REFRESH.cmd`](./BUILD-SERVICE-REFRESH.cmd).
 
 **[Follow the Dataverse Direct steps ->](./SETUP-Dataverse.md)**
 
@@ -49,7 +49,7 @@ Choose this path for a one-time snapshot, a proof of concept, or a report that m
 
 **Required access:** Bot Transcript Viewer, or a custom Dataverse role with organization-level Read on `conversationtranscript`.
 
-**Included files:** `ESS Dashboard - Dynamic Topics (CSV) V18.pbit` and `tools\agent_registry.py`.
+**Included files:** [`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) and [`tools\agent_registry.py`](./tools/agent_registry.py).
 
 **[Follow the CSV Upload steps ->](./SETUP-CSV-Download.md)**
 
@@ -59,7 +59,7 @@ Choose this path only when you need multiple environments, independently governe
 
 **Required access:** Fabric workspace Contributor, Member, or Admin; an Entra app registration; and a Dataverse Application User with organization-level Read on `conversationtranscript`.
 
-**Included files:** `ESS - Fabric V2.pbit`, `Copilot_Agent_Transcript_Parser.ipynb`, and the optional credit-ingestion notebook.
+**Included files:** [`ESS - Fabric V2.pbit`](./ESS%20-%20Fabric%20V2.pbit), [`Copilot_Agent_Transcript_Parser.ipynb`](./Fabric/notebooks/Copilot_Agent_Transcript_Parser.ipynb), and the optional [`Copilot_Credit_Consumption_Ingester.ipynb`](./Fabric/notebooks/Copilot_Credit_Consumption_Ingester.ipynb).
 
 **Report experience:** Fabric V2 uses Studio pages for topic exploration, conversation quality, performance, errors, feedback, knowledge files, value, and credit consumption. It does not use the CSV/Dataverse layout shown in the demo PBIX.
 
@@ -71,9 +71,9 @@ Each path guide shows the portal, exact click path, required role, expected outp
 
 | Path | Required input | Required role | Template and helper | Success checkpoint |
 |---|---|---|---|---|
-| **Dataverse Direct** | Dataverse Environment URL | Bot Transcript Viewer or custom organization-level transcript Read | Dataverse V21 plus `START-HERE-DATAVERSE.cmd` | Total Conversations is non-zero |
-| **CSV Upload** | Untouched `ConversationTranscript` CSV and validated `agent-registry.json` | Bot Transcript Viewer or custom organization-level transcript Read | CSV V18 plus `tools\agent_registry.py` | Total Conversations is non-zero and the intended agent is shown |
-| **Fabric** | Dataverse URL, application credentials, and `agent-registry.csv` | Fabric Contributor+; Entra/Power Platform admin help; Application User with transcript Read | Fabric V2 plus transcript-parser notebook | Eight transcript tables exist and Total Conversations is non-zero |
+| **Dataverse Direct** | Dataverse Environment URL | Bot Transcript Viewer or custom organization-level transcript Read | [Dataverse V21](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21.pbit) plus [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd) | Total Conversations is non-zero |
+| **CSV Upload** | Untouched `ConversationTranscript` CSV and validated `agent-registry.json` | Bot Transcript Viewer or custom organization-level transcript Read | [CSV V18](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) plus [`tools\agent_registry.py`](./tools/agent_registry.py) | Total Conversations is non-zero and the intended agent is shown |
+| **Fabric** | Dataverse URL, application credentials, and `agent-registry.csv` | Fabric Contributor+; Entra/Power Platform admin help; Application User with transcript Read | [Fabric V2](./ESS%20-%20Fabric%20V2.pbit) plus [transcript-parser notebook](./Fabric/notebooks/Copilot_Agent_Transcript_Parser.ipynb) | Eight transcript tables exist and Total Conversations is non-zero |
 
 Power BI Desktop is required for all three paths. Python 3.10 or later is required for the guided Dataverse setup, the CSV registry, and the optional local preparation tools; the included Python tools use only the standard library.
 
@@ -82,9 +82,9 @@ Power BI Desktop is required for all three paths. Python 3.10 or later is requir
 | Enhancement | What it adds | Where to retrieve it | Required role | Included helper or guide |
 |---|---|---|---|---|
 | **Users / organization** | Department, country, job title, display name | Microsoft 365 admin center: **Users -> Active users -> Export users**, or an approved HR/Viva Insights/Graph source | Global Reader, User Administrator, or Global Administrator for the Microsoft 365 export; other sources use their own access model | CSV and Dataverse Desktop accept `OrgData.csv`; Fabric requires a customer-built Lakehouse ingestion |
-| **Copilot Credits** | Observed tenant, agent, and user credit consumption | Power Platform admin center: **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator is recommended least privilege; tenant administrator or Dynamics 365 Administrator also works | CSV/Dataverse Desktop use the User-Level file; Fabric uses all three files and `Copilot_Credit_Consumption_Ingester.ipynb` |
-| **External Product Feedback** | Microsoft 365 Copilot Chat and exported Monitor reactions beyond the reactions already found in transcripts | Microsoft 365 admin center: **Health -> Product feedback -> Export to CSV** | A Microsoft 365 administrator or reader with Product Feedback access; Compliance Administrator or Global Administrator only when identity details or deletion are required | [`tools\ess_feedback_normalizer.py`](./FEEDBACK-INGESTION.md) |
-| **Customer-specific topics** | Reviewed local topic rules without changing the template | Learn from the customer's native Copilot Studio topic evidence | Transcript read access; no additional cloud role | [`tools\ess_topic_tuner.py`](./TOPIC-TUNER.md) |
+| **Copilot Credits** | Observed tenant, agent, and user credit consumption | Power Platform admin center: **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator is recommended least privilege; tenant administrator or Dynamics 365 Administrator also works | CSV/Dataverse Desktop use the User-Level file; Fabric uses all three files and [`Copilot_Credit_Consumption_Ingester.ipynb`](./Fabric/notebooks/Copilot_Credit_Consumption_Ingester.ipynb) |
+| **External Product Feedback** | Microsoft 365 Copilot Chat and exported Monitor reactions beyond the reactions already found in transcripts | Microsoft 365 admin center: **Health -> Product feedback -> Export to CSV** | A Microsoft 365 administrator or reader with Product Feedback access; Compliance Administrator or Global Administrator only when identity details or deletion are required | [`tools\ess_feedback_normalizer.py`](./tools/ess_feedback_normalizer.py) ([guide](./FEEDBACK-INGESTION.md)) |
+| **Customer-specific topics** | Reviewed local topic rules without changing the template | Learn from the customer's native Copilot Studio topic evidence | Transcript read access; no additional cloud role | [`tools\ess_topic_tuner.py`](./tools/ess_topic_tuner.py) ([guide](./TOPIC-TUNER.md)) |
 | **Power BI publication** | Shared report and scheduled refresh | Power BI Desktop: **Home -> Publish** | Workspace Contributor, Member, or Admin plus the applicable Power BI license | [Refresh and publication guide](./AUTO-REFRESH.md) |
 
 ## Approved release files
