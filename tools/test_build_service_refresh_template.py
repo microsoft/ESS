@@ -124,12 +124,25 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             service_description = model_parameters[
                 "Dataverse Environment URL (required)"
             ]["description"]
-            self.assertIn("START-HERE-DATAVERSE.cmd", service_description)
-            self.assertIn("BUILD-SERVICE-REFRESH.cmd", service_description)
-            for internal_reference in ("python", ".py", "tools/"):
-                self.assertNotIn(
+            self.assertIn(environment_url, service_description)
+            descriptions = [
+                str(item.get("description") or "")
+                for item in model_parameters.values()
+            ]
+            for internal_reference in (
+                "python",
+                ".py",
+                "tools/",
+                ".cmd",
+                "build",
+                "generated",
+            ):
+                self.assertTrue(
+                    all(
+                        internal_reference not in value.lower()
+                        for value in descriptions
+                    ),
                     internal_reference,
-                    service_description.lower(),
                 )
 
             with zipfile.ZipFile(SOURCE) as source_package:
@@ -247,12 +260,38 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
         desktop_description = schema_expressions[
             "Dataverse Environment URL (required)"
         ]["description"]
-        self.assertIn("BUILD-SERVICE-REFRESH.cmd", desktop_description)
-        for internal_reference in ("python", ".py", "tools/"):
-            self.assertNotIn(
+        self.assertIn("Power Apps Session details", desktop_description)
+        descriptions = [
+            str(item.get("description") or "")
+            for item in schema_expressions.values()
+        ]
+        for internal_reference in (
+            "python",
+            ".py",
+            "tools/",
+            ".cmd",
+            "build",
+            "generated",
+        ):
+            self.assertTrue(
+                all(
+                    internal_reference not in value.lower()
+                    for value in descriptions
+                ),
                 internal_reference,
-                desktop_description.lower(),
             )
+        self.assertIn(
+            "approved customer topic rules",
+            schema_expressions[
+                "Customer Topic Overrides JSON (optional)"
+            ]["description"].lower(),
+        )
+        self.assertIn(
+            "approved agents",
+            schema_expressions[
+                "Feedback Events JSON (optional)"
+            ]["description"].lower(),
+        )
 
         expressions = {
             item["name"]: (
@@ -311,6 +350,61 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             ["f1d40245-f319-4e2d-8023-9e7b6f6456ac"],
         )
         self.assertEqual(credits_audit["warning"], "")
+
+    def test_monitor_feedback_can_reconcile_by_conversation(self):
+        registry_rows, _ = serialize_registry(
+            ROOT / "SampleData" / "agent-registry.json"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            feedback_path = Path(temporary) / "monitor-feedback.json"
+            feedback_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "FeedbackEventId": "monitor-1",
+                            "ConversationId": "conversation-1",
+                            "AgentId": "",
+                            "FeedbackSource": "MonitorReactions.csv",
+                            "FeedbackVerdict": "Thumbs Up",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            _, audit = validate_feedback_events(
+                feedback_path,
+                registry_rows,
+            )
+
+        self.assertEqual(audit["events"], 1)
+
+    def test_product_feedback_requires_registered_agent(self):
+        registry_rows, _ = serialize_registry(
+            ROOT / "SampleData" / "agent-registry.json"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            feedback_path = Path(temporary) / "product-feedback.json"
+            feedback_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "FeedbackEventId": "product-1",
+                            "ConversationId": "unsupported-metadata-id",
+                            "AgentId": "",
+                            "FeedbackSource": "Microsoft 365 Product Feedback",
+                            "FeedbackVerdict": "Thumbs Up",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "neither an enabled registry AgentKey",
+            ):
+                validate_feedback_events(feedback_path, registry_rows)
 
     def test_rejects_local_files_in_service_refresh_mode(self):
         with self.assertRaisesRegex(ValueError, "not supported"):

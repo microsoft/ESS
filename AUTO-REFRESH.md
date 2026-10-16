@@ -12,7 +12,7 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 > ✅ **Start here:** For hands‑off, production dashboards, **Dataverse Direct (Path A)** is the simplest — no file hosting, no gateway. If you must stay on CSV, **host it on SharePoint/OneDrive (Path B)** so the cloud can refresh it without a gateway.
 
-> **Why this matters for refresh:** Power BI Service rejects the reusable Dataverse template because its environment and optional file URLs are dynamic. Before publishing Dataverse V21, generate an environment-specific Service-refresh PBIT as shown below.
+> **Why this matters for refresh:** Power BI Service rejects the reusable Dataverse starting template because its environment and optional file paths are dynamic. Before publishing Dataverse V21, use its publication step to prepare a report fixed to the intended environment.
 
 > 🆕 **Already need more than this?** Path A and Path B above already give you gateway‑free, cloud‑to‑cloud scheduled refresh — most customers don't need anything else. If you're consolidating multiple Dataverse environments into one dashboard, hitting refresh limits at very large scale, or want [Power Platform admin center](https://admin.powerplatform.microsoft.com) credit-consumption analytics alongside conversation data (with a separate file-landing step), see **[SETUP-Fabric.md ↗](SETUP-Fabric.md)**.
 
@@ -30,19 +30,19 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 ## Path A — Dataverse Direct (recommended)
 
-The Dataverse Direct Service-refresh build connects the service **directly to one fixed Dataverse environment** — no exported files, no gateway.
+The report prepared by the Dataverse publication step connects the service **directly to one fixed Dataverse environment** - no transcript export and no gateway.
 
-1. After the Desktop-validation checklist passes, return to the extracted `ESS-main` folder and double-click **`BUILD-SERVICE-REFRESH.cmd`**. It reuses the Environment URL and approved JSON files saved by `START-HERE-DATAVERSE.cmd`.
+1. Complete [Action 3 in the Dataverse guide](SETUP-Dataverse.md#action-3---publish-only-if-needed). Its included publication helper reuses the validated Environment URL and approved registry, feedback, and topic data.
 
-   The launcher does not include Org Data or Credits in the Service template. Use Fabric when those sources must refresh automatically.
+   Organization and Credits files are not included in the publishable Dataverse report. Use Fabric when those sources must refresh automatically.
 
-2. Open the generated PBIT, confirm the environment URL and embedded optional JSON, wait until every prefilled parameter value is visible and stable, then select **Load**. Refresh it successfully in Desktop and **Publish** it to your workspace.
+2. Open the prepared report, confirm the Environment URL, wait until every prefilled parameter value is visible and stable, then select **Load**. Refresh it successfully in Desktop and **Publish** it to your workspace.
 3. In the service, open the **semantic model → Settings**.
 4. Expand **Data source credentials** and click **Edit credentials** on the Dataverse source:
    - **Authentication method:** `OAuth2`
    - **Privacy level:** `Organizational`
    - Sign in with an account that holds the **Bot Transcript Viewer** role (or equivalent read access to the `conversationtranscript` table) on that environment.
-5. Expand **Parameters** to confirm **Dataverse Environment URL** matches the URL used by the builder. Changing it does not retarget the connector; rebuild the PBIT to change environments.
+5. Expand **Parameters** to confirm **Dataverse Environment URL** matches the prepared report. Changing it does not retarget the connector; repeat the Dataverse publication step to change environments.
 6. Expand **Scheduled refresh** → toggle **On** → set your cadence (up to **8×/day** on Pro; more on Premium/Fabric capacity) and time zone → **Apply**.
 
 ✅ **Done.** The service now pulls fresh transcripts on your schedule with **no gateway**.
@@ -51,7 +51,7 @@ The Dataverse Direct Service-refresh build connects the service **directly to on
 
 > ⚠️ **Scheduled refresh is not historical storage.** It re-queries Dataverse and therefore reflects only records still retained there. Extend Dataverse transcript retention for the reporting period you need; records deleted before a refresh cannot be restored by Power BI.
 
-> ⚠️ **Org Data and Agent Credits file parameters are disabled in the Service-refresh build.** File and web path branches make the entire semantic model dynamic even when left blank. Use topic/feedback JSON inputs, the Desktop/manual-refresh V21 template for file overlays, or Fabric for automated organization and credit enrichment.
+> ⚠️ **Organization and Credits files are excluded from the publishable Dataverse report.** File and web path branches make the semantic model dynamic even when left blank. Use Desktop/manual refresh for those file overlays, or Fabric for automated organization and credit enrichment.
 
 ---
 
@@ -107,13 +107,13 @@ If the parameter points at a **local file** (`C:\Data\…`) or a **network share
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | The reusable Dataverse V21 PBIT or Desktop-validation result was published directly. | Run `BUILD-SERVICE-REFRESH.cmd`, refresh its generated PBIT in Desktop, and publish that result. |
+| **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | The reusable Dataverse starting template or a report containing local file inputs was published directly. | Repeat [Action 3 in the Dataverse guide](SETUP-Dataverse.md#action-3---publish-only-if-needed), refresh the prepared report in Desktop, and publish that result. |
 | **“We couldn't authenticate with the credentials provided.”** | Credentials not bound, or account lacks access. | **dataset → Settings → Data source credentials → Edit credentials**; sign in with an account that has Bot Transcript Viewer (Dataverse) or library read (SharePoint). |
 | **Scheduled refresh option is greyed out.** | Credentials for one or more sources not yet set. | Edit credentials on **every** listed source first, then the schedule unlocks. |
 | **Refresh succeeds but data is stale.** | New export saved under a new name/path. | Overwrite the file at the **same URL/path** the parameter points to. |
 | **Refresh very slow / times out (Dataverse).** | Lookback window too wide. | Lower **Transcript Lookback Days**. |
-| **“The remote name could not be resolved” / “Invalid URL.”** | The environment URL supplied to the builder was wrong. | Re-copy the Instance URL and rebuild the Service-refresh PBIT. |
-| **Queries are blocked / “A cyclic reference was encountered” immediately after Load.** | Load was selected before the prefilled parameter values finished initializing. | Close the report without saving, reopen the generated PBIT, wait for every value to appear and stabilize, then select **Load**. |
+| **“The remote name could not be resolved” / “Invalid URL.”** | The Environment URL used during publication preparation was wrong. | Re-copy the Instance URL and repeat the Dataverse publication step. |
+| **Queries are blocked / “A cyclic reference was encountered” immediately after Load.** | Load was selected before the prefilled parameter values finished initializing. | Close the report without saving, reopen the prepared report, wait for every value to appear and stabilize, then select **Load**. |
 
 ---
 

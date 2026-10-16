@@ -8,7 +8,7 @@ import json
 import os
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 from build_service_refresh_template import normalize_environment_url
@@ -17,8 +17,10 @@ from build_service_refresh_template import normalize_environment_url
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_TEMPLATE = ROOT / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
 BUILDER = ROOT / "tools" / "build_service_refresh_template.py"
+FEEDBACK_NORMALIZER = ROOT / "tools" / "ess_feedback_normalizer.py"
 GENERATED_DIR = ROOT / "Generated Templates"
 DEFAULT_SETTINGS = GENERATED_DIR / "dataverse-setup.json"
+PREPARED_FEEDBACK = GENERATED_DIR / "Prepared Inputs" / "feedback-events.csv"
 OUTPUT_NAMES = {
     "desktop-validation": (
         "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Desktop Validation.pbit"
@@ -37,6 +39,7 @@ class SetupOptions:
     agent_credits_file: str = ""
     topic_overrides_json: str = ""
     feedback_events_json: str = ""
+    feedback_input_files: list[str] = field(default_factory=list)
 
 
 OPTIONAL_FILES = (
@@ -44,7 +47,7 @@ OPTIONAL_FILES = (
         "agent_registry_json",
         "Agent registry",
         "Optional mapping for stable friendly agent names and feedback/credit IDs.",
-        (("JSON files", "*.json"),),
+        (("Registry files", "*.csv *.json"),),
     ),
     (
         "org_data_file",
@@ -64,14 +67,11 @@ OPTIONAL_FILES = (
         "Optional customer-topic-overrides.json produced by the topic tuner.",
         (("JSON files", "*.json"),),
     ),
-    (
-        "feedback_events_json",
-        "Prepared Microsoft 365 feedback",
-        "Optional feedback-events.json produced by the feedback normalizer.",
-        (("JSON files", "*.json"),),
-    ),
 )
-OPTIONAL_FILE_FIELDS = tuple(item[0] for item in OPTIONAL_FILES)
+OPTIONAL_FILE_FIELDS = tuple(item[0] for item in OPTIONAL_FILES) + (
+    "feedback_events_json",
+    "feedback_input_files",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -89,6 +89,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--agent-credits-file", type=Path)
     parser.add_argument("--topic-overrides-json", type=Path)
     parser.add_argument("--feedback-events-json", type=Path)
+    parser.add_argument(
+        "--feedback-input",
+        type=Path,
+        action="append",
+        default=[],
+        help="Raw Product Feedback or Monitor CSV; repeat for multiple exports.",
+    )
     parser.add_argument("--output", type=Path)
     parser.add_argument("--settings-file", type=Path, default=DEFAULT_SETTINGS)
     parser.add_argument("--non-interactive", action="store_true")
@@ -107,6 +114,11 @@ def load_settings(path: Path) -> SetupOptions | None:
         agent_credits_file=str(payload.get("agent_credits_file") or ""),
         topic_overrides_json=str(payload.get("topic_overrides_json") or ""),
         feedback_events_json=str(payload.get("feedback_events_json") or ""),
+        feedback_input_files=[
+            str(value)
+            for value in payload.get("feedback_input_files") or []
+            if str(value).strip()
+        ],
     )
 
 
@@ -128,7 +140,11 @@ def ask_yes_no(prompt: str, *, default: bool) -> bool:
 
 def clear_optional_files(options: SetupOptions) -> None:
     for field_name in OPTIONAL_FILE_FIELDS:
-        setattr(options, field_name, "")
+        setattr(
+            options,
+            field_name,
+            [] if field_name == "feedback_input_files" else "",
+        )
 
 
 def same_environment(left: str, right: str) -> bool:
@@ -191,6 +207,15 @@ def merge_cli_options(
         argument = getattr(args, field_name)
         if argument:
             setattr(options, field_name, str(argument.resolve()))
+    if args.feedback_events_json:
+        options.feedback_events_json = str(args.feedback_events_json.resolve())
+        options.feedback_input_files = []
+    feedback_inputs = getattr(args, "feedback_input", [])
+    if feedback_inputs:
+        options.feedback_input_files = [
+            str(path.resolve()) for path in feedback_inputs
+        ]
+        options.feedback_events_json = ""
     if args.environment_url:
         options.environment_url = normalize_environment_url(
             args.environment_url
@@ -225,6 +250,11 @@ def collect_interactive_options(
             value = getattr(options, field_name)
             if value:
                 print(f"  {label}: {value}")
+        if options.feedback_input_files:
+            print(
+                "  Microsoft 365 feedback exports: "
+                + ", ".join(options.feedback_input_files)
+            )
         if not ask_yes_no(
             "Keep these saved optional files for this environment?",
             default=True,
@@ -251,7 +281,84 @@ def collect_interactive_options(
                 setattr(options, field_name, str(Path(selected).resolve()))
         else:
             setattr(options, field_name, "")
+
+    print(
+        "\nMicrosoft 365 feedback: optional raw Product Feedback or Monitor "
+        "CSV exports. The guided setup prepares them locally."
+    )
+    if ask_yes_no(
+        "Select one or more raw Microsoft 365 feedback exports?",
+        default=bool(options.feedback_input_files),
+    ):
+        options.feedback_input_files = []
+        while True:
+            selected = select_file(
+                "Select a Microsoft 365 feedback export",
+                (("CSV files", "*.csv"),),
+            )
+            if selected:
+                options.feedback_input_files.append(str(Path(selected).resolve()))
+            if not selected or not ask_yes_no(
+                "Add another feedback export?",
+                default=False,
+            ):
+                break
+        options.feedback_events_json = ""
+    else:
+        options.feedback_input_files = []
+        options.feedback_events_json = ""
     return options
+
+
+def build_feedback_command(options: SetupOptions, output: Path) -> list[str]:
+    if not options.agent_registry_json:
+        raise ValueError(
+            "Microsoft 365 feedback requires an agent registry so tenant-wide "
+            "rows can be attributed safely."
+        )
+    command = [sys.executable, str(FEEDBACK_NORMALIZER)]
+    for path in options.feedback_input_files:
+        command.extend(("--input", path))
+    command.extend(
+        (
+            "--agent-registry",
+            options.agent_registry_json,
+            "--scope-mode",
+            "ESS Safe",
+            "--output",
+            str(output),
+        )
+    )
+    return command
+
+
+def prepare_feedback(options: SetupOptions) -> SetupOptions:
+    if not options.feedback_input_files:
+        return options
+    PREPARED_FEEDBACK.parent.mkdir(parents=True, exist_ok=True)
+    completed = subprocess.run(
+        build_feedback_command(options, PREPARED_FEEDBACK),
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    )
+    if completed.returncode:
+        raise ValueError(
+            "Microsoft 365 feedback preparation failed: "
+            f"{last_process_message(completed)}"
+        )
+    prepared_json = PREPARED_FEEDBACK.with_suffix(".json")
+    if not prepared_json.exists():
+        raise RuntimeError(
+            "Microsoft 365 feedback preparation completed without creating the "
+            "validated feedback data."
+        )
+    return replace(
+        options,
+        feedback_events_json=str(prepared_json),
+    )
 
 
 def build_command(
@@ -298,7 +405,7 @@ def validate_runtime() -> None:
             "Python 3.10 or later is required. Download it from "
             "https://www.python.org/downloads/windows/."
         )
-    for path in (SOURCE_TEMPLATE, BUILDER):
+    for path in (SOURCE_TEMPLATE, BUILDER, FEEDBACK_NORMALIZER):
         if not path.exists():
             raise FileNotFoundError(
                 f"Required package file is missing: {path}. Download and "
@@ -375,8 +482,9 @@ def main() -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
 
     print("\nChecking the supplied information and building the template...")
+    prepared_options = prepare_feedback(options)
     completed = subprocess.run(
-        build_command(args.mode, options, output),
+        build_command(args.mode, prepared_options, output),
         check=False,
         capture_output=True,
         text=True,
@@ -412,8 +520,9 @@ def main() -> int:
     print(f"\nTemplate created successfully:\n{output}")
     if args.mode == "desktop-validation":
         print(
-            "\nIn Power BI Desktop, confirm the displayed values, select "
-            "Load, sign in with Organizational account, and refresh."
+            "\nIn Power BI Desktop, wait until the displayed values are visible "
+            "and stable. Then select Load, sign in with Organizational account, "
+            "and refresh."
         )
     else:
         print(

@@ -14,28 +14,29 @@ Complete only the required steps first:
 4. Create and validate `agent-registry.json`.
 5. Open CSV V18 with those two inputs.
 6. Confirm Total Conversations is non-zero and the intended agent appears.
-7. Add optional files one at a time.
+7. Add the data needed for other report areas one source at a time.
 
 ## Files, portals, and required roles
 
 ### Required for the first run
 
-| Need | Data or input | Portal and retrieval steps | Required role | Expected file or output | Included helper |
+| Need | Data or input | Portal and retrieval steps | Required role | Included helper | Expected file or output |
 |---|---|---|---|---|---|
-| Transcript capture | Future conversations with node details | [Copilot Studio](https://copilotstudio.microsoft.com) -> open agent -> **Settings -> Advanced -> Conversation transcripts** | Agent owner or coauthor with edit access | Both transcript settings on; agent saved and published | None |
-| Conversations | `ConversationTranscript` table | [Power Apps](https://make.powerapps.com) -> select environment -> **Tables -> All -> ConversationTranscript -> Export -> Export data** | Bot Transcript Viewer, or custom role with organization-level Read on `conversationtranscript`; Environment Maker alone is insufficient | Untouched `ConversationTranscripts.csv` | None |
-| Safe agent scope | Agent identifiers and friendly name | Use the transcript CSV to identify `BotId`, then follow the [agent registry guide](./AGENT-REGISTRY.md) | Access to the exported transcript CSV; no extra cloud role | `agent-registry.json` | [`tools\agent_registry.py`](./tools/agent_registry.py) |
-| Report | CSV V18 | Included in the extracted package | Power BI Desktop user | Loaded report | [`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) |
+| Transcript capture | Future conversations with node details | [Copilot Studio](https://copilotstudio.microsoft.com) -> open agent -> **Settings -> Advanced -> Conversation transcripts** | Agent owner or coauthor with edit access | None | Both transcript settings on; agent saved and published |
+| Conversations | `ConversationTranscript` table | [Power Apps](https://make.powerapps.com) -> select environment -> **Tables -> All -> ConversationTranscript -> Export -> Export data** | Bot Transcript Viewer, or custom role with organization-level Read on `conversationtranscript`; Environment Maker alone is insufficient | None | Untouched `ConversationTranscripts.csv` |
+| Safe agent scope | Agent identifiers and friendly name | Use the transcript CSV to identify `BotId`, then follow the [agent registry guide](./AGENT-REGISTRY.md) | Access to the exported transcript CSV; no extra cloud role | [`tools\agent_registry.py`](./tools/agent_registry.py) | `agent-registry.json` |
+| Report | CSV V18 | Included in the extracted package | Power BI Desktop user | [`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) | Loaded report |
 
-### Optional after the first successful refresh
+### Optional data for full report functionality
 
-| Need | Data or input | Portal and retrieval steps | Required role | Expected file or output | Included helper |
+Load only the data needed for the report areas you intend to use. The transcript-only baseline remains functional without these inputs.
+
+| Need | Data or input | Portal and retrieval steps | Required role | Included helper | Why load it / report area enabled |
 |---|---|---|---|---|---|
-| Organization | User roster | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Users -> Active users -> Export users**, or an approved HR/Viva Insights/Graph source | Global Reader, User Administrator, or Global Administrator for the Microsoft 365 export | `OrgData.csv` | Built into [CSV V18](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) |
-| Copilot Credits | User-Level Credit Consumption | [Power Platform admin center](https://admin.powerplatform.microsoft.com) -> **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator recommended; tenant administrator or Dynamics 365 Administrator also works | `EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv` | Built into [CSV V18](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) |
-| Cross-channel feedback | Product Feedback export | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Health -> Product feedback -> Export to CSV** | Microsoft 365 administrator or reader with Product Feedback access | Prepared `feedback-events.json` plus audit file | [`tools\ess_feedback_normalizer.py`](./tools/ess_feedback_normalizer.py) ([guide](./FEEDBACK-INGESTION.md)) |
-| Customer topics | Native-topic learning evidence | Run the local tuner after the baseline report works | Transcript read access; no extra cloud role | Reviewed `customer-topic-overrides.json` | [`tools\ess_topic_tuner.py`](./tools/ess_topic_tuner.py) ([guide](./TOPIC-TUNER.md)) |
-| Publication | Power BI workspace | Power BI Desktop -> **Home -> Publish** | Workspace Contributor, Member, or Admin plus applicable license | Published report | [Publication guide](./AUTO-REFRESH.md) |
+| Organization | User roster | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Users -> Active users -> Export users**, or an approved HR/Viva Insights/Graph source | Global Reader, User Administrator, or Global Administrator for the Microsoft 365 export | Built into [CSV V18](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) | Adds department, country, job title, and display-name segmentation to **Adoption** and user-level analysis. |
+| Copilot Credits | User-Level Credit Consumption | [Power Platform admin center](https://admin.powerplatform.microsoft.com) -> **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator recommended; tenant administrator or Dynamics 365 Administrator also works | Built into [CSV V18](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) | Adds observed credit totals and modeled cost/value measures to **Executive Summary** and **Business Impact**. |
+| Cross-channel feedback | Product Feedback export | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Health -> Product feedback -> Export to CSV** | Microsoft 365 administrator or reader with Product Feedback access | [`tools\ess_feedback_normalizer.py`](./tools/ess_feedback_normalizer.py) ([guide](./FEEDBACK-INGESTION.md)) | Adds Microsoft 365 Copilot and Monitor reactions to **Agent Feedback**; transcript-native reactions already work without this file. |
+| Customer-specific topics | Representative transcript evidence, used only when built-in topics need improvement | [Review when to use or skip it](./TOPIC-TUNER.md) | Transcript read access; no extra cloud role | [`tools\ess_topic_tuner.py`](./tools/ess_topic_tuner.py) ([guide](./TOPIC-TUNER.md)) | Improves classification of recurring customer language in **Conversation Details**, **Improvement Opportunities**, and **Adjust Topic Assumptions**. Skip when native and built-in topics already provide adequate coverage. |
 
 ## Prepare the package and tools
 
@@ -94,7 +95,7 @@ The registry ensures the template reports only approved agents and gives technic
 4. Run the included validator to create `agent-registry.json` with `ESS Safe` scope.
 5. Do not continue until the validator reports at least one active agent.
 
-The exact command and column definitions are in [Build and validate the registry](./AGENT-REGISTRY.md#step-7---build-and-validate-the-registry).
+The exact command and column definitions are in [Build registry JSON for CSV V18](./AGENT-REGISTRY.md#step-7---build-registry-json-for-csv-v18).
 
 ## Step 3 - Open CSV V18
 
@@ -137,7 +138,7 @@ Use these files from `SampleData`:
 
 With `ESS Safe`, the baseline should show **168 conversations** and **25 users**. Optional synthetic files can then be added to test the remaining inputs.
 
-## Step 5 - Add optional enhancements
+## Step 5 - Add data for the report areas you need
 
 Add one enhancement, refresh, and validate it before adding the next.
 

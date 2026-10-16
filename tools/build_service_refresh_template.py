@@ -84,14 +84,36 @@ DATAVERSE_HOST_PATTERNS = tuple(
     )
 )
 STATIC_DESCRIPTION = (
-    "Required. This Service-refresh build is fixed to {url}. To target another "
-    "environment, run START-HERE-DATAVERSE.cmd with the new URL, then run "
-    "BUILD-SERVICE-REFRESH.cmd."
+    "Required. This report is connected to {url}. To use another environment, "
+    "return to the Dataverse setup guide and create a new report for that URL."
 )
 DESKTOP_DESCRIPTION = (
-    "Required. Dataverse Environment URL used by this Desktop-validation build. "
-    "After validating this report, run BUILD-SERVICE-REFRESH.cmd before publishing."
+    "Required. The Dataverse environment that contains the Copilot Studio "
+    "conversation data. Use the Instance URL from Power Apps Session details."
 )
+PARAMETER_DESCRIPTIONS = {
+    REGISTRY_EXPRESSION: (
+        "Optional. Approved agent mapping for stable labels and cross-source "
+        "identity matching. Required when cross-channel Product Feedback is loaded."
+    ),
+    ORG_DATA_PARAMETER: (
+        "Optional. Approved user roster CSV for organization analysis. The file "
+        "must contain UserPrincipalName, UPN, or PersonId. Leave blank to skip."
+    ),
+    CREDITS_PARAMETER: (
+        "Optional. User-Level Credit Consumption CSV from Power Platform admin "
+        "center. Leave blank to skip credit-consumption analysis."
+    ),
+    OVERRIDES_PARAMETER: (
+        "Optional. Approved customer topic rules for recurring language that native "
+        "and built-in topics do not classify reliably. Leave blank to use the "
+        "built-in taxonomy."
+    ),
+    FEEDBACK_PARAMETER: (
+        "Optional. Prepared Microsoft 365 or Monitor feedback events limited to "
+        "approved agents. Leave blank to use transcript-native reactions only."
+    ),
+}
 CONTENT_TYPES_NAMESPACE = (
     "http://schemas.openxmlformats.org/package/2006/content-types"
 )
@@ -310,17 +332,25 @@ def validate_feedback_events(
         for row in registry_rows
         if row["Enabled"]
     }
-    unknown = sorted(
+    invalid_identifiers = sorted(
         {
-            str(row.get("AgentId") or "").strip()
+            str(row.get("AgentId") or "").strip() or "<blank>"
             for row in rows
-            if str(row.get("AgentId") or "").strip() not in active_keys
+            if (
+                str(row.get("AgentId") or "").strip() not in active_keys
+                and not (
+                    str(row.get("ConversationId") or "").strip()
+                    and "product feedback"
+                    not in str(row.get("FeedbackSource") or "").casefold()
+                )
+            )
         }
     )
-    if unknown:
+    if invalid_identifiers:
         raise ValueError(
-            "Feedback Events contains AgentId values that are not enabled registry "
-            f"AgentKey values: {unknown}"
+            "Feedback Events contains rows that have neither an enabled registry "
+            "AgentKey nor a supported conversation identifier: "
+            f"{invalid_identifiers}"
         )
     return (
         json.dumps(rows, ensure_ascii=False, separators=(",", ":")),
@@ -519,14 +549,14 @@ def update_parameter_metadata(
     for annotation in environment.get("annotations", []):
         if annotation["name"] == "PBI_ResultType":
             annotation["value"] = "Text"
+    for name, parameter_description in PARAMETER_DESCRIPTIONS.items():
+        if name in schema_expressions:
+            schema_expressions[name]["description"] = parameter_description
+
     if registry_json is not None:
         registry_expression = m_text(registry_json)
         registry = schema_expressions[REGISTRY_EXPRESSION]
         registry["expression"] = registry_expression
-        registry["description"] = (
-            "Embedded advanced agent mapping generated from a validated "
-            "agent-registry.json file."
-        )
 
     parameter_values = {
         ORG_DATA_PARAMETER: (

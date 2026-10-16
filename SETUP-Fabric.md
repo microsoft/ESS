@@ -18,31 +18,32 @@ Build the transcript-only baseline first:
 5. Upload and validate `agent-registry.csv`.
 6. Run the notebook and confirm all eight transcript tables exist.
 7. Connect Fabric V2 and confirm Total Conversations is non-zero.
-8. Add credits, feedback, customer topics, or organization data only after that works.
+8. Add the data needed for other report areas one source at a time.
 
 ## Files, portals, and required roles
 
 ### Required for the first run
 
-| Need | Data or input | Portal and retrieval steps | Required role | Expected file or output | Included helper |
+| Need | Data or input | Portal and retrieval steps | Required role | Included helper | Expected file or output |
 |---|---|---|---|---|---|
-| Transcript capture | Future conversations with node details | [Copilot Studio](https://copilotstudio.microsoft.com) -> open each source agent -> **Settings -> Advanced -> Conversation transcripts** | Agent owner or coauthor with edit access | Both transcript settings on; each agent saved and published | None |
-| Fabric destination | Workspace and Lakehouse | [Microsoft Fabric](https://app.fabric.microsoft.com) -> create or select workspace -> **New -> Lakehouse** | Workspace Contributor, Member, or Admin; capacity assigned | Attached Lakehouse | None |
-| Dataverse authentication | Entra app registration | [Entra admin center](https://entra.microsoft.com) -> **Identity -> Applications -> App registrations -> New registration** | Account permitted to register applications; Application Developer or Entra administrator help may be required by tenant policy | Tenant ID, client ID, secret or approved credential | None |
-| Transcript authorization | Dataverse Application User in each source environment | [Power Platform admin center](https://admin.powerplatform.microsoft.com) -> **Environments -> Settings -> Users + permissions -> Application users** | Power Platform or Dataverse administrator | Application User with organization-level transcript Read | Bot Transcript Viewer or approved custom role |
-| Agent scope | Cross-source registry | Follow the [agent registry guide](./AGENT-REGISTRY.md) and upload to `Files/config/agent-registry.csv` | Access to approved agent identifiers | Reviewed CSV in Lakehouse | [Transcript notebook](./Fabric/notebooks/Copilot_Agent_Transcript_Parser.ipynb) validation |
-| Transcript ingestion | Dataverse records | Configure and run the required notebook | Fabric notebook execution permission plus application credential | Eight transcript-derived Delta tables | [`Copilot_Agent_Transcript_Parser.ipynb`](./Fabric/notebooks/Copilot_Agent_Transcript_Parser.ipynb) |
-| Report | Lakehouse SQL analytics endpoint | Open Lakehouse -> SQL analytics endpoint -> copy connection string and database name | Lakehouse read access and Power BI Desktop | Loaded report | [`ESS - Fabric V2.pbit`](./ESS%20-%20Fabric%20V2.pbit) |
+| Transcript capture | Future conversations with node details | [Copilot Studio](https://copilotstudio.microsoft.com) -> open each source agent -> **Settings -> Advanced -> Conversation transcripts** | Agent owner or coauthor with edit access | None | Both transcript settings on; each agent saved and published |
+| Fabric destination | Workspace and Lakehouse | [Microsoft Fabric](https://app.fabric.microsoft.com) -> create or select workspace -> **New -> Lakehouse** | Workspace Contributor, Member, or Admin; capacity assigned | None | Attached Lakehouse |
+| Dataverse authentication | Entra app registration | [Entra admin center](https://entra.microsoft.com) -> **Identity -> Applications -> App registrations -> New registration** | Account permitted to register applications; Application Developer or Entra administrator help may be required by tenant policy | None | Tenant ID, client ID, secret or approved credential |
+| Transcript authorization | Dataverse Application User in each source environment | [Power Platform admin center](https://admin.powerplatform.microsoft.com) -> **Environments -> Settings -> Users + permissions -> Application users** | Power Platform or Dataverse administrator | Bot Transcript Viewer or approved custom role | Application User with organization-level transcript Read |
+| Agent scope | Cross-source registry | Follow the [agent registry guide](./AGENT-REGISTRY.md) and upload to `Files/config/agent-registry.csv` | Access to approved agent identifiers | [Transcript notebook](./Fabric/notebooks/Copilot_Agent_Transcript_Parser.ipynb) validation | Reviewed CSV in Lakehouse |
+| Transcript ingestion | Dataverse records | Configure and run the required notebook | Fabric notebook execution permission plus application credential | [`Copilot_Agent_Transcript_Parser.ipynb`](./Fabric/notebooks/Copilot_Agent_Transcript_Parser.ipynb) | Eight transcript-derived Delta tables |
+| Report | Lakehouse SQL analytics endpoint | Open Lakehouse -> SQL analytics endpoint -> copy connection string and database name | Lakehouse read access and Power BI Desktop | [`ESS - Fabric V2.pbit`](./ESS%20-%20Fabric%20V2.pbit) | Loaded report |
 
-### Optional after the first successful refresh
+### Optional data for full report functionality
 
-| Need | Data or input | Portal and retrieval steps | Required role | Expected file or output | Included helper |
+Load only the data needed for the report areas you intend to use. The transcript-only baseline remains functional without these inputs.
+
+| Need | Data or input | Portal and retrieval steps | Required role | Included helper | Why load it / report area enabled |
 |---|---|---|---|---|---|
-| Copilot Credits | Environment, Agent-Level, and User-Level exports | [Power Platform admin center](https://admin.powerplatform.microsoft.com) -> **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator recommended; tenant administrator or Dynamics 365 Administrator also works | Three current CSVs in `Files/credit_consumption` | [`Copilot_Credit_Consumption_Ingester.ipynb`](./Fabric/notebooks/Copilot_Credit_Consumption_Ingester.ipynb) |
-| Cross-channel feedback | Product Feedback export | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Health -> Product feedback -> Export to CSV** | Microsoft 365 administrator or reader with Product Feedback access | Prepared `feedback-events.csv` plus audit file | [`tools\ess_feedback_normalizer.py`](./tools/ess_feedback_normalizer.py) ([guide](./FEEDBACK-INGESTION.md)) |
-| Customer topics | Native-topic learning evidence | Run the local tuner after the baseline works | Transcript read access; no extra cloud role | Reviewed `customer-topic-overrides.csv` | [`tools\ess_topic_tuner.py`](./tools/ess_topic_tuner.py) ([guide](./TOPIC-TUNER.md)) |
-| Organization | Approved HR, Viva Insights, Graph, or Microsoft 365 user export | Source-specific retrieval | Global Reader, User Administrator, or Global Administrator for Microsoft 365 export | Customer-managed Lakehouse tables | No organization-ingestion notebook is included |
-| Publication | Power BI workspace | Power BI Desktop -> **Home -> Publish** | Workspace Contributor, Member, or Admin plus applicable license | Published report | [Publication guide](./AUTO-REFRESH.md) |
+| Copilot Credits | Environment, Agent-Level, and User-Level exports | [Power Platform admin center](https://admin.powerplatform.microsoft.com) -> **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator recommended; tenant administrator or Dynamics 365 Administrator also works | [`Copilot_Credit_Consumption_Ingester.ipynb`](./Fabric/notebooks/Copilot_Credit_Consumption_Ingester.ipynb) | Enables the Fabric credit-consumption and value views with tenant, agent, and user totals. |
+| Cross-channel feedback | Product Feedback export | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Health -> Product feedback -> Export to CSV** | Microsoft 365 administrator or reader with Product Feedback access | [`tools\ess_feedback_normalizer.py`](./tools/ess_feedback_normalizer.py) ([guide](./FEEDBACK-INGESTION.md)) | Adds Microsoft 365 Copilot and Monitor reactions to the Fabric feedback views; transcript-native reactions already work without this file. |
+| Customer-specific topics | Representative transcript evidence, used only when built-in topics need improvement | [Review when to use or skip it](./TOPIC-TUNER.md) | Transcript read access; no extra cloud role | [`tools\ess_topic_tuner.py`](./tools/ess_topic_tuner.py) ([guide](./TOPIC-TUNER.md)) | Improves topic exploration and improvement views for recurring customer language. Skip when native and built-in topics already provide adequate coverage. |
+| Organization | Approved HR, Viva Insights, Graph, or Microsoft 365 user export | Source-specific retrieval | Global Reader, User Administrator, or Global Administrator for Microsoft 365 export | No organization-ingestion notebook is included | Use only when organization segmentation is required and a customer-managed Lakehouse ingestion has been implemented; it is not part of the baseline Fabric package. |
 
 ## Step 1 - Download the package and create Fabric resources
 
@@ -195,7 +196,7 @@ Confirm:
 
 Schedule the transcript notebook only after a manual end-to-end run succeeds. A daily run with a seven-day merge overlap is recommended; monitor failures so the gap never reaches the Dataverse retention boundary.
 
-## Step 9 - Add optional enhancements
+## Step 9 - Add data for the report areas you need
 
 ### Copilot Credits
 

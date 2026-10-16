@@ -91,8 +91,6 @@ If the command shows more than one agent, create separate registry rows and dist
 3. If that value is a GUID, add it as `TranscriptId`.
 4. If it is a schema-style value, add it as `TranscriptSchema`.
 
-If you can export a small ConversationTranscript CSV, the PowerShell method above is the most reliable confirmation.
-
 ## Step 3 - Find the credit identifier
 
 Skip this step if you are not loading Copilot Credits.
@@ -159,9 +157,9 @@ Column rules:
 - An enabled alias cannot map to more than one agent in the same environment.
 - Do not add a blank alias row.
 
-## Step 7 - Build and validate the registry
+## Step 7 - Build registry JSON for CSV V18
 
-CSV and optional Dataverse registry users complete this step to create `agent-registry.json`. Fabric users can skip to Step 8 because the notebook reads and validates `agent-registry.csv` directly.
+Only CSV V18 requires this manual conversion to `agent-registry.json`. Dataverse guided setup accepts the reviewed CSV or JSON and validates it for you. Fabric reads and validates `agent-registry.csv` directly.
 
 1. Open the extracted `ESS-main` folder in File Explorer.
 2. Click the address bar, type `powershell`, and press **Enter**.
@@ -217,7 +215,7 @@ Replace `production-us` with the exact `EnvironmentKey` in your CSV.
 
 No registry is required to discover transcript agents in `All Agents` mode. A registry is recommended when the Copilot Studio technical name must display as a stable friendly label, when a credits export must be checked against a known `CreditId`, or when Microsoft 365 feedback uses a `T_...` title ID.
 
-Run `START-HERE-DATAVERSE.cmd` as described in the [Dataverse Direct guide](SETUP-Dataverse.md#step-4--create-the-validated-desktop-template). When asked about optional files, select `agent-registry.json` under **Agent registry**. The launcher validates and embeds it. After the Desktop result is validated, the Dataverse guide explains when to run the separate Service launcher.
+Follow [Action 2 in the Dataverse Direct guide](SETUP-Dataverse.md#action-2---run-the-guided-setup-and-validate-the-report). When adding data, select the reviewed `agent-registry.csv` or `agent-registry.json` under **Agent registry**. Guided setup validates and embeds it; no separate conversion command is required.
 
 ### Fabric V2
 
@@ -234,19 +232,14 @@ Files/config/agent-registry.csv
 
 Fabric writes the canonical agent identity to every transcript-derived table. It sends identifier-only details for unmapped external feedback and credits to quarantine tables; it does not infer an environment from an agent name.
 
-## Product Feedback command
+## Prepare cross-channel feedback
 
-After the `M365Title` row is validated, prepare the tenant-wide Product Feedback export:
+After the `M365Title` row is reviewed:
 
-```powershell
-python tools\ess_feedback_normalizer.py `
-  --input "C:\AgentData\ProductFeedback.csv" `
-  --agent-registry "C:\AgentData\agent-registry.csv" `
-  --scope-mode "ESS Safe" `
-  --output "C:\AgentData\feedback-events.csv"
-```
+- **Dataverse V21:** select the registry and raw Product Feedback or Monitor exports in guided setup. It filters and prepares them locally.
+- **CSV V18 or Fabric V2:** follow [Microsoft 365 Copilot feedback: export, prepare, and load](FEEDBACK-INGESTION.md).
 
-The normalizer changes the Product Feedback `T_...` ID to the canonical `AgentKey`. The legacy repeatable `--agent-id` option filters rows only and does not unify transcript and credit identities; use the registry for production.
+The preparation step changes the Product Feedback `T_...` ID to the canonical `AgentKey`. The registry remains the required safety boundary for production attribution.
 
 ## Attribution boundary
 

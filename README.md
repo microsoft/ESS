@@ -12,15 +12,11 @@ Preview resources:
 
 ## Start here
 
-Complete these steps in order:
+Complete three actions:
 
-1. **Preview the result.** Open the included synthetic [`ESS Dashboard - DEMO PBIX.pbix`](./ESS%20Dashboard%20-%20DEMO%20PBIX.pbix), or review the dashboard pages below. This preview reflects the CSV and Dataverse report layout; Fabric V2 uses its own advanced Studio/Lakehouse layout.
-2. **Download the complete package.** Select [Download ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip), extract it, and keep the folder structure intact.
-3. **Choose one data path.** Use the three choices below. Do not combine setup steps from different paths.
-4. **Confirm transcript capture.** Before collecting data, complete the [environment and transcript-settings preflight](#before-collecting-data). The settings affect future conversations only.
-5. **Build the minimum transcript-only report.** Confirm that it works before adding organization data, credits, feedback, or custom topics.
-6. **Add optional data one source at a time.** Refresh after each addition so any issue is easy to isolate.
-7. **Publish only after Desktop validation succeeds.**
+1. **Download and choose one path.** Select [Download ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip), extract it, and choose Dataverse Direct, CSV Upload, or Fabric below.
+2. **Validate the transcript-only baseline.** Follow only that path's guide and confirm the report works before adding other data.
+3. **Enable the report areas you need.** Add their data one source at a time, and publish only when shared Service access is required.
 
 > [!IMPORTANT]
 > Download the complete ZIP rather than individual templates, scripts, or notebooks. The included files were tested together.
@@ -35,13 +31,13 @@ Complete these steps in order:
 
 ### 1. [Dataverse Direct - Recommended](./SETUP-Dataverse.md)
 
-Choose this path when the report will use one Production, Sandbox, or Default Dataverse environment. The included launcher creates a validated Desktop template for that environment; after validation, a second launcher creates the cloud-only Service-refresh template.
+Choose this path when the report will use one Production, Sandbox, or Default Dataverse environment. The only required template input is the Dataverse Environment URL; conversation data is read directly from Dataverse, not from an exported transcript CSV.
 
 **Required access:** Bot Transcript Viewer, or a custom Dataverse role with organization-level Read on `conversationtranscript`. Environment Maker alone is not enough.
 
-**Included files:** [`ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21.pbit), [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd), and [`BUILD-SERVICE-REFRESH.cmd`](./BUILD-SERVICE-REFRESH.cmd).
+**Included setup:** the [Dataverse guide](./SETUP-Dataverse.md) walks through the Environment URL, guided setup, validation, and optional publication.
 
-When either generated PBIT opens, wait until every prefilled parameter value is visible and stable before selecting **Load**.
+When the report opens, wait until every prefilled parameter value is visible and stable before selecting **Load**.
 
 **[Follow the Dataverse Direct steps ->](./SETUP-Dataverse.md)**
 
@@ -73,21 +69,24 @@ Each path guide shows the portal, exact click path, required role, expected outp
 
 | Path | Required input | Required role | Template and helper | Success checkpoint |
 |---|---|---|---|---|
-| **Dataverse Direct** | Dataverse Environment URL | Bot Transcript Viewer or custom organization-level transcript Read | [Dataverse V21](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21.pbit) plus [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd) | Total Conversations is non-zero |
+| **Dataverse Direct** | Dataverse Environment URL; no transcript CSV export | Bot Transcript Viewer or custom organization-level transcript Read | [Guided Dataverse setup](./SETUP-Dataverse.md) | Total Conversations is non-zero |
 | **CSV Upload** | Untouched `ConversationTranscript` CSV and validated `agent-registry.json` | Bot Transcript Viewer or custom organization-level transcript Read | [CSV V18](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) plus [`tools\agent_registry.py`](./tools/agent_registry.py) | Total Conversations is non-zero and the intended agent is shown |
 | **Fabric** | Dataverse URL, application credentials, and `agent-registry.csv` | Fabric Contributor+; Entra/Power Platform admin help; Application User with transcript Read | [Fabric V2](./ESS%20-%20Fabric%20V2.pbit) plus [transcript-parser notebook](./Fabric/notebooks/Copilot_Agent_Transcript_Parser.ipynb) | Eight transcript tables exist and Total Conversations is non-zero |
 
-Power BI Desktop is required for all three paths. Python 3.10 or later is required for the guided Dataverse setup, the CSV registry, and the optional local preparation tools; the included Python tools use only the standard library.
+Power BI Desktop is required for all three paths. The guided setup and optional local tools validate their own prerequisites.
 
-## Add optional data only after the baseline works
+## Optional data for full report functionality
+
+These inputs enable specific report areas; they are not required for the transcript-only baseline. Validate the baseline first to isolate access or source errors, then load the data needed for the report functionality you intend to use.
 
 | Enhancement | What it adds | Where to retrieve it | Required role | Included helper or guide |
 |---|---|---|---|---|
 | **Users / organization** | Department, country, job title, display name | Microsoft 365 admin center: **Users -> Active users -> Export users**, or an approved HR/Viva Insights/Graph source | Global Reader, User Administrator, or Global Administrator for the Microsoft 365 export; other sources use their own access model | CSV and Dataverse Desktop accept `OrgData.csv`; Fabric requires a customer-built Lakehouse ingestion |
 | **Copilot Credits** | Observed tenant, agent, and user credit consumption | Power Platform admin center: **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator is recommended least privilege; tenant administrator or Dynamics 365 Administrator also works | CSV/Dataverse Desktop use the User-Level file; Fabric uses all three files and [`Copilot_Credit_Consumption_Ingester.ipynb`](./Fabric/notebooks/Copilot_Credit_Consumption_Ingester.ipynb) |
-| **External Product Feedback** | Microsoft 365 Copilot Chat and exported Monitor reactions beyond the reactions already found in transcripts | Microsoft 365 admin center: **Health -> Product feedback -> Export to CSV** | A Microsoft 365 administrator or reader with Product Feedback access; Compliance Administrator or Global Administrator only when identity details or deletion are required | [`tools\ess_feedback_normalizer.py`](./tools/ess_feedback_normalizer.py) ([guide](./FEEDBACK-INGESTION.md)) |
-| **Customer-specific topics** | Reviewed local topic rules without changing the template | Learn from the customer's native Copilot Studio topic evidence | Transcript read access; no additional cloud role | [`tools\ess_topic_tuner.py`](./tools/ess_topic_tuner.py) ([guide](./TOPIC-TUNER.md)) |
-| **Power BI publication** | Shared report and scheduled refresh | Power BI Desktop: **Home -> Publish** | Workspace Contributor, Member, or Admin plus the applicable Power BI license | [Refresh and publication guide](./AUTO-REFRESH.md) |
+| **External Product Feedback** | Microsoft 365 Copilot Chat and exported Monitor reactions beyond the reactions already found in transcripts | Microsoft 365 admin center: **Health -> Product feedback -> Export to CSV** | A Microsoft 365 administrator or reader with Product Feedback access; Compliance Administrator or Global Administrator only when identity details or deletion are required | Dataverse prepares raw exports in its guided setup; CSV/Fabric use the [feedback guide](./FEEDBACK-INGESTION.md) |
+| **Customer-specific topics** | Better coverage for recurring customer language that native and built-in topics do not classify reliably | Learn from the customer's native Copilot Studio topic evidence | Transcript read access; no additional cloud role | Use the [optional topic tuner](./TOPIC-TUNER.md) only after reviewing when to use or skip it |
+
+To share the report or schedule refresh, follow the [refresh and publication guide](./AUTO-REFRESH.md) after the intended data sources work in Desktop.
 
 ## Approved release files
 
@@ -95,7 +94,7 @@ The downloadable ZIP contains these current report artifacts:
 
 | File | Use |
 |---|---|
-| [`ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21.pbit) | Base input used by the two Dataverse launchers |
+| [`ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21.pbit) | Approved Dataverse V21 report used by the guided setup |
 | [`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) | CSV Upload template |
 | [`ESS - Fabric V2.pbit`](./ESS%20-%20Fabric%20V2.pbit) | Fabric/Lakehouse template |
 | [`ESS Dashboard - DEMO PBIX.pbix`](./ESS%20Dashboard%20-%20DEMO%20PBIX.pbix) | Synthetic demonstration report; not a customer template |

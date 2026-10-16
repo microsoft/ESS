@@ -1,4 +1,13 @@
-# Private adaptive topic tuner
+# Optional private adaptive topic tuner
+
+Use this optional tool when recurring customer terminology remains unclassified or is repeatedly classified under a broad built-in topic. It can improve **Conversation Details**, **Improvement Opportunities**, **Adjust Topic Assumptions**, and Fabric topic exploration without changing native Copilot Studio topics.
+
+| Decision | Guidance |
+|---|---|
+| **Use it** | Native and built-in classification repeatedly miss meaningful customer terms, and enough representative conversations exist to validate a rule. |
+| **Skip it** | Native and built-in topics already provide adequate coverage, the gaps are rare, or there is not enough evidence to validate a customer rule safely. |
+
+Start with the report's existing topic results. This tool does not unlock the baseline report and is not required for transcript, adoption, outcome, feedback, or business-impact analysis.
 
 `tools/ess_topic_tuner.py` learns customer-specific topic rules from the customer's own Copilot Studio native-topic evidence and applies those rules to similar conversations that have no native topic. It processes every user turn locally, uses only the Python standard library, and makes no network, LLM, or external API calls.
 
@@ -125,7 +134,7 @@ Open **Transform data → Edit parameters** and paste the full contents of `cust
 
 ### Dataverse V21
 
-Run `START-HERE-DATAVERSE.cmd` as described in the [Dataverse Direct guide](SETUP-Dataverse.md#step-4--create-the-validated-desktop-template). Answer **Yes** when asked about optional files and select `customer-topic-overrides.json` under **Approved topic rules**. The launcher validates and embeds the rules. After Desktop validation, the Dataverse guide's second launcher reuses the approved file for the publishable template.
+Follow [Action 2 in the Dataverse Direct guide](SETUP-Dataverse.md#action-2---run-the-guided-setup-and-validate-the-report). When adding data, select `customer-topic-overrides.json` under **Approved topic rules**. Guided setup validates and embeds the reviewed rules. If shared Service access is needed, follow the guide's collapsed publication section after the Desktop result is correct.
 
 ### Fabric V2
 
@@ -147,7 +156,7 @@ Run `Copilot_Agent_Transcript_Parser.ipynb`. The notebook reads only rows where 
 | No automatic customer rules are produced | The export has no usable native topic evidence, too few distinct conversations, or the observed precision is below the threshold | Check `topic-learning-audit.csv`; keep the corrected built-in fallback or review disabled items locally |
 | A known topic is `NeedsReview` after previously appearing strong | It did not match at least three held-out conversations or fell below the out-of-fold precision threshold | Check `ValidationStatus`, `ValidationPrecision`, and `ValidationCoverage`; collect more resolved examples or keep the rule disabled |
 | A learned term contains a sensitive business term | Redaction reduces common PII but cannot identify every customer-specific term | Disable or remove the term and keep all outputs inside the customer environment |
-| Approved rules do not appear in the report | The edited CSV was not supplied on the second run, or `Enabled` is not `true` | Rerun with `--overrides`, then load the newly generated JSON/CSV and refresh |
+| Approved rules do not appear in the report | The edited CSV was not supplied on the second run, or `Enabled` is not `true` | Rerun with `--overrides`, then load the newly prepared JSON/CSV and refresh |
 | One retained thread contains several business questions | The report has one primary topic per conversation | Use **Start over** so each question is retained as a separate conversation; the tuner still learns from all paired user turns |
 
 ## Production validation cycle
@@ -155,8 +164,8 @@ Run `Copilot_Agent_Transcript_Parser.ipynb`. The notebook reads only rows where 
 1. Start with the built-in classifier and confirm native Copilot Studio topics are present.
 2. Export a representative resolved transcript set; for large tenants, use a window that includes ordinary, rare, and seasonally important requests.
 3. Run the tuner and promote only `AutoValidated` rules with `ValidationStatus = Passed`.
-4. Build a Desktop validation PBIT and confirm native topics remain unchanged, enabled customer rules classify only unresolved rows, ambiguous rows remain unassigned, and topic counts are plausible.
-5. Build the Service-refresh PBIT from the same source template and the same approved JSON. Do not reuse a manually edited or test-only PBIT.
+4. Load the reviewed rules through the applicable report setup and confirm native topics remain unchanged, enabled customer rules classify only unresolved rows, ambiguous rows remain unassigned, and topic counts are plausible.
+5. If publishing Dataverse V21, use its publication step so the same approved rules are included in the report prepared for Power BI Service.
 6. Re-run the tuner after material topic or wording changes. Replace the approved JSON deliberately; do not append every historical candidate indefinitely.
 
 ## Sharing guidance
