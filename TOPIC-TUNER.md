@@ -75,15 +75,19 @@ python tools\ess_topic_tuner.py --input "C:\AgentData\ConversationTranscripts.cs
 
 The third command creates `C:\AgentData\topic-review` and the six files described below.
 
-Open `topic-learning-audit.csv` and check `Status`:
+Check the printed `enabledCustomerRulesWritten` value, then open `topic-learning-audit.csv` and check `Status`:
 
-- If every required rule is `AutoValidated` and its validation metrics are acceptable, use `C:\AgentData\topic-review\customer-topic-overrides.json`.
+- If `enabledCustomerRulesWritten` is `1` or higher, every required rule is `AutoValidated`, and its validation metrics are acceptable, use `C:\AgentData\topic-review\customer-topic-overrides.json`.
 - If a required rule is `NeedsReview` or `Candidate`, complete the review process in [Review only unresolved items](#3-review-only-unresolved-items). Use the `customer-topic-overrides.json` from the resulting `topic-review-approved` folder.
+- If `enabledCustomerRulesWritten` is `0` and the audit has no rule rows, the generated JSON contains `[]`. There is no approved custom rule to add. Skip Step 3 and continue using the baseline report without **Approved topic rules**.
 - If the result is `InsufficientEvidence`, collect more representative conversations or skip the custom rule. Do not lower safety thresholds merely to force a result.
 
 ### Step 3 - Add the approved JSON to Dataverse V21
 
-The tuner does not update a report that is already open. After choosing the approved JSON:
+> [!IMPORTANT]
+> Complete this step only when the final tuner run reports `enabledCustomerRulesWritten` as `1` or higher. Do not select a `customer-topic-overrides.json` file containing `[]`.
+
+The tuner does not update a report that is already open. After confirming that the approved JSON contains at least one enabled rule:
 
 1. Return to the extracted `ESS-main` folder.
 2. Double-click `START-HERE-DATAVERSE.cmd`.
