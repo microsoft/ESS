@@ -32,16 +32,11 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 The Dataverse Direct Service-refresh build connects the service **directly to one fixed Dataverse environment** — no exported files, no gateway.
 
-1. From the extracted `ESS-main` folder, generate the environment-specific template:
+1. After the Desktop-validation checklist passes, return to the extracted `ESS-main` folder and double-click **`BUILD-SERVICE-REFRESH.cmd`**. It reuses the Environment URL and approved JSON files saved by `START-HERE-DATAVERSE.cmd`.
 
-   ```powershell
-   python tools\build_service_refresh_template.py `
-     --input "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit" `
-     --environment-url "https://orgabc12345.crm.dynamics.com" `
-     --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Service Refresh.pbit"
-   ```
+   The launcher does not include Org Data or Credits in the Service template. Use Fabric when those sources must refresh automatically.
 
-2. Open the generated PBIT, confirm the environment URL, provide any optional topic/feedback JSON, load it successfully in Desktop, and **Publish** it to your workspace.
+2. Open the generated PBIT, confirm the environment URL and embedded optional JSON, load it successfully in Desktop, and **Publish** it to your workspace.
 3. In the service, open the **semantic model → Settings**.
 4. Expand **Data source credentials** and click **Edit credentials** on the Dataverse source:
    - **Authentication method:** `OAuth2`
@@ -112,7 +107,7 @@ If the parameter points at a **local file** (`C:\Data\…`) or a **network share
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | The reusable Dataverse V21 PBIT or another parameter-built source was published directly. | Generate and publish the environment-specific PBIT with `tools\build_service_refresh_template.py`. |
+| **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | The reusable Dataverse V21 PBIT or Desktop-validation result was published directly. | Run `BUILD-SERVICE-REFRESH.cmd`, refresh its generated PBIT in Desktop, and publish that result. |
 | **“We couldn't authenticate with the credentials provided.”** | Credentials not bound, or account lacks access. | **dataset → Settings → Data source credentials → Edit credentials**; sign in with an account that has Bot Transcript Viewer (Dataverse) or library read (SharePoint). |
 | **Scheduled refresh option is greyed out.** | Credentials for one or more sources not yet set. | Edit credentials on **every** listed source first, then the schedule unlocks. |
 | **Refresh succeeds but data is stale.** | New export saved under a new name/path. | Overwrite the file at the **same URL/path** the parameter points to. |

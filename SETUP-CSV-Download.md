@@ -161,7 +161,7 @@ Leave Org Data, credits, topic overrides, and feedback blank for the first load.
 
 > 💡 **Topic classification.** Native Copilot Studio topics are preserved. Rows without a native topic use the shared customer-neutral English, Spanish, and Chinese taxonomy in `taxonomy/topics-taxonomy.csv`. Complete-word matching, scoring, exclusions, and ambiguity handling prevent partial-word collisions and leave low-signal prompts as **Other / Uncategorized**.
 
-> Need customer-specific topics? Run the [Private topic tuner](TOPIC-TUNER.md), review the generated candidates, then paste its approved JSON into the optional parameter. No new template release is required.
+> Need customer-specific topics? Run the [Private adaptive topic tuner](TOPIC-TUNER.md). It learns high-precision rules from the customer's native topic evidence and leaves weak or unlabeled discoveries disabled for local review. Paste its enabled JSON into the optional parameter; no new template release is required.
 
 > Microsoft 365 Copilot Chat reactions aren't stored in Dataverse transcripts. Follow [Cross-channel feedback ingestion](FEEDBACK-INGESTION.md) to normalize Product Feedback or Monitor exports, then paste the resulting JSON here. This avoids cross-source privacy conflicts.
 
