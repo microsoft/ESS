@@ -23,19 +23,19 @@ Complete only the baseline steps first:
 | Need | Data or input | Portal and retrieval steps | Required role | Expected file or output | Included helper |
 |---|---|---|---|---|---|
 | Transcript capture | Future conversations with node details | [Copilot Studio](https://copilotstudio.microsoft.com) -> open agent -> **Settings -> Advanced -> Conversation transcripts** | Agent owner or coauthor with edit access | Both transcript settings on; agent saved and published | None |
-| Live conversations | Dataverse Environment URL | [Power Apps](https://make.powerapps.com) -> select environment -> **Settings -> Session details -> Instance url** | Bot Transcript Viewer, or custom role with organization-level Read on `conversationtranscript`; Environment Maker alone is insufficient | URL such as `https://org.crm.dynamics.com` | `START-HERE-DATAVERSE.cmd` |
-| Desktop validation | Environment-specific Desktop template | Run the first launcher from the extracted package | Python 3.10+ locally; no extra cloud role | `Generated Templates\...\Desktop Validation.pbit` | Dataverse V21 plus guided launcher |
-| Service publication | Cloud-only Service template | Run the second launcher after Desktop validation | Same Dataverse transcript role; Power BI workspace Contributor+ to publish | `Generated Templates\...\Service Refresh.pbit` | `BUILD-SERVICE-REFRESH.cmd` |
+| Live conversations | Dataverse Environment URL | [Power Apps](https://make.powerapps.com) -> select environment -> **Settings -> Session details -> Instance url** | Bot Transcript Viewer, or custom role with organization-level Read on `conversationtranscript`; Environment Maker alone is insufficient | URL such as `https://org.crm.dynamics.com` | [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd) |
+| Desktop validation | Environment-specific Desktop template | Run the first launcher from the extracted package | Python 3.10+ locally; no extra cloud role | `Generated Templates\...\Desktop Validation.pbit` | [Dataverse V21](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21.pbit) plus [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd) |
+| Service publication | Cloud-only Service template | Run the second launcher after Desktop validation | Same Dataverse transcript role; Power BI workspace Contributor+ to publish | `Generated Templates\...\Service Refresh.pbit` | [`BUILD-SERVICE-REFRESH.cmd`](./BUILD-SERVICE-REFRESH.cmd) |
 
 ### Optional after the first successful refresh
 
 | Need | Data or input | Portal and retrieval steps | Required role | Expected file or output | Included helper |
 |---|---|---|---|---|---|
-| Friendly names or cross-source aliases | Agent registry | Follow the [agent registry guide](./AGENT-REGISTRY.md) | Access to the environment or transcript identifiers | Validated `agent-registry.json` | `tools\agent_registry.py` |
+| Friendly names or cross-source aliases | Agent registry | Follow the [agent registry guide](./AGENT-REGISTRY.md) | Access to the environment or transcript identifiers | Validated `agent-registry.json` | [`tools\agent_registry.py`](./tools/agent_registry.py) |
 | Organization | User roster | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Users -> Active users -> Export users**, or approved HR/Viva Insights/Graph source | Global Reader, User Administrator, or Global Administrator for Microsoft 365 export | `OrgData.csv` | Desktop-validation build only |
 | Copilot Credits | User-Level Credit Consumption | [Power Platform admin center](https://admin.powerplatform.microsoft.com) -> **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator recommended; tenant administrator or Dynamics 365 Administrator also works | `EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv` | Desktop-validation build only |
-| Cross-channel feedback | Product Feedback export | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Health -> Product feedback -> Export to CSV** | Microsoft 365 administrator or reader with Product Feedback access | Prepared `feedback-events.json` plus audit file | [`tools\ess_feedback_normalizer.py`](./FEEDBACK-INGESTION.md) |
-| Customer topics | Native-topic learning evidence | Run the local tuner after the baseline works | Transcript read access; no extra cloud role | Reviewed `customer-topic-overrides.json` | [`tools\ess_topic_tuner.py`](./TOPIC-TUNER.md) |
+| Cross-channel feedback | Product Feedback export | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Health -> Product feedback -> Export to CSV** | Microsoft 365 administrator or reader with Product Feedback access | Prepared `feedback-events.json` plus audit file | [`tools\ess_feedback_normalizer.py`](./tools/ess_feedback_normalizer.py) ([guide](./FEEDBACK-INGESTION.md)) |
+| Customer topics | Native-topic learning evidence | Run the local tuner after the baseline works | Transcript read access; no extra cloud role | Reviewed `customer-topic-overrides.json` | [`tools\ess_topic_tuner.py`](./tools/ess_topic_tuner.py) ([guide](./TOPIC-TUNER.md)) |
 
 ## Step 1 - Confirm access and transcript capture
 
