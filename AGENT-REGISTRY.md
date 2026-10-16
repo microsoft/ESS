@@ -63,12 +63,19 @@ Use PowerShell so the transcript CSV is not modified:
 
 ```powershell
 Import-Csv "C:\AgentData\ConversationTranscripts.csv" |
-  Select-Object BotName,BotId |
+  ForEach-Object {
+    $metadata = $_.metadata | ConvertFrom-Json -ErrorAction Stop
+    [pscustomobject]@{
+      BotName = $metadata.BotName
+      BotId = $metadata.BotId
+    }
+  } |
+  Where-Object { $_.BotId } |
   Sort-Object BotId -Unique |
   Format-Table
 ```
 
-Find the ESS agent by `BotName` and copy its `BotId`. Add it to the registry as:
+The export stores `BotName` and `BotId` inside the `metadata` JSON column; the command reads that JSON without changing the CSV. Find the ESS agent by `BotName` and copy its `BotId`. Add it to the registry as:
 
 ```text
 AliasType = TranscriptId

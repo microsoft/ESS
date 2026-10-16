@@ -1,256 +1,296 @@
-# Step-by-Step Setup Guide — Fabric
+# Fabric setup
 
-> **Choose this path for:** independently governed history, multiple Dataverse environments in one report, very large-scale ingestion, or Lakehouse-based credit analytics. If you have one environment and need scheduled refresh, use [Dataverse Direct](SETUP-Dataverse.md) with [scheduled refresh](AUTO-REFRESH.md) instead. [Compare all data paths](README.md#choose-your-data-path).
+Use this advanced path when you need multiple Dataverse environments in one report, independently governed Lakehouse history, large-scale ingestion, or Lakehouse-based credit analytics.
 
-This path adds a **Fabric/Lakehouse ingestion layer** in front of the same ESS Insights dashboard, for teams that have outgrown the CSV Upload and Dataverse Direct paths. It is **not** a replacement for either — most customers should keep using whichever of those two they're already on.
+If you have one environment and need scheduled refresh, use [Dataverse Direct](./SETUP-Dataverse.md). For a snapshot or proof of concept, use [CSV Upload](./SETUP-CSV-Download.md).
 
-> ⚠️ **History requires the full ingestion solution.** The `.pbit` does not archive Dataverse data. A scheduled transcript-parser notebook must ingest each record before Dataverse deletes it. The default merge mode then preserves that record in Delta, but it cannot recover history that expired before the first successful run.
+> [!IMPORTANT]
+> The PBIT does not archive Dataverse records. Schedule the transcript notebook before records reach the Dataverse retention boundary. Merge mode preserves only records that were successfully ingested.
 
----
+## Your first successful report
 
-## Is this path right for you?
+Build the transcript-only baseline first:
 
-Use this path only if at least one of these is true:
+1. Download the package and create the Fabric workspace and Lakehouse.
+2. Confirm each source agent's supported environment and required transcript settings.
+3. Have an administrator create the Entra app registration and Dataverse Application User.
+4. Import and configure the transcript-parser notebook.
+5. Upload and validate `agent-registry.csv`.
+6. Run the notebook and confirm all eight transcript tables exist.
+7. Connect Fabric V2 and confirm Total Conversations is non-zero.
+8. Add credits, feedback, customer topics, or organization data only after that works.
 
-- [ ] **Multiple Dataverse environments.** You want conversations from two or more Dataverse environments (e.g. regional or business-unit agents) consolidated into a single dashboard, instead of maintaining one `.pbit` copy per environment.
-- [ ] **Durable Lakehouse history.** You need an independently governed transcript history beyond the Dataverse source-retention window and can operate a scheduled ingestion process.
-- [ ] **Refresh performance at scale.** Per-refresh live Dataverse queries against a very large environment (long history, high conversation volume) are slow or timing out with Dataverse Direct.
-- [ ] **Credit-consumption analytics.** You want the three current Power Platform admin center Copilot Credits exports ingested alongside conversation data, with the option to automate file landing in your own architecture.
+## Files, portals, and required roles
 
-If none of these apply, use **[Dataverse Direct](SETUP-Dataverse.md)** or **[CSV Upload](SETUP-CSV-Download.md)** instead — they get you running faster with no Fabric capacity required.
+### Required for the first run
 
----
+| Need | Data or input | Portal and retrieval steps | Required role | Expected file or output | Included helper |
+|---|---|---|---|---|---|
+| Transcript capture | Future conversations with node details | [Copilot Studio](https://copilotstudio.microsoft.com) -> open each source agent -> **Settings -> Advanced -> Conversation transcripts** | Agent owner or coauthor with edit access | Both transcript settings on; each agent saved and published | None |
+| Fabric destination | Workspace and Lakehouse | [Microsoft Fabric](https://app.fabric.microsoft.com) -> create or select workspace -> **New -> Lakehouse** | Workspace Contributor, Member, or Admin; capacity assigned | Attached Lakehouse | None |
+| Dataverse authentication | Entra app registration | [Entra admin center](https://entra.microsoft.com) -> **Identity -> Applications -> App registrations -> New registration** | Account permitted to register applications; Application Developer or Entra administrator help may be required by tenant policy | Tenant ID, client ID, secret or approved credential | None |
+| Transcript authorization | Dataverse Application User in each source environment | [Power Platform admin center](https://admin.powerplatform.microsoft.com) -> **Environments -> Settings -> Users + permissions -> Application users** | Power Platform or Dataverse administrator | Application User with organization-level transcript Read | Bot Transcript Viewer or approved custom role |
+| Agent scope | Cross-source registry | Follow the [agent registry guide](./AGENT-REGISTRY.md) and upload to `Files/config/agent-registry.csv` | Access to approved agent identifiers | Reviewed CSV in Lakehouse | Transcript notebook validation |
+| Transcript ingestion | Dataverse records | Configure and run the required notebook | Fabric notebook execution permission plus application credential | Eight transcript-derived Delta tables | `Fabric\notebooks\Copilot_Agent_Transcript_Parser.ipynb` |
+| Report | Lakehouse SQL analytics endpoint | Open Lakehouse -> SQL analytics endpoint -> copy connection string and database name | Lakehouse read access and Power BI Desktop | Loaded report | `ESS - Fabric V2.pbit` |
 
-## Benefits of this path
+### Optional after the first successful refresh
 
-- **Schedulable ingestion and refresh.** Transcript ingestion notebooks can be scheduled. Copilot Credits files must first be landed in the Lakehouse; manual upload is supported now, and automated landing can be added separately.
-- **Multiple Dataverse environments, one dashboard.** Conversations from two or more Dataverse environments can be ingested into the same Lakehouse and consolidated into a single dashboard, instead of maintaining a separate `.pbit` copy per environment.
-- **Copilot credit-consumption analytics.** `Copilot_Credit_Consumption_Ingester.ipynb` reads the three Power Platform admin center Copilot Credits reports after they are landed under `Files/credit_consumption`.
-- **Automatic multilingual topic identification for conversations without a native topic.** `Copilot_Agent_Transcript_Parser.ipynb` preserves Copilot Studio topics, then applies a shared English, Spanish, and Chinese taxonomy and a local discovery fallback. No conversation data leaves the customer's Fabric workspace, and no LLM or external API call is involved. (See Step 3 below for how it works.)
+| Need | Data or input | Portal and retrieval steps | Required role | Expected file or output | Included helper |
+|---|---|---|---|---|---|
+| Copilot Credits | Environment, Agent-Level, and User-Level exports | [Power Platform admin center](https://admin.powerplatform.microsoft.com) -> **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator recommended; tenant administrator or Dynamics 365 Administrator also works | Three current CSVs in `Files/credit_consumption` | `Copilot_Credit_Consumption_Ingester.ipynb` |
+| Cross-channel feedback | Product Feedback export | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Health -> Product feedback -> Export to CSV** | Microsoft 365 administrator or reader with Product Feedback access | Prepared `feedback-events.csv` plus audit file | [`tools\ess_feedback_normalizer.py`](./FEEDBACK-INGESTION.md) |
+| Customer topics | Native-topic learning evidence | Run the local tuner after the baseline works | Transcript read access; no extra cloud role | Reviewed `customer-topic-overrides.csv` | [`tools\ess_topic_tuner.py`](./TOPIC-TUNER.md) |
+| Organization | Approved HR, Viva Insights, Graph, or Microsoft 365 user export | Source-specific retrieval | Global Reader, User Administrator, or Global Administrator for Microsoft 365 export | Customer-managed Lakehouse tables | No organization-ingestion notebook is included |
+| Publication | Power BI workspace | Power BI Desktop -> **Home -> Publish** | Workspace Contributor, Member, or Admin plus applicable license | Published report | [Publication guide](./AUTO-REFRESH.md) |
 
----
+## Step 1 - Download the package and create Fabric resources
 
-## Before you start
+1. [Download the complete ESS ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) and extract it.
+2. Keep the package folder structure intact.
+3. In [Microsoft Fabric](https://app.fabric.microsoft.com), create or select a capacity-backed workspace.
+4. Create a Lakehouse.
+5. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/).
+6. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) only when you are ready to use the optional local feedback or topic-preparation tools.
 
-✅ The [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded and extracted; do not download notebooks or scripts individually
-✅ A **Fabric workspace** with Fabric capacity assigned (a trial capacity is enough to evaluate)
-✅ A **Lakehouse** created in that workspace
-✅ Permission to **create and run notebooks** in that workspace
-✅ A **Microsoft Entra app registration** added as a Dataverse **Application User** (with read access on Conversation Transcript) in every Dataverse environment you're ingesting from — this typically needs a Dataverse or Entra administrator to set up; it's a different, additional requirement from the CSV/Dataverse-Direct paths' simpler Bot Transcript Viewer role
-✅ **Power BI Desktop** installed — [download free](https://powerbi.microsoft.com/desktop/)
-✅ **Python 3.10 or later** installed locally — [download for Windows](https://www.python.org/downloads/windows/); it is used in the linked agent-registry steps and optional feedback/topic steps, and no packages are required
+The baseline uses:
 
-> 📋 See the landing page's single [required and optional data-access table](README.md#get-your-data-and-confirm-access). This guide repeats each role only where you use it.
+| Package file | Purpose |
+|---|---|
+| `ESS - Fabric V2.pbit` | Imports the Lakehouse SQL analytics endpoint |
+| `Fabric\notebooks\Copilot_Agent_Transcript_Parser.ipynb` | Required transcript ingestion and parsing |
+| `SampleData\agent-registry.csv` | Fabricated starter registry to copy and replace |
 
----
+The credit notebook is optional and should not be run until the transcript-only report works.
 
-## One-time administrator setup — create the Dataverse application user
+## Required preflight - confirm transcript capture
 
-Ask an Entra and Power Platform administrator to complete these steps. Reuse one app registration across the Dataverse environments, but add it as an application user in every environment.
+Complete this for every source agent before configuring ingestion:
 
-### Create the Microsoft Entra app registration
+1. Confirm the agent is in a Production, Sandbox, or Default environment. Microsoft Teams and Microsoft 365 Copilot environments do not persist the required records; Developer environments contain only the maker's conversations.
+2. Open the agent in [Copilot Studio](https://copilotstudio.microsoft.com).
+3. Select **Settings -> Advanced -> Conversation transcripts**.
+4. Turn on **Save conversation transcripts to Dataverse**.
+5. Turn on **Include node-level details in transcripts**.
+6. Save and publish the agent.
+7. Run several new test conversations and allow a few minutes for the records to appear.
+
+The settings affect future conversations only. You need owner or coauthor edit access to change them; ask the agent owner if the controls are unavailable.
+
+## Step 2 - Create the Entra application
+
+Ask an Entra administrator or an application owner permitted by tenant policy to:
 
 1. Sign in to the [Microsoft Entra admin center](https://entra.microsoft.com).
-2. Select **Identity → Applications → App registrations → New registration**.
+2. Select **Identity -> Applications -> App registrations -> New registration**.
 3. Enter a customer-approved name such as `ESS Fabric Transcript Reader`.
 4. Keep **Accounts in this organizational directory only** selected and leave Redirect URI blank.
 5. Select **Register**.
-6. On **Overview**, copy:
-   - **Application (client) ID** — this becomes `CLIENT_ID`;
-   - **Directory (tenant) ID** — this becomes `TENANT_ID`.
-7. Select **Certificates & secrets → Client secrets → New client secret**.
-8. Enter a description and the shortest approved expiration, then select **Add**.
-9. Immediately copy the secret **Value** — not the Secret ID. It is displayed only once.
+6. Copy the **Application (client) ID** and **Directory (tenant) ID**.
+7. Select **Certificates & secrets -> Client secrets -> New client secret**.
+8. Use the shortest approved expiration and copy the secret **Value**, not the Secret ID.
 
-> Store the secret in an approved secret store. Do not commit it to this repository, leave it in a shared notebook, paste it into screenshots, or send it by email or chat. For production, use Azure Key Vault and `notebookutils.credentials.getSecret(...)`.
+For production, store the credential in an approved secret store and retrieve it with `notebookutils.credentials.getSecret(...)`. Do not commit secrets to the repository or leave a literal secret in a shared notebook.
 
-### Add the app to each Dataverse environment
+## Step 3 - Add the Dataverse Application User
+
+A Power Platform or Dataverse administrator must repeat these steps in every source environment:
 
 1. Sign in to the [Power Platform admin center](https://admin.powerplatform.microsoft.com).
-2. Select **Environments**, then select the environment that hosts the agent.
-3. Select **Settings → Users + permissions → Application users**.
-4. Select **New app user → Add an app**.
-5. Select the app registration created above, then select **Add**.
-6. Choose the environment's business unit.
-7. Under **Security roles**, select **Bot Transcript Viewer** or a customer-approved custom role with organization-level **Read** access to the `conversationtranscript` table.
+2. Select **Environments**, then the environment that hosts the agent.
+3. Select **Settings -> Users + permissions -> Application users**.
+4. Select **New app user -> Add an app**.
+5. Select the app registration, then select **Add**.
+6. Choose the business unit.
+7. Assign **Bot Transcript Viewer** or a customer-approved custom role with organization-level **Read** on `conversationtranscript`.
 8. Select **Create**.
-9. Repeat these steps for every environment listed in `DATAVERSE_URLS`.
 
-Application permissions can take a few minutes to become active.
+Application permissions can take several minutes to become active. Power Platform Administrator or Environment Maker alone does not grant the application transcript access.
 
----
+## Step 4 - Build and upload the agent registry
 
-## Step 1 — Get the template and notebooks
+1. Follow [Agent registry and reporting scope](./AGENT-REGISTRY.md).
+2. Replace the synthetic rows in `SampleData\agent-registry.csv` with approved customer identifiers.
+3. Mark the intended agents enabled and in scope.
+4. Review the registry column rules and identifiers.
+5. In the Lakehouse, create `Files/config`.
+6. Upload the reviewed file as:
 
-Download and extract the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip). Keep its folder structure intact. You'll use these files:
+```text
+Files/config/agent-registry.csv
+```
 
-| Package location | What it does |
+The Fabric notebook reads and validates the CSV directly. It does not use the JSON version or require the local registry validator.
+
+## Step 5 - Import and configure the transcript notebook
+
+1. In the Fabric workspace, select **New -> Import notebook**.
+2. Import `Fabric\notebooks\Copilot_Agent_Transcript_Parser.ipynb`.
+3. Open the notebook and select **Add lakehouse** to attach the target Lakehouse.
+4. Find the **CONFIG** cell.
+5. For one environment, set `DATAVERSE_URL` and leave `DATAVERSE_URLS = []`.
+6. For several environments, populate `DATAVERSE_URLS` and leave the single URL unused.
+7. Set `TENANT_ID`, `CLIENT_ID`, and the approved credential retrieval.
+8. Keep `LOOKBACK_DAYS = 7` and `WRITE_MODE = 'merge'` for scheduled incremental ingestion.
+9. Set the same approved `AGENT_SCOPE_MODE` used by the registry:
+   - `ESS Safe` for enabled rows marked `IsEss=true`;
+   - `Selected Agents` for enabled rows marked `Selected=true`; or
+   - `All Agents` only as an explicit broad-scope choice.
+
+Use the environment **Instance URL** from Power Apps **Settings -> Session details**, without a trailing slash.
+
+Use `LOOKBACK_DAYS = 0` with `WRITE_MODE = 'overwrite'` only for an intentional full replacement. The notebook rejects overwrite with a bounded lookback because that combination would discard older Lakehouse history.
+
+## Step 6 - Run and validate transcript ingestion
+
+1. Select **Run all** in `Copilot_Agent_Transcript_Parser.ipynb`.
+2. Confirm the run ends without a red error cell.
+3. Review the printed source and row-count summary.
+4. Refresh the Lakehouse Explorer.
+5. Confirm these eight tables exist:
+   - `agent_sessions`
+   - `agent_turns`
+   - `agent_errors`
+   - `agent_subagents`
+   - `agent_catalogue`
+   - `agent_performance`
+   - `user_feedback`
+   - `user_feedback_quarantine`
+6. Confirm `agent_sessions` contains non-zero rows and only the intended agent scope.
+
+Stop here if ingestion fails. Optional sources will not repair application credentials, Dataverse permissions, registry errors, or unsupported environments.
+
+## Step 7 - Connect Fabric V2
+
+1. Open the Lakehouse.
+2. Open its **SQL analytics endpoint**.
+3. Copy the **SQL connection string** and note the Lakehouse/database name.
+4. Double-click `ESS - Fabric V2.pbit`.
+5. Complete the parameter prompt:
+
+| Template parameter | Baseline value |
 |---|---|
-| `ESS - Fabric V2.pbit` | Dashboard template that imports the Lakehouse SQL analytics endpoint and preserves decimal Copilot Credits |
-| `Fabric/notebooks/Copilot_Agent_Transcript_Parser.ipynb` | Required notebook that parses conversation transcripts and writes the eight transcript-derived Delta tables |
-| `Fabric/notebooks/Copilot_Credit_Consumption_Ingester.ipynb` | Optional notebook that ingests Power Platform admin center reports into the three credit-consumption tables |
-| `SampleData/agent-registry.csv` | Fabricated starter registry to copy and replace with customer identifiers |
+| **Fabric SQL Endpoint** | SQL connection string |
+| **Lakehouse Name** | Lakehouse/database name |
+| **Enable_Dataverse** | `Include` |
+| **Enable_ProductFeedback** | `Include` so native transcript reactions are visible |
+| **Enable_Agent365** | `Exclude` |
+| **Enable_Consumption** | `Exclude` |
+| **Enable_CostConsumption** | `Exclude` |
 
-> Both notebooks are adapted from the community, MIT-licensed **[StudioLens-for-Copilot-Studio](https://github.com/Keithland89/StudioLens-for-Copilot-Studio)** project by **Keithland89** — see [Attribution & license ↓](#attribution--license).
+6. When prompted, select **Organizational account**, sign in, and select **Connect**.
+7. Select **Home -> Refresh**.
 
----
+The supplied template uses Import mode.
 
-## Step 2 — Land the notebooks in your Fabric workspace
+## Step 8 - Confirm the baseline
 
-1. In your Fabric workspace, import both `Copilot_Agent_Transcript_Parser.ipynb` and `Copilot_Credit_Consumption_Ingester.ipynb` (**New → Import notebook**).
-2. Attach each notebook to your **Lakehouse** (**Add lakehouse** in the notebook's Explorer pane).
-3. Open `Copilot_Agent_Transcript_Parser.ipynb` and find the **CONFIG** cell near the top.
-4. For one environment, set `DATAVERSE_URL` and leave `DATAVERSE_URLS = []`. For several environments, populate `DATAVERSE_URLS` and leave the single URL unused. Use each environment's **Instance URL** from Power Apps **Settings → Session details**, without a trailing slash.
-5. Set `TENANT_ID`, `CLIENT_ID`, and `CLIENT_SECRET` from the administrator setup above. For production, replace the literal secret with `notebookutils.credentials.getSecret(...)`.
-6. Leave `LOOKBACK_DAYS = 7` and `WRITE_MODE = 'merge'` for safe incremental refresh. Use `LOOKBACK_DAYS = 0` with `WRITE_MODE = 'overwrite'` only for an intentional full replacement.
+Confirm:
 
-Create and validate the [agent registry](AGENT-REGISTRY.md#before-you-start), then upload `agent-registry.csv` to `Files/config/agent-registry.csv`. The registry guide contains the exact download, edit, and validation steps. Set the same `AGENT_SCOPE_MODE` in both notebooks:
+- [ ] Total Conversations is non-zero.
+- [ ] `agent_catalogue` and `agent_sessions` contain only the agents enabled by the selected registry scope.
+- [ ] The report date range matches the ingested records.
+- [ ] Lakehouse `agent_sessions` and Power BI totals are plausible for the same scope.
+- [ ] The transcript notebook completed without errors and the Lakehouse row counts are plausible.
 
-- `ESS Safe` — enabled registry agents marked `IsEss=true` (default);
-- `Selected Agents` — enabled registry agents marked `Selected=true`;
-- `All Agents` — all transcript/credit agents, while Product Feedback still requires a registry match.
+Schedule the transcript notebook only after a manual end-to-end run succeeds. A daily run with a seven-day merge overlap is recommended; monitor failures so the gap never reaches the Dataverse retention boundary.
 
-To add customer-specific topics without editing the notebook, run the [Private topic tuner](TOPIC-TUNER.md), review and enable the approved rules, then upload `customer-topic-overrides.csv` to `Files/config/customer-topic-overrides.csv`. The notebook uses only enabled rows and continues with the built-in taxonomy when the file is absent.
+## Step 9 - Add optional enhancements
 
-To include Microsoft 365 Copilot Chat or exported Monitor reactions, follow [Cross-channel feedback ingestion](FEEDBACK-INGESTION.md), then upload `feedback-events.csv` to `Files/feedback/feedback-events.csv`. The transcript parser writes mapped events to `user_feedback` and identifier-only unmapped rows to `user_feedback_quarantine`.
+### Copilot Credits
 
-Parent/child attribution is built into the same transcript parser. With node-level transcript details enabled, conversation summaries land in `agent_sessions` and `agent_performance`, and every initialize/completed event lands in `agent_subagents`. See [Parent and child agent attribution](CHILD-AGENT-ATTRIBUTION.md).
+1. Import and attach `Fabric\notebooks\Copilot_Credit_Consumption_Ingester.ipynb`.
+2. Add a `CreditId` alias for each intended agent to `agent-registry.csv`, then replace `Files/config/agent-registry.csv` with the updated file.
+3. Set the credit notebook's `AGENT_SCOPE_MODE` to the same value used by the transcript notebook.
+4. In the [Power Platform admin center](https://admin.powerplatform.microsoft.com), select **Licensing -> Copilot Studio -> Summary -> Download report**.
+5. Set **Usage type** to `Copilot Credits` and choose one lookback.
+6. Download all three types:
+   - **Environment Consumption Summary**
+   - **Agent-Level Credit Consumption**
+   - **User-Level Credit Consumption**
+7. Upload exactly one current copy of each file to `Files/credit_consumption`.
+8. Remove older copies and `(1)` duplicates.
+9. Run the credit notebook and confirm:
+   - `credit_consumption_tenant`
+   - `credit_consumption_agent`
+   - `credit_consumption_user`
+10. Set **Enable_Consumption** to `Include` and refresh Power BI.
 
-> If the token check returns `invalid_client`, confirm that `CLIENT_SECRET` contains the secret **Value**, not the Secret ID, and that it has not expired.
+The notebook reads pre-landed files; it does not acquire the exports. Manual upload is supported. Automated landing requires a separately approved pipeline or flow.
 
-### Land the three Copilot Credits exports
+Credit values are decimals. Agent and user exports are overlapping lookback snapshots, not transactions. Retain blank `User Email` rows as unmatched identities.
 
-1. In the [Power Platform admin center](https://admin.powerplatform.microsoft.com), go to **Licensing → Copilot Studio → Summary → Download report**. This page allows a tenant administrator, Power Platform Administrator, or Dynamics 365 Administrator; use **Power Platform Administrator** as least privilege for this workflow.
-2. Set **Usage type** to `Copilot Credits`, choose a `30`, `60`, `90`, or `180` day lookback, and download each type: **Environment Consumption Summary**, **Agent-Level Credit Consumption**, and **User-Level Credit Consumption**.
-3. In the attached Lakehouse, create/open **Files → `credit_consumption`** and upload all three CSVs. At 30 days their generated names are:
-   - `EntitlementConsumptionTenantDetailsReport_MCSMessages_30.csv`
-   - `EntitlementConsumptionTenantPerAgentDetailsReport_MCSMessages_30.csv`
-   - `EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30.csv`
+### Product Feedback
 
-   Keep exactly one current file of each type in this folder. Move or delete older downloads, including `(1)` duplicates, before running the notebook; overlapping lookback snapshots are rejected to prevent double counting.
+1. Add the agent's `M365Title` alias to `agent-registry.csv`.
+2. Replace `Files/config/agent-registry.csv` with the updated registry.
+3. Export Product Feedback from **Health -> Product feedback** in the Microsoft 365 admin center.
+4. Follow [Cross-channel feedback ingestion](./FEEDBACK-INGESTION.md).
+5. Review `feedback-events.audit.json`.
+6. Upload the prepared file to `Files/feedback/feedback-events.csv`.
+7. Run the transcript notebook.
+8. Confirm mapped rows appear in `user_feedback` and review `user_feedback_quarantine`.
+9. Keep **Enable_ProductFeedback** set to `Include` and refresh Power BI.
 
-The notebook reads pre-landed files; it does **not** acquire exports. Manual upload is supported. A scheduled Power Automate flow or other landing pipeline is an architecture option, but this repository does not include a companion flow.
+Do not upload the tenant-wide raw export directly.
 
-### Land Microsoft 365 Copilot feedback
+### Customer-specific topics
 
-1. Add the agent's `M365Title` (`T_...`) alias to `agent-registry.csv` by following the [agent registry guide](AGENT-REGISTRY.md).
-2. In the [Microsoft 365 admin center](https://admin.microsoft.com), select **Health → Product feedback → Export to CSV**.
-3. Follow [Microsoft 365 Copilot feedback: export, prepare, and load](FEEDBACK-INGESTION.md) to run the local normalizer with the registry.
-4. Review `feedback-events.audit.json` and confirm the expected ESS rows were included. The export is tenant-wide; do not upload it directly to Fabric.
-5. In the attached Lakehouse, create/open **Files → `feedback`** and upload the prepared `feedback-events.csv`.
-6. Run `Copilot_Agent_Transcript_Parser.ipynb`. Confirm mapped rows appear in `user_feedback` and review identifier-only rows in `user_feedback_quarantine`.
+1. Follow [Private adaptive topic tuning](./TOPIC-TUNER.md).
+2. Review proposed rules and enable only approved rows.
+3. Upload the result to:
 
-The export is a snapshot rather than a live connection. Repeat the export, preparation, upload, and notebook run for each refresh, or implement an approved export-landing process separately.
+```text
+Files/config/customer-topic-overrides.csv
+```
 
-The validated raw contracts are:
+4. Run the transcript notebook and review classification diagnostics.
 
-- **Environment (daily):** `BillingPlan Id`, `BillingPlan Name`, `Environment Id`, `Environment Name`, `Capacity Type`, `Entitled Quantity`, `Prepaid Consumed Quantity`, `Pay as you go Consumed Quantity`, `Usage Date`
-- **Agent (lookback aggregate):** `Agent Name`, `Agent Id`, `Product`, `AI Feature/Billable Feature`, `Billed credit`, `Non-billed credit`, `Channel`, `Knowledge Sources`, `Tool Used`, `LLM Model`, `Scenario Name`, `Environment Id`, `Environment Name`
-- **User (lookback aggregate):** `User Id`, `User Email`, `Agent Id`, `Agent Name`, `Billable credit used`, `Credits used`, `M365 Copilot Licensed`
+Native Copilot Studio topics remain authoritative. The built-in taxonomy continues to work when the override file is absent.
 
-Credit quantities are decimals (for example, `113.89` and `150.94`), and `Agent Id` is a bare GUID—not a `P_`-prefixed value. The environment report has daily `Usage Date` rows; agent and user reports have no activity date and represent the entire selected lookback. `User Email` may be blank and must be retained as unmatched identity. The separate **M365 Copilot Credits report** is limited to metered declarative agents in M365 Copilot Chat and is not the recommended ESS source.
+### Users and organization data
 
-> 💡 **Fabricated validation files:** [`SampleData`](./SampleData/) includes schema-identical Environment, Agent, and User Power Platform admin center files that reconcile to **1,651.75 credits**. Upload exactly those three consumption files to `Files/credit_consumption` to validate the credit notebook without customer data.
+Fabric V2 treats `copilot_org_data`, `copilot_licensed_users`, and `copilot_interactions_parsed` as optional typed-empty sources so the baseline refresh succeeds without them.
 
----
+This repository does not include an organization-ingestion notebook. Populate those tables only through a separately designed, governed, and validated Lakehouse process. If Microsoft 365 **Active users** is the approved source, the exporting account needs Global Reader, User Administrator, or Global Administrator.
 
-## Step 3 — Run (or schedule) the notebooks
+## Step 10 - Publish and operate
 
-1. **Run all cells** in `Copilot_Agent_Transcript_Parser.ipynb` first — it populates `agent_sessions` and `agent_catalogue`.
-2. A successful run ends without a red error cell and prints row counts for each output. Refresh the Lakehouse Explorer and confirm these required tables exist: `agent_sessions`, `agent_turns`, `agent_errors`, `agent_subagents`, `agent_catalogue`, `agent_performance`, `user_feedback`, and `user_feedback_quarantine`.
-3. After landing the three CSVs under `Files/credit_consumption`, **run all cells** in `Copilot_Credit_Consumption_Ingester.ipynb`. It populates `credit_consumption_tenant`, `credit_consumption_agent`, and `credit_consumption_user`.
-4. Confirm `agent_sessions`, `agent_catalogue`, `user_feedback`, and all three `credit_consumption_*` Delta tables appear under your Lakehouse's **Tables** list.
-5. *(Recommended for production)* Schedule the notebooks (or wrap them in a Fabric pipeline). If credits must be hands-off, separately implement and schedule the Power Platform admin center export-landing step before the credit notebook.
+1. Save the validated report as a `.pbix`.
+2. Select **Home -> Publish** and choose a workspace where you have Contributor, Member, or Admin access.
+3. In Power BI Service, bind the semantic model to an explicit OAuth cloud connection for the Lakehouse SQL analytics endpoint.
+4. Configure scheduled refresh.
+5. Schedule the transcript notebook or a Fabric pipeline.
+6. Monitor ingestion before the Dataverse retention boundary.
 
-> ✅ **Recommended transcript schedule:** Run the transcript parser daily with `LOOKBACK_DAYS = 7` and `WRITE_MODE = 'merge'`. The overlap safely updates recent records and tolerates short missed-run periods. Monitor failures so the gap never reaches the Dataverse retention boundary.
+See [AUTO-REFRESH.md](./AUTO-REFRESH.md) for publication details.
 
-> ⚠️ **Rolling snapshots are not transactions.** The agent and user reports overlap when the same lookback is downloaded repeatedly. Use the default `overwrite` mode for a current snapshot. If you intentionally use `append`, `LoadDate` is snapshot-history metadata; measures must select/deduplicate snapshots and must not sum overlapping windows as transaction history.
+Before production use, reconcile:
 
-> 💡 **Transcript history is protected by default.** The transcript parser uses `WRITE_MODE = 'merge'` for its bounded seven-day Dataverse pull. It rejects `overwrite` with a nonzero lookback because that combination would discard older Delta history. For an intentional full replacement, set both `LOOKBACK_DAYS = 0` and `WRITE_MODE = 'overwrite'`.
+- `agent_sessions` and `agent_catalogue` row counts;
+- each credit snapshot to its source total without rounding;
+- unmatched blank-email credits;
+- `feedback-events.audit.json` to mapped and quarantined feedback; and
+- Power BI totals to the same registry scope and date range.
 
-> ⚠️ **No backfill after deletion.** Merge mode preserves only records that reached the Lakehouse. Deploy and schedule ingestion before the required Dataverse history expires.
+Observed Power Platform exports have no conversation/session ID. Any credit attributed to a conversation, topic, or outcome is a modeled allocation and must reconcile to the exported control total.
 
-> 💡 **Native analytics signals are preserved.** `messageReaction.value.reaction` supplies transcript thumbs, and `SessionInfo.outcome`/`outcomeReason` remain authoritative. Conversations without `SessionInfo` are labeled `Engaged-Unclassified` rather than assumed resolved.
+## Troubleshooting
 
-> 💡 **Safe and flexible agent scope.** Do not comment out notebook cells. Change `AGENT_SCOPE_MODE` and registry flags instead. The registry maps transcript, credit, and Microsoft 365 title IDs to one canonical agent identity and prevents unrelated tenant feedback from entering agent metrics.
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `invalid_client` | Wrong secret value, expired credential, or incorrect tenant/client ID | Use the secret **Value**, verify expiration, and recopy IDs |
+| Dataverse request is forbidden | Application User or transcript role is missing in that environment | Add the app to every source environment and assign organization-level transcript Read |
+| Registry validation fails | Duplicate, ambiguous, or inactive aliases | Correct `agent-registry.csv` and validate again |
+| Older history disappears | Notebook used unsafe overwrite or never ingested records before retention | Restore the approved merge configuration; expired source records cannot be recovered |
+| Credit notebook rejects files | Duplicate or overlapping exports are present | Keep exactly one current file of each type |
+| Power BI baseline is empty | Required tables are empty, wrong endpoint/database, or agent scope excludes rows | Validate notebook counts, connection parameters, and registry scope |
+| Organization visuals are blank | Optional customer-managed tables are not populated | Implement and validate a governed organization-ingestion process |
 
-> 💡 **Automatic topic identification.** `Copilot_Agent_Transcript_Parser.ipynb` classifies conversations as part of the same run. A native Copilot Studio topic remains authoritative. For rows without one, **Stage 1** uses the shared customer-neutral English, Spanish, and Chinese taxonomy with complete-word or phrase matching, scoring, exclusions, and ambiguity handling. **Stage 2** groups a sufficiently large set of remaining uncategorized prompts with multilingual character n-grams and labels each group `Auto-Discovered: <terms>`. Results land in `primary_topic_derived`; audit fields record the source, matched terms, score, confidence, ambiguity, language, and classifier version. Advanced users can disable Stage 2 via `ENABLE_SEMANTIC_FALLBACK`. Auto-discovered labels are candidate themes and should be reviewed before business use.
+## Attribution and help
 
----
+The Fabric notebooks adapt the MIT-licensed [StudioLens-for-Copilot-Studio](https://github.com/Keithland89/StudioLens-for-Copilot-Studio) project by Keithland89. The original license references are retained in both notebooks.
 
-## Step 4 — Open the template and connect it to your Lakehouse
-
-1. In the Fabric workspace, open the Lakehouse.
-2. Open its **SQL analytics endpoint** and copy the **SQL connection string** from the endpoint settings. Also note the Lakehouse/database name.
-3. Double-click `ESS - Fabric V2.pbit` to open it in Power BI Desktop.
-4. Complete the parameter prompt:
-
-   | Template parameter | Value |
-   |---|---|
-   | **Fabric SQL Endpoint** | The SQL connection string copied in Step 2 |
-   | **Lakehouse Name** | The Lakehouse/database name |
-   | **Enable_Dataverse** | `Include` |
-   | **Enable_ProductFeedback** | `Include` when `user_feedback` is used; otherwise `Exclude` |
-   | **Enable_Agent365** | `Include` only when the optional Agent 365 source table is supplied; otherwise `Exclude` |
-   | **Enable_Consumption** | `Include` when the credit notebook was run; otherwise `Exclude` |
-   | **Enable_CostConsumption** | `Include` only when cost-consumption inputs are supplied; otherwise `Exclude` |
-
-5. When Power BI requests credentials, select **Organizational account**, sign in, and select **Connect**.
-6. Select **Home → Refresh** and confirm the Lakehouse tables load without errors.
-
-The supplied template uses Import mode. It does not provide selectable Direct Lake or DirectQuery behavior.
-
-### Minimum successful first run
-
-For the smallest working configuration:
-
-1. Run only the transcript parser with a valid `agent-registry.csv`.
-2. Confirm all eight required transcript outputs exist.
-3. Open the PBIT and enter **Fabric SQL Endpoint** and **Lakehouse Name**.
-4. Set **Enable_Dataverse** to `Include`.
-5. Set Product Feedback, Agent 365, Consumption, and Cost Consumption to `Exclude`.
-6. Refresh and confirm **Total Conversations** is non-zero.
-
-Add optional feedback and credit inputs only after this first refresh succeeds.
-
-### Optional — Add Users / organization enrichment
-
-`copilot_org_data`, `copilot_licensed_users`, and `copilot_interactions_parsed` are not produced by the two included notebooks. Fabric V2 treats them as typed-empty optional sources so refresh still succeeds.
-
-Populate them only through a separately implemented and validated Lakehouse ingestion process; this repository does not provide a local Org Data file parameter or those ingestion artifacts. If Microsoft 365 **Active users** is the approved source, the exporting account needs **Global Reader**, **User Administrator**, or **Global Administrator**. Other sources such as HR, Viva Insights, or Microsoft Graph use their own access model.
-
----
-
-## Validation status — read before production use
-
-`ESS - Fabric V2.pbit` and both notebooks have been validated end to end with fabricated data against a standard schema-less Fabric Lakehouse and Power BI Desktop. The transcript parser created all eight required outputs, including zero-row tables, and the credit ingester created the tenant, agent, and user credit tables while preserving decimal values. Power BI Service validation also completed successfully against the Lakehouse SQL analytics endpoint.
-
-Optional auxiliary-table ingestion remains outside the two included notebooks. Before relying on a customer deployment in production:
-
-- [ ] Run the ingestion → Lakehouse → refresh loop once against the customer's own environment(s).
-- [ ] Confirm row counts in `agent_sessions`, `agent_catalogue`, `credit_consumption_tenant`, `credit_consumption_agent`, and `credit_consumption_user` look right.
-- [ ] Confirm decimal totals remain decimal and reconcile to the source exports; do not round credit quantities to integers.
-- [ ] Confirm blank `User Email` rows remain present as unmatched identities.
-- [ ] If Product Feedback is used, reconcile `feedback-events.audit.json` to `user_feedback` and review `user_feedback_quarantine`.
-- [ ] In Power BI Service, replace the default SQL connection with an explicit OAuth cloud connection before scheduling refresh.
-- [ ] Validate the dashboard the same way described in [Step 6 of the CSV guide](SETUP-CSV-Download.md#step-6--validate-before-sharing) or [Step 7 of the Dataverse guide](SETUP-Dataverse.md#step-7--validate-before-sharing).
-
-### Observed versus modeled attribution
-
-Power Platform admin center credits are observed only at environment-day, agent-lookback, and user-agent-lookback grain. They can be linked to ESS by bare `Agent Id` and, for nonblank identities, normalized `User Email`; there is no conversation/session ID. Therefore any credit shown per resolved conversation, topic, or outcome is a **modeled allocation**, not observed billing.
-
-A defensible model keeps each exported snapshot as the control total, retains blank-email credits in an unmatched bucket, then allocates a user-agent total only across in-scope resolved conversations using a documented weight (for example equal share, or proportional transcript diagnostic cost). Reconcile allocations back to each exported total, expose unmatched/unallocated amounts, and label all downstream conversation/topic/outcome figures as modeled.
-
----
-
-## Attribution & license
-
-This path adapts the community, MIT-licensed **[StudioLens-for-Copilot-Studio](https://github.com/Keithland89/StudioLens-for-Copilot-Studio)** project by **Keithland89**, which contributes the pattern used here for Fabric/Lakehouse ingestion via notebooks — parsing Copilot Studio transcript and credit-consumption data into Delta tables. The original project's MIT license is preserved and referenced in both notebooks; see the source repository for the full license text.
-
----
-
-## Need more help?
-
-- 🐛 [Open an issue](https://github.com/microsoft/ESS/issues)
-- 📘 Not sure this is the right path? See [Choose your data path ↗](README.md#choose-your-data-path)
-- 📖 The **Metric Glossary** page (inside the dashboard) has every measure's definition
+- [Return to data-path selection](./README.md#choose-your-data-path)
+- [Open a GitHub issue](https://github.com/microsoft/ESS/issues)
+- Review **Appendix: Glossary** and the notebook's validation output
