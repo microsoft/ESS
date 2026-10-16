@@ -230,6 +230,43 @@ class TemplatePackageTests(unittest.TestCase):
             )
         )
 
+    def test_v21_dataverse_source_uses_required_parameter_directly(self):
+        path = (
+            ROOT
+            / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
+        )
+        with zipfile.ZipFile(path) as package:
+            schema = json.loads(
+                package.read("DataModelSchema").decode("utf-16-le")
+            )
+            unapplied = json.loads(
+                package.read("UnappliedChanges").decode("utf-16-le")
+            )
+
+        table = next(
+            item
+            for item in schema["model"]["tables"]
+            if item["name"] == "Agent Performance"
+        )
+        schema_expression = table["partitions"][0]["source"]["expression"]
+        unapplied_expression = next(
+            item["text"]
+            for item in unapplied["queries"]
+            if item["name"] == "Agent Performance"
+        )
+        parameterized_source = (
+            'Cds.Entities('
+            '#"Dataverse Environment URL (required)", null)'
+        )
+        for expression in (schema_expression, unapplied_expression):
+            text = (
+                "\n".join(expression)
+                if isinstance(expression, list)
+                else expression
+            )
+            self.assertEqual(text.count(parameterized_source), 1)
+            self.assertNotIn("Cds.Entities(_EnvUrl, null)", text)
+
 
 if __name__ == "__main__":
     unittest.main()

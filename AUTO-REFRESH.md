@@ -12,7 +12,7 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 > ✅ **Start here:** For hands‑off, production dashboards, **Dataverse Direct (Path A)** is the simplest — no file hosting, no gateway. If you must stay on CSV, **host it on SharePoint/OneDrive (Path B)** so the cloud can refresh it without a gateway.
 
-> **Why this matters for refresh:** Power BI Service rejects the reusable Dataverse starting template because its environment and optional file paths are dynamic. Before publishing Dataverse V21, use its publication step to prepare a report fixed to the intended environment.
+> **Why this matters for refresh:** Dataverse V21 passes the validated customer URL directly to the Dataverse connector through a Power Query parameter, which Power BI Service supports for refresh. Before publishing, use the publication step to remove unsupported local Organization and Credits file sources and embed the approved reusable inputs.
 
 > 🆕 **Already need more than this?** Path A and Path B above already give you gateway‑free, cloud‑to‑cloud scheduled refresh — most customers don't need anything else. If you're consolidating multiple Dataverse environments into one dashboard, hitting refresh limits at very large scale, or want [Power Platform admin center](https://admin.powerplatform.microsoft.com) credit-consumption analytics alongside conversation data (with a separate file-landing step), see **[SETUP-Fabric.md ↗](SETUP-Fabric.md)**.
 
@@ -30,7 +30,7 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 ## Path A — Dataverse Direct (recommended)
 
-The report prepared by the Dataverse publication step connects the service **directly to one fixed Dataverse environment** - no transcript export and no gateway.
+The report prepared by the Dataverse publication step connects the service directly to the Dataverse environment selected in its parameter - no transcript export and no gateway.
 
 1. Complete [Action 3 in the Dataverse guide](SETUP-Dataverse.md#action-3---publish-only-if-needed). Its included publication helper reuses the validated Environment URL and approved registry, feedback, and topic data.
 
@@ -42,7 +42,7 @@ The report prepared by the Dataverse publication step connects the service **dir
    - **Authentication method:** `OAuth2`
    - **Privacy level:** `Organizational`
    - Sign in with an account that holds the **Bot Transcript Viewer** role (or equivalent read access to the `conversationtranscript` table) on that environment.
-5. Expand **Parameters** to confirm **Dataverse Environment URL** matches the prepared report. Changing it does not retarget the connector; repeat the Dataverse publication step to change environments.
+5. Expand **Parameters** to confirm **Dataverse Environment URL** matches the intended environment. The connector references this parameter directly. If you change it, apply the change and update the Dataverse credentials before refreshing.
 6. Expand **Scheduled refresh** → toggle **On** → set your cadence (up to **8×/day** on Pro; more on Premium/Fabric capacity) and time zone → **Apply**.
 
 ✅ **Done.** The service now pulls fresh transcripts on your schedule with **no gateway**.
@@ -107,7 +107,7 @@ If the parameter points at a **local file** (`C:\Data\…`) or a **network share
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | The reusable Dataverse starting template or a report containing local file inputs was published directly. | Repeat [Action 3 in the Dataverse guide](SETUP-Dataverse.md#action-3---publish-only-if-needed), refresh the prepared report in Desktop, and publish that result. |
+| **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | The report was prepared with an older package, its Dataverse query was modified to compute the URL, or it still contains local file inputs. | Download the current package, repeat [Action 3 in the Dataverse guide](SETUP-Dataverse.md#action-3---publish-only-if-needed), refresh the prepared report in Desktop, and publish that result. |
 | **“We couldn't authenticate with the credentials provided.”** | Credentials not bound, or account lacks access. | **dataset → Settings → Data source credentials → Edit credentials**; sign in with an account that has Bot Transcript Viewer (Dataverse) or library read (SharePoint). |
 | **Scheduled refresh option is greyed out.** | Credentials for one or more sources not yet set. | Edit credentials on **every** listed source first, then the schedule unlocks. |
 | **Refresh succeeds but data is stale.** | New export saved under a new name/path. | Overwrite the file at the **same URL/path** the parameter points to. |

@@ -83,14 +83,16 @@ DATAVERSE_HOST_PATTERNS = tuple(
         r"^[a-z0-9-]+\.crm\.microsoftdynamics\.de$",
     )
 )
-STATIC_DESCRIPTION = (
-    "Required. This report is connected to {url}. To use another environment, "
-    "return to the Dataverse setup guide and create a new report for that URL."
-)
-DESKTOP_DESCRIPTION = (
+ENVIRONMENT_DESCRIPTION = (
     "Required. The Dataverse environment that contains the Copilot Studio "
-    "conversation data. Use the Instance URL from Power Apps Session details."
+    "conversation data. Use the Instance URL from Power Apps Session details. "
+    "The connector uses this parameter directly; after changing environments in "
+    "Power BI Service, update the Dataverse credentials before refreshing."
 )
+PARAMETERIZED_DATAVERSE_SOURCE = (
+    'Cds.Entities(#"Dataverse Environment URL (required)", null)'
+)
+LEGACY_DATAVERSE_SOURCE = "Cds.Entities(_EnvUrl, null)"
 PARAMETER_DESCRIPTIONS = {
     REGISTRY_EXPRESSION: (
         "Optional. Approved agent mapping for stable labels and cross-source "
@@ -466,7 +468,6 @@ def empty_partition_expression(table: dict) -> str:
 
 def build_query_expressions(
     schema: dict,
-    environment_url: str,
 ) -> dict[str, str]:
     tables = {
         table["name"]: table
@@ -477,29 +478,23 @@ def build_query_expressions(
     agent_table = tables["Agent Performance"]
     partition = agent_table["partitions"][0]
     agent_expression = expression_text(partition["source"]["expression"])
-    agent_expression = replace_once(
-        agent_expression,
-        (
-            '    _EnvUrl = (let _raw = '
-            '#"Dataverse Environment URL (required)" in if _raw = null '
-            'then null else Text.Trim(Text.From(_raw), '
-            '{" ", "#(tab)", "#(cr)", "#(lf)", """", "\'"})),'
-        ),
-        f"    _EnvUrl = {m_text(environment_url)},",
-        "Dataverse environment constant",
-    )
-    source_old = 'Source       = Cds.Entities(_EnvUrl, null),'
-    if source_old not in agent_expression:
-        source_old = (
-            'Source       = Cds.Entities('
-            '#"Dataverse Environment URL (required)", null),'
+    if PARAMETERIZED_DATAVERSE_SOURCE not in agent_expression:
+        agent_expression = replace_once(
+            agent_expression,
+            LEGACY_DATAVERSE_SOURCE,
+            PARAMETERIZED_DATAVERSE_SOURCE,
+            "Dataverse connector parameter",
         )
-    agent_expression = replace_once(
-        agent_expression,
-        source_old,
-        f"Source       = Cds.Entities({m_text(environment_url)}, null),",
-        "Dataverse connector constant",
-    )
+    if agent_expression.count(PARAMETERIZED_DATAVERSE_SOURCE) != 1:
+        raise ValueError(
+            "Dataverse connector must reference the Environment URL parameter "
+            "exactly once."
+        )
+    if LEGACY_DATAVERSE_SOURCE in agent_expression:
+        raise ValueError(
+            "Dataverse connector still uses a computed URL instead of the "
+            "Environment URL parameter."
+        )
     partition["source"]["expression"] = store_expression(
         partition["source"]["expression"],
         agent_expression,
@@ -533,19 +528,13 @@ def update_parameter_metadata(
         f"{m_text(environment_url)} meta "
         '[IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]'
     )
-    description = (
-        STATIC_DESCRIPTION.format(url=environment_url)
-        if mode == "service-refresh"
-        else DESKTOP_DESCRIPTION
-    )
-
     schema_expressions = {
         item["name"]: item
         for item in schema["model"]["expressions"]
     }
     environment = schema_expressions[ENVIRONMENT_PARAMETER]
     environment["expression"] = parameter_expression
-    environment["description"] = description
+    environment["description"] = ENVIRONMENT_DESCRIPTION
     for annotation in environment.get("annotations", []):
         if annotation["name"] == "PBI_ResultType":
             annotation["value"] = "Text"
@@ -668,10 +657,7 @@ def build_package(
     materialize_unapplied_queries(schema, changes)
     schema["name"] = str(uuid.uuid4())
     if mode == "service-refresh":
-        build_query_expressions(
-            schema,
-            environment_url,
-        )
+        build_query_expressions(schema)
     update_parameter_metadata(
         schema,
         environment_url,

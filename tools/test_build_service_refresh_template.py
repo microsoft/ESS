@@ -50,7 +50,7 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 normalize_environment_url(value)
 
-    def test_builds_static_refresh_template(self):
+    def test_builds_parameterized_refresh_template(self):
         environment_url = "https://orgexample.crm.dynamics.com"
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "service-refresh.pbit"
@@ -95,11 +95,13 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 )
 
             agent_text = model_expressions["Agent Performance"]
-            self.assertIn(
-                f'Cds.Entities("{environment_url}", null)',
-                agent_text,
+            parameterized_source = (
+                'Cds.Entities('
+                '#"Dataverse Environment URL (required)", null)'
             )
+            self.assertEqual(agent_text.count(parameterized_source), 1)
             self.assertNotIn("Cds.Entities(_EnvUrl", agent_text)
+            self.assertNotIn(environment_url, agent_text)
 
             for name in ("Chat + Agent Org Data", "AgentCredits"):
                 text = model_expressions[name]
@@ -124,7 +126,8 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             service_description = model_parameters[
                 "Dataverse Environment URL (required)"
             ]["description"]
-            self.assertIn(environment_url, service_description)
+            self.assertIn("connector uses this parameter directly", service_description)
+            self.assertNotIn(environment_url, service_description)
             descriptions = [
                 str(item.get("description") or "")
                 for item in model_parameters.values()
@@ -161,6 +164,34 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 model_expressions["ConversationFeedback"],
                 source_queries["ConversationFeedback"],
             )
+
+    def test_service_query_is_independent_of_customer_url(self):
+        environment_urls = (
+            "https://orgone.crm.dynamics.com",
+            "https://orgtwo.crm4.dynamics.com",
+        )
+        agent_expressions = []
+        with tempfile.TemporaryDirectory() as temporary:
+            for index, environment_url in enumerate(environment_urls):
+                output = Path(temporary) / f"service-refresh-{index}.pbit"
+                build_package(SOURCE, output, environment_url)
+                with zipfile.ZipFile(output) as package:
+                    schema = json.loads(
+                        package.read("DataModelSchema").decode("utf-16-le")
+                    )
+                table = next(
+                    item
+                    for item in schema["model"]["tables"]
+                    if item["name"] == "Agent Performance"
+                )
+                expression = table["partitions"][0]["source"]["expression"]
+                agent_expressions.append(
+                    "\n".join(expression)
+                    if isinstance(expression, list)
+                    else expression
+                )
+
+        self.assertEqual(agent_expressions[0], agent_expressions[1])
 
     def test_embeds_optional_validated_registry(self):
         environment_url = "https://orgexample.crm.dynamics.com"
@@ -311,7 +342,11 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             else transcript_expression
         )
 
-        self.assertIn("Cds.Entities(_EnvUrl, null)", transcript_text)
+        self.assertIn(
+            'Cds.Entities(#"Dataverse Environment URL (required)", null)',
+            transcript_text,
+        )
+        self.assertNotIn("Cds.Entities(_EnvUrl, null)", transcript_text)
         self.assertIn(str(org_data.resolve()), expressions["Org Data File"])
         self.assertIn(
             str(credits.resolve()),
