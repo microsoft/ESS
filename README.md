@@ -115,13 +115,14 @@ Start with the one **required** row for your selected path. Add the optional fil
 
 > A Dataverse administrator must assign transcript access. **Environment Maker alone is not sufficient**, and a tenant-wide administrator role does not replace the environment security role.
 
-#### Optional files
+#### Optional files and customization
 
-| Optional input | Used by | Access needed | Exact export path and instructions |
+| Optional input or tool | Used by | Access needed | Exact export or setup instructions |
 |---|---|---|---|
 | **Users / organization data** (`OrgData.csv`) | CSV Upload and Dataverse Direct Desktop validation | For the Microsoft 365 export: **Global Reader**, **User Administrator**, or **Global Administrator**. Other sources use their own access model. | [admin.microsoft.com](https://admin.microsoft.com) → **Users → Active users → Export users → Confirm** · [CSV Step 2](SETUP-CSV-Download.md#step-2--recommended-export-your-org-data-) · [Dataverse Step 2](SETUP-Dataverse.md#step-2--desktopmanual-refresh-only-export-your-org-data) |
 | **Copilot Credits / consumption** | CSV and Dataverse use **User-Level Credit Consumption**; Fabric uses Environment, Agent-Level, and User-Level files | **Power Platform Administrator** is recommended; tenant administrator or **Dynamics 365 Administrator** also works | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → **Licensing → Copilot Studio → Summary → Download report** · [CSV Step 3](SETUP-CSV-Download.md#step-3--optional-download-copilot-credits-reports) · [Dataverse Step 3](SETUP-Dataverse.md#step-3--desktopmanual-refresh-or-fabric-only-download-copilot-credits-reports) · [Fabric steps](SETUP-Fabric.md#land-the-three-copilot-credits-exports) |
 | **Microsoft 365 Product Feedback** | All paths | Any appropriate Microsoft 365 administrator or reader; **Compliance Administrator** or **Global Administrator** only for identity details or deletion | [admin.microsoft.com](https://admin.microsoft.com) → **Health → Product feedback → Export to CSV** · [Feedback export and load guide](FEEDBACK-INGESTION.md#step-3---export-product-feedback-from-microsoft-365) |
+| **Customer-specific topic rules** (`tools\ess_topic_tuner.py`) | All paths; produces approved JSON for CSV/Dataverse and CSV for Fabric | **Python 3.10 or later**; no Python packages, administrator role, network call, or coding is required | Included in the complete package; run it against a raw transcript CSV, review the local result, then apply only approved rules · [Topic tuner — download, run, review, and apply](TOPIC-TUNER.md#download-the-tuner) |
 
 > **Fabric Users data:** the included Fabric notebooks do not ingest a Users file. See [optional Fabric organization enrichment](SETUP-Fabric.md#optional--add-users--organization-enrichment) before planning that source.
 >
