@@ -114,9 +114,13 @@ The Desktop-validation template prompts for:
 | **Customer Topic Overrides JSON (optional)** | Blank |
 | **Feedback Events JSON (optional)** | Blank |
 
-1. Select **Load**.
-2. When prompted for Dataverse credentials, select **Organizational account**.
-3. Select **Sign in**, complete authentication, and select **Connect**.
+1. Wait until every prefilled parameter value is visible and has stopped changing. Power BI fills these values asynchronously.
+2. Only then select **Load**.
+3. When prompted for Dataverse credentials, select **Organizational account**.
+4. Select **Sign in**, complete authentication, and select **Connect**.
+
+> [!IMPORTANT]
+> If Power BI reports that queries are blocked or that a cyclic reference was encountered, close that report without saving and reopen the generated PBIT. Do not edit the queries. This message can appear when **Load** is selected before the prefilled values finish initializing.
 
 Power BI may reuse a valid cached credential. To change accounts or environments, use **File -> Options and settings -> Data source settings**.
 
@@ -200,7 +204,7 @@ Only continue after the Desktop checklist passes.
 2. Double-click `BUILD-SERVICE-REFRESH.cmd`.
 3. The launcher reuses the saved Environment URL and approved embedded JSON choices.
 4. Select **Yes** to open the generated Service-refresh template.
-5. Select **Load**, sign in if prompted, and select **Home -> Refresh**.
+5. Wait until every prefilled parameter value is visible and stable, select **Load**, sign in if prompted, and select **Home -> Refresh**.
 6. Save the working result as a `.pbix`.
 7. Select **Home -> Publish** and choose a workspace where you have Contributor, Member, or Admin access.
 
@@ -226,6 +230,7 @@ Configure OAuth credentials and scheduled refresh by following [AUTO-REFRESH.md]
 | Credit visuals are blank in Desktop | No `Agent Id` matches the selected agent or registry `CreditId` | Check the export and launcher audit |
 | Need to switch environments | Saved choices point to the previous URL | Run the first launcher and decline reuse of saved choices |
 | Orange Apply changes banner remains | Template was built with an old setup tool | Download the current package and regenerate both templates |
+| Queries are blocked or a cyclic reference appears immediately after Load | Load was selected before the prefilled parameter values finished initializing | Close the report without saving, reopen the generated PBIT, wait for every value to appear and stabilize, then select Load |
 
 ## Need help?
 

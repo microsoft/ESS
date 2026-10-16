@@ -121,6 +121,16 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 "Agent Credits  (optional)",
                 model_parameters,
             )
+            service_description = model_parameters[
+                "Dataverse Environment URL (required)"
+            ]["description"]
+            self.assertIn("START-HERE-DATAVERSE.cmd", service_description)
+            self.assertIn("BUILD-SERVICE-REFRESH.cmd", service_description)
+            for internal_reference in ("python", ".py", "tools/"):
+                self.assertNotIn(
+                    internal_reference,
+                    service_description.lower(),
+                )
 
             with zipfile.ZipFile(SOURCE) as source_package:
                 source_changes = json.loads(
@@ -229,6 +239,20 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 schema = json.loads(
                     package.read("DataModelSchema").decode("utf-16-le")
                 )
+
+        schema_expressions = {
+            item["name"]: item
+            for item in schema["model"]["expressions"]
+        }
+        desktop_description = schema_expressions[
+            "Dataverse Environment URL (required)"
+        ]["description"]
+        self.assertIn("BUILD-SERVICE-REFRESH.cmd", desktop_description)
+        for internal_reference in ("python", ".py", "tools/"):
+            self.assertNotIn(
+                internal_reference,
+                desktop_description.lower(),
+            )
 
         expressions = {
             item["name"]: (

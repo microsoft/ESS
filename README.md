@@ -41,6 +41,8 @@ Choose this path when the report will use one Production, Sandbox, or Default Da
 
 **Included files:** [`ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21.pbit), [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd), and [`BUILD-SERVICE-REFRESH.cmd`](./BUILD-SERVICE-REFRESH.cmd).
 
+When either generated PBIT opens, wait until every prefilled parameter value is visible and stable before selecting **Load**.
+
 **[Follow the Dataverse Direct steps ->](./SETUP-Dataverse.md)**
 
 ### 2. [CSV Upload](./SETUP-CSV-Download.md)
