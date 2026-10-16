@@ -1,14 +1,17 @@
 # Microsoft 365 Copilot feedback: export, prepare, and load
 
-ESS Insights uses two stored feedback sources because reactions from Microsoft 365 Copilot Chat are not written to Dataverse conversation transcripts.
+ESS Insights reads reactions stored in Dataverse transcripts automatically. Microsoft 365 Copilot and exported Copilot Studio Monitor reactions use a separate export because they are not written to the same transcript records.
 
-| Channel/source | Stored source | ESS Insights path |
+| Channel/source | Stored source | How to add it |
 |---|---|---|
-| Copilot Studio channels with Dataverse transcripts | Reaction activity inside `ConversationTranscript.Content` | Parsed automatically |
-| Copilot Studio agents used in Microsoft 365 Copilot | Microsoft 365 admin center **Health → Product feedback** export | Prepare with `ess_feedback_normalizer.py` |
-| Copilot Studio Monitor reaction export | Exported CSV | Prepare with the same tool |
+| Copilot Studio channels with Dataverse transcripts | Reaction activity inside `ConversationTranscript.Content` | No extra input; parsed automatically |
+| Copilot Studio agents used in Microsoft 365 Copilot | Microsoft 365 admin center **Health -> Product feedback** export | Dataverse guided setup accepts the raw export; CSV and Fabric use the preparation steps below |
+| Copilot Studio Monitor | Exported reaction CSV | Dataverse guided setup accepts the raw export; CSV and Fabric use the same preparation steps below |
 
-The Microsoft 365 export can include feedback from many products and agents. ESS Insights includes only rows whose **Agent ID** matches an enabled agent in your registry. A blank Agent ID cannot be safely attributed to ESS and is excluded.
+The Microsoft 365 export is tenant-wide and can contain feedback from many products and agents. ESS Insights includes only rows whose **Agent ID** matches an enabled `M365Title` alias in the agent registry. Blank or unmatched Agent IDs are excluded and are never inferred from the user, time, prompt, response, or app.
+
+> [!IMPORTANT]
+> The export can contain comments, prompts, responses, user identifiers, and diagnostics. Keep it in an approved customer-controlled location. Preparation runs locally and makes no network calls.
 
 Microsoft documentation:
 
@@ -17,74 +20,77 @@ Microsoft documentation:
 
 ## Before you start
 
-You need:
+All paths need:
 
-- the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) downloaded and extracted;
-- Python 3.10 or later;
 - an administrator or reader account that can open **Product feedback** in the Microsoft 365 admin center;
-- `agent-registry.csv` with the ESS agent's `M365Title` alias; and
+- a reviewed agent registry CSV or JSON containing the agent's `M365Title` alias; and
 - an approved customer-controlled folder such as `C:\AgentData`.
 
 All Microsoft 365 administrators and readers can view and export Product feedback. Only Compliance Administrators and Global Administrators can see user identity details and delete feedback. Use the least-privileged role that meets your needs.
 
-> The export can contain comments, prompts, responses, user identifiers, and diagnostics. Store it only in an approved customer-controlled location. The preparation script runs locally and makes no network calls.
+**Dataverse Direct:** use the [guided Dataverse setup](SETUP-Dataverse.md#action-2---run-the-guided-setup-and-validate-the-report). Select the reviewed registry and raw feedback exports; do not prepare a JSON file first.
 
-> Keep the package structure intact and run the command from the extracted `ESS-main` folder. Do not download `ess_feedback_normalizer.py` by itself; it imports `tools/agent_registry.py`.
+**CSV or Fabric:** download and extract the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip). These paths use the included local preparation tool after export.
 
-## Step 1 - Confirm Python
+## Step 1 - Identify the Microsoft 365 Agent ID
 
-1. Open the extracted `ESS-main` folder in File Explorer.
-2. Click the address bar, type `powershell`, and press **Enter**. A PowerShell window opens in the correct folder.
-3. Run:
-
-```powershell
-python --version
-```
-
-The expected result is `Python 3.10` or later. If Windows says that Python is not recognized, install Python from [python.org](https://www.python.org/downloads/windows/), select **Add Python to PATH** during setup, close PowerShell, and repeat these steps.
-
-No Python packages need to be installed.
-
-## Step 2 - Identify the ESS Microsoft 365 Agent ID
-
-Skip this step if `agent-registry.csv` already has a working `M365Title` row for the agent.
+Skip this step if the registry already has a working `M365Title` row for the agent.
 
 1. Publish the Copilot Studio agent to Microsoft 365 Copilot.
 2. Open that agent in Microsoft 365 Copilot.
 3. Ask a harmless test question that contains no private information.
 4. Select **Thumbs up** or **Thumbs down** on the response.
 5. If a comment box appears, enter a unique marker such as `ESS feedback setup YYYY-MM-DD`. Do not include customer, employee, or case information.
-6. Wait for the item to appear in the Microsoft 365 Product feedback list. This can take several minutes.
-7. Complete Step 3 and open the downloaded CSV.
+6. Wait for the item to appear in the Microsoft 365 Product feedback list.
+7. Export Product feedback by following Step 2 and open the downloaded CSV.
 8. Find the row by its unique comment, submitted time, or test prompt.
-9. Copy the value from **Agent ID**. It is normally stored as a JSON-style value such as `["T_example"]`; copy only the value beginning with `T_`.
-10. Add a row to `agent-registry.csv` with `AliasType` set to `M365Title` and `AliasValue` set to that `T_...` value. Use the same `AgentKey`, `AgentLabel`, environment fields, and scope flags as the agent's transcript alias.
-11. Validate the registry by following [Build and validate the registry](AGENT-REGISTRY.md#step-7---build-and-validate-the-registry).
+9. In **Agent ID**, copy only the value beginning with `T_`.
+10. Add a registry row with `AliasType` set to `M365Title` and `AliasValue` set to that `T_...` value. Reuse the agent's approved `AgentKey`, `AgentLabel`, environment fields, and scope flags.
+11. Review the registry by following [Agent registry and reporting scope](AGENT-REGISTRY.md).
 
-> **Do not use `App = M365 Chat` as proof of ESS ownership.** Standard Copilot Chat and other custom agents can use the same app value. The `T_...` Agent ID is the supported agent-level filter for this workflow.
+Do not use `App = M365 Chat` as proof of agent ownership. Standard Copilot Chat and other custom agents can use the same app value.
 
-If the controlled test row has a blank Agent ID, the export does not provide enough information to attribute that reaction to ESS. Do not guess from the user, time, prompt, response, or app name.
+If the controlled row has a blank Agent ID, the export cannot safely identify the receiving agent. Exclude it.
 
-## Step 3 - Export Product feedback from Microsoft 365
+## Step 2 - Export Product feedback
 
 1. Sign in to the [Microsoft 365 admin center](https://admin.microsoft.com).
-2. If **Health** is not visible in the left navigation, select **Show all** or customize the navigation to display it.
-3. Select **Health → Product feedback**.
-4. Wait for the feedback list to load.
-5. Select **Export** or **Export to CSV** on the command bar.
-6. Save the downloaded CSV as:
+2. If **Health** is not visible, select **Show all** or customize the navigation.
+3. Select **Health -> Product feedback**.
+4. Wait for the list to load.
+5. Select **Export** or **Export to CSV**.
+6. Save the CSV in the approved customer-controlled folder.
 
-```text
-C:\AgentData\ProductFeedback.csv
+The downloaded file remains tenant-wide even when the page is filtered. Do not load it directly into Power BI or Fabric.
+
+If Copilot Studio Monitor also provides a reaction export, save that CSV in the same approved folder.
+
+## Step 3 - Prepare and load for your path
+
+### Dataverse Direct
+
+1. Open the extracted ESS package and run the guided Dataverse setup again.
+2. Reuse the saved Environment URL.
+3. Choose to add or replace data.
+4. Select the reviewed registry CSV or JSON under **Agent registry**.
+5. Select the raw Product Feedback export when asked for Microsoft 365 feedback.
+6. Add the Monitor export when available.
+7. Open and refresh the prepared report.
+8. On **Agent Feedback**, confirm the cross-channel totals and verdicts are plausible.
+
+The guided setup filters, deduplicates, validates, and embeds matching rows locally. Product Feedback requires an approved registry match. A Monitor reaction uses a registry Bot/Agent ID when present; otherwise the report includes it only after its exported Conversation ID matches one exact loaded conversation. Rows with neither form of identity are excluded.
+
+If the report will be published, follow [Publish only if needed](SETUP-Dataverse.md#action-3---publish-only-if-needed) after the Desktop result is correct.
+
+### CSV V18 or Fabric V2
+
+Confirm Python 3.10 or later from the extracted `ESS-main` folder:
+
+```powershell
+python --version
 ```
 
-The downloaded file is tenant-wide even when the page is filtered. The local preparation step below is therefore required; do not load the raw export directly into Power BI or Fabric.
-
-If Copilot Studio Monitor also provides a reaction export for the agent, save that CSV in the same folder. You can provide both files to the preparation command.
-
-## Step 4 - Prepare and filter the export
-
-From the PowerShell window opened in Step 1, run:
+Then prepare one or more raw exports:
 
 ```powershell
 python tools\ess_feedback_normalizer.py `
@@ -94,7 +100,7 @@ python tools\ess_feedback_normalizer.py `
   --output "C:\AgentData\feedback-events.csv"
 ```
 
-If you also have a Copilot Studio Monitor reaction export, add another input:
+For a Monitor export, add another input:
 
 ```powershell
 python tools\ess_feedback_normalizer.py `
@@ -105,100 +111,64 @@ python tools\ess_feedback_normalizer.py `
   --output "C:\AgentData\feedback-events.csv"
 ```
 
-The command creates three files:
+The command creates:
 
 | File | Use |
 |---|---|
 | `feedback-events.csv` | Upload to Fabric |
-| `feedback-events.json` | Paste into CSV V18 or Dataverse V21 |
+| `feedback-events.json` | Paste into CSV V18 |
 | `feedback-events.audit.json` | Review before loading |
 
-The tool:
+The tool includes only registry-approved Product Feedback Agent IDs, maps each `T_...` value to the canonical `AgentKey`, normalizes verdicts, and removes duplicate event IDs.
 
-- recognizes the current Microsoft 365 Product Feedback export and common Monitor reaction columns;
-- includes only Product Feedback Agent IDs allowed by the selected registry scope;
-- maps the Microsoft 365 `T_...` ID to the same agent key used by transcripts and credits;
-- converts reactions to **Thumbs Up** or **Thumbs Down**;
-- records channel, source, comment, and available identifiers;
-- removes duplicate external rows with the same feedback event ID; and
-- never sends data to an external service.
+Check the audit before loading:
 
-## Step 5 - Check the result before loading
-
-Open `feedback-events.audit.json` in Notepad and check:
-
-- `outputFeedbackEvents` is greater than zero when you expect matching feedback;
-- `productFeedbackRowsIncludedByAllowlist` is the expected number of ESS rows;
-- `productFeedbackRowsExcludedWithoutAgentId` shows how many rows could not be safely attributed;
-- `productFeedbackRowsExcludedOutsideAllowlist` shows how many tenant rows belonged to other agents; and
+- `outputFeedbackEvents` is greater than zero when matching feedback is expected;
+- `productFeedbackRowsIncludedByAllowlist` is the expected number of agent rows;
+- excluded-without-ID and outside-allowlist counts are plausible; and
 - `duplicatesRemoved` is plausible.
 
-You can also open `feedback-events.csv` and confirm that `AgentId` contains your customer-defined `AgentKey`, not an unrelated title ID. The prepared CSV may contain prompt, response, and comment text, so keep it in the same approved location as the source export.
+Do not switch to `All Agents` to bypass a no-match result. Confirm the controlled row's `T_...` value and the registry alias.
 
-If the command says no rows matched, do not switch to `All Agents` to bypass the error. Confirm the controlled feedback row's `T_...` value and the registry's `M365Title` row.
-
-## Step 6 - Load the prepared output
-
-### CSV V18
+#### Load into CSV V18
 
 1. Open the report in Power BI Desktop.
-2. Select **Home → Transform data → Edit parameters**.
-3. Open `C:\AgentData\feedback-events.json` in Notepad.
-4. Select all text, copy it, and paste it into **Feedback Events JSON (optional)**.
-5. Select **OK**, then **Home → Refresh**.
-6. Open the **Agent Feedback** page and confirm the totals and verdicts are plausible.
+2. Select **Home -> Transform data -> Edit parameters**.
+3. Paste the full reviewed registry JSON into **Agent Registry JSON**.
+4. Paste the full `feedback-events.json` contents into **Feedback Events JSON (optional)**.
+5. Select **OK**, refresh, and confirm **Agent Feedback**.
 
-The report combines exported events with reactions already present in transcripts. When an exported event has the same exact conversation, agent, and verdict as a transcript reaction, the exported event replaces the duplicate. An agent-matched event without a conversation ID remains visible at agent level but is not guessed onto a conversation.
+#### Load into Fabric V2
 
-### Dataverse V21
+1. In the Lakehouse attached to the transcript-parser notebook, create `Files/feedback` if needed.
+2. Upload `feedback-events.csv` to `Files/feedback/feedback-events.csv`.
+3. Run all cells in `Copilot_Agent_Transcript_Parser.ipynb`.
+4. Confirm expected mapped rows in `user_feedback`.
+5. Review `user_feedback_quarantine`; it contains identifiers only for unmapped rows.
 
-Run `START-HERE-DATAVERSE.cmd` as described in the [Dataverse Direct guide](SETUP-Dataverse.md#step-4--create-the-validated-desktop-template). Answer **Yes** when asked about optional files, then select:
+## Step 4 - Refresh the feedback snapshot
 
-- `agent-registry.json` under **Agent registry**; and
-- `feedback-events.json` under **Prepared Microsoft 365 feedback**.
+The Product feedback export is a snapshot, not a live connection.
 
-Open and refresh the generated Desktop template. The launcher rejects feedback whose `AgentId` is not an enabled registry `AgentKey`. After validation, follow the Dataverse guide's publish step; its second launcher reuses the approved files.
+- **Dataverse Direct:** export the latest CSV, rerun guided setup, select the registry and new raw export, then refresh the newly prepared report.
+- **CSV V18:** rerun the preparation command, replace the JSON parameter, and refresh.
+- **Fabric V2:** rerun preparation, replace `Files/feedback/feedback-events.csv`, and rerun the transcript notebook.
 
-### Fabric V2
-
-1. In the Fabric workspace, open the Lakehouse attached to the transcript-parser notebook.
-2. In the Lakehouse Explorer, open **Files**.
-3. Create the `feedback` folder if it does not exist.
-4. Upload `feedback-events.csv` to:
-
-```text
-Files/feedback/feedback-events.csv
-```
-
-5. Run all cells in `Copilot_Agent_Transcript_Parser.ipynb`.
-6. Confirm the `user_feedback` table contains the expected mapped rows.
-7. Review `user_feedback_quarantine`. It contains identifiers only for unmapped rows; prompts, responses, and comments are not copied there.
-
-## Step 7 - Repeat for each refresh
-
-The Product feedback export is a snapshot, not a real-time connection.
-
-1. Export the latest Product feedback CSV.
-2. Replace `C:\AgentData\ProductFeedback.csv`.
-3. Run the same preparation command.
-4. Replace the JSON parameter in CSV V18/Dataverse V21, or replace the Fabric CSV. Rebuild the V21 template only when the registry mapping itself changes.
-5. Refresh the report.
-
-For an automated Fabric deployment, schedule the approved export and Lakehouse landing process separately. This repository does not include a process that signs in to the Microsoft 365 admin center or downloads the export automatically.
+This repository does not include a process that signs in to the Microsoft 365 admin center or downloads Product feedback automatically.
 
 ## Common issues
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| **Health** or **Product feedback** is missing | The navigation is collapsed or the signed-in account is not an administrator/reader | Select **Show all** and confirm the account has an appropriate Microsoft 365 role |
-| Test feedback is not listed yet | Product feedback has not reached the admin center | Wait several minutes, refresh the page, and confirm the reaction was submitted from the published agent |
-| Agent ID is blank | The export cannot safely identify the receiving agent | Exclude the row; do not infer ESS from app, user, time, prompt, or response |
-| `No Microsoft 365 Product Feedback rows matched` | The registry has the wrong or missing `M365Title` alias | Recheck the controlled test row and copy only the `T_...` value |
-| PowerShell says `python` is not recognized | Python is not installed or not on PATH | Install Python 3.10+ with **Add Python to PATH**, then reopen PowerShell |
-| Power BI shows old feedback | The JSON parameter or Fabric CSV was not replaced | Replace the prepared output and refresh again |
+| **Health** or **Product feedback** is missing | Navigation is collapsed or the account lacks an administrator/reader role | Select **Show all** and confirm the account role |
+| Test feedback is not listed yet | Feedback has not reached the admin center | Wait several minutes, refresh, and confirm the reaction came from the published agent |
+| Agent ID is blank | The export cannot identify the receiving agent | Exclude the row; do not infer the agent |
+| No Product Feedback rows match | Registry has the wrong or missing `M365Title` alias | Recheck the controlled row and copy only the `T_...` value |
+| PowerShell says `python` is not recognized | Python is unavailable for the CSV/Fabric preparation path | Install Python 3.10+ with **Add Python to PATH**, then reopen PowerShell |
+| Power BI shows old feedback | The latest guided report, JSON parameter, or Fabric CSV was not loaded | Replace the applicable prepared input and refresh |
 
 ## Attribution boundary
 
-Microsoft 365 Product Feedback proves which published agent received a reaction when Agent ID is populated. The export does not provide the supported conversation identifier needed to link that reaction to one exact transcript turn or child agent. Report it at agent level; keep per-conversation and child-agent attribution separate.
+Microsoft 365 Product Feedback proves which published agent received a reaction when Agent ID is populated. It does not provide the supported conversation identifier needed to link that reaction to one exact transcript turn or child agent. Report it at agent level; keep per-conversation and child-agent attribution separate.
 
 `SampleData/feedback-events.csv` and `SampleData/feedback-events.json` contain fabricated examples for testing.

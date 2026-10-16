@@ -205,8 +205,16 @@ def normalize_row(row: dict, input_name: str) -> dict | None:
         return None
 
     product_feedback = is_product_feedback_export(row.keys())
-    conversation_id = row_get(row, "Conversation Id", "ConversationId", "Session Id", "SessionId")
-    if not conversation_id:
+    conversation_id = ""
+    if not product_feedback:
+        conversation_id = row_get(
+            row,
+            "Conversation Id",
+            "ConversationId",
+            "Session Id",
+            "SessionId",
+        )
+    if not product_feedback and not conversation_id:
         conversation_id = find_metadata_value(
             metadata,
             "conversationId",
@@ -310,6 +318,9 @@ def normalize_files(
     included_product_feedback_rows = 0
     excluded_outside_allowlist = 0
     excluded_without_agent_id = 0
+    external_rows_mapped_by_registry = 0
+    external_rows_pending_conversation_match = 0
+    external_rows_excluded_without_identity = 0
     for path in paths:
         with path.open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
@@ -384,6 +395,56 @@ def normalize_files(
                 event = normalize_row(row, path.name)
                 if event is None:
                     continue
+                if not product_feedback and registry_rows:
+                    source_agent_id = str(event["AgentId"] or "").strip()
+                    conversation_id = str(event["ConversationId"] or "").strip()
+                    registry_matches = []
+                    if source_agent_id:
+                        direct_match = next(
+                            (
+                                registry_row
+                                for registry_row in registry_rows
+                                if registry_row["Enabled"]
+                                and registry_row["AgentKey"] in registry_active_keys
+                                and registry_row["AgentKey"].casefold()
+                                == source_agent_id.casefold()
+                            ),
+                            None,
+                        )
+                        if direct_match:
+                            registry_matches.append(direct_match)
+                        for alias_type in (
+                            "TranscriptId",
+                            "TranscriptSchema",
+                            "M365Title",
+                        ):
+                            match = resolve_alias(
+                                registry_rows,
+                                alias_type,
+                                source_agent_id,
+                                registry_active_keys,
+                            )
+                            if match:
+                                registry_matches.append(match)
+                    matched_keys = {
+                        match["AgentKey"] for match in registry_matches
+                    }
+                    if len(matched_keys) > 1:
+                        raise ValueError(
+                            "External feedback row maps to multiple active "
+                            f"registry agents: {sorted(matched_keys)}"
+                        )
+                    if registry_matches:
+                        match = registry_matches[0]
+                        event["AgentId"] = match["AgentKey"]
+                        event["AgentName"] = match["AgentLabel"]
+                        external_rows_mapped_by_registry += 1
+                    elif conversation_id:
+                        event["AgentId"] = ""
+                        external_rows_pending_conversation_match += 1
+                    else:
+                        external_rows_excluded_without_identity += 1
+                        continue
                 event["_InputFile"] = path.name
                 event["_InputRow"] = row_number
                 events.append(event)
@@ -434,6 +495,13 @@ def normalize_files(
         "productFeedbackRowsIncludedByAllowlist": included_product_feedback_rows,
         "productFeedbackRowsExcludedOutsideAllowlist": excluded_outside_allowlist,
         "productFeedbackRowsExcludedWithoutAgentId": excluded_without_agent_id,
+        "externalRowsMappedByRegistry": external_rows_mapped_by_registry,
+        "externalRowsPendingConversationMatch": (
+            external_rows_pending_conversation_match
+        ),
+        "externalRowsExcludedWithoutIdentity": (
+            external_rows_excluded_without_identity
+        ),
         "channelCounts": dict(sorted(Counter(row["Channel"] for row in deduplicated).items())),
         "verdictCounts": dict(sorted(Counter(row["FeedbackVerdict"] for row in deduplicated).items())),
         "sourceCounts": dict(sorted(Counter(row["FeedbackSource"] for row in deduplicated).items())),

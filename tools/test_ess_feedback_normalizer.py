@@ -97,7 +97,7 @@ class FeedbackNormalizerTests(unittest.TestCase):
                 audit["channelCounts"],
             )
             self.assertEqual("T_agent-1", events[0]["AgentId"])
-            self.assertEqual("conversation-1", events[0]["ConversationId"])
+            self.assertEqual("", events[0]["ConversationId"])
             self.assertEqual("Microsoft 365 Product Feedback", events[0]["FeedbackSource"])
             self.assertEqual(["T_agent-1"], audit["allowedAgentIds"])
             self.assertEqual(2, audit["productFeedbackRowsIncludedByAllowlist"])
@@ -169,6 +169,19 @@ class FeedbackNormalizerTests(unittest.TestCase):
                     "AliasType": "M365Title",
                     "AliasValue": "T_it",
                 },
+                {
+                    "RegistryVersion": "1",
+                    "AgentKey": "ess-agent",
+                    "AgentLabel": "Employee Self-Service",
+                    "IsEss": "true",
+                    "Selected": "false",
+                    "Enabled": "true",
+                    "EnvironmentKey": "prod",
+                    "EnvironmentName": "Production",
+                    "EnvironmentUrl": "",
+                    "AliasType": "TranscriptId",
+                    "AliasValue": "00000000-0000-0000-0000-000000000001",
+                },
             ]
             with registry.open("w", encoding="utf-8-sig", newline="") as handle:
                 writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -217,13 +230,40 @@ class FeedbackNormalizerTests(unittest.TestCase):
                     }
                 )
 
+            monitor = temp / "monitor-reactions.csv"
+            with monitor.open("w", encoding="utf-8-sig", newline="") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=(
+                        "Reaction Id",
+                        "Conversation ID",
+                        "Reaction",
+                        "Bot ID",
+                        "Channel",
+                    ),
+                )
+                writer.writeheader()
+                writer.writerow(
+                    {
+                        "Reaction Id": "monitor-feedback",
+                        "Conversation ID": "conversation-1",
+                        "Reaction": "Thumbs Down",
+                        "Bot ID": "00000000-0000-0000-0000-000000000001",
+                        "Channel": "Microsoft Teams",
+                    }
+                )
+
             events, audit = normalize_files(
-                [product], registry_rows=loaded, scope_mode="ESS Safe"
+                [product, monitor],
+                registry_rows=loaded,
+                scope_mode="ESS Safe",
             )
-            self.assertEqual(1, len(events))
+            self.assertEqual(2, len(events))
             self.assertEqual("ess-agent", events[0]["AgentId"])
             self.assertEqual("Employee Self-Service", events[0]["AgentName"])
             self.assertEqual(["ess-agent"], audit["agentRegistryKeys"])
+            self.assertEqual("ess-agent", events[1]["AgentId"])
+            self.assertEqual(1, audit["externalRowsMappedByRegistry"])
             metadata = json.loads(events[0]["AdditionalMetadata"])
             self.assertEqual(["T_ESS"], metadata["sourceAgentIds"])
 
