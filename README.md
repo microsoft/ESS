@@ -20,10 +20,10 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 
 ---
 
-> ### 🚀 New here? Start in 4 steps
-> **1.** [Download the package](#download-the-complete-self-service-package) → **2.** [Choose one path](#choose-your-path) → **3.** Follow only that path's guide → **4.** Open its Power BI template and validate the report.
+> ### 🚀 Start Here
+> **1.** [Download the package](#download-the-complete-self-service-package) → **2.** [Choose one data path](#choose-your-data-path) → **3.** Click **Start Here** for that path → **4.** Follow its step-by-step guide from top to bottom.
 >
-> **Jump to:** [Download the package](#download-the-complete-self-service-package) · [Choose your path](#choose-your-path) · [Common prerequisites](#common-prerequisites) · [Troubleshooting](#validation--troubleshooting)
+> **Jump to:** [Download the package](#download-the-complete-self-service-package) · [Choose your data path](#choose-your-data-path) · [Common prerequisites](#common-prerequisites) · [Troubleshooting](#validation--troubleshooting)
 
 ---
 
@@ -35,9 +35,11 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 
 ---
 
-## Choose your path
+## Choose your data path
 
-All three paths use the same ESS reporting model. Dataverse V21 discovers agents from the loaded transcripts and exposes a synchronized **Agent** filter. Its basic setup does not require an agent registry; the selected setup guide explains if and when one is needed.
+Pick **one** path below. Its **Start Here** link opens a complete step-by-step guide with that path's prerequisites, exports, setup actions, validation, and refresh instructions. Follow the selected guide from top to bottom; do not combine setup steps from different paths.
+
+All three paths use the same ESS reporting model. Dataverse V21 discovers agents from the loaded transcripts and exposes a synchronized **Agent** filter. Its basic setup does not require an agent registry; the selected guide explains if and when one is needed.
 
 <table>
 <tr>
@@ -48,7 +50,7 @@ All three paths use the same ESS reporting model. Dataverse V21 discovers agents
 
 Best for a first evaluation, a one-time export, an offline copy, or sharing a controlled snapshot. You manually export `ConversationTranscript` again whenever you want newer data.
 
-➡️ **[Start with CSV Upload](SETUP-CSV-Download.md)**
+➡️ **[Start Here — CSV Upload](SETUP-CSV-Download.md)**
 
 </td>
 <td width="33%" valign="top">
@@ -60,7 +62,7 @@ Best production default for one supported Dataverse environment. The setup tool 
 
 Extend Dataverse retention for the reporting period you need; report refresh does not archive deleted records.
 
-➡️ **[Start with Dataverse Direct](SETUP-Dataverse.md)**
+➡️ **[Start Here — Dataverse Direct](SETUP-Dataverse.md)**
 
 </td>
 <td width="33%" valign="top">
@@ -72,7 +74,7 @@ Use when you need independently governed history, multiple Dataverse environment
 
 Fabric preserves only records ingested before Dataverse deletes them and requires more administration.
 
-➡️ **[Start with Fabric Lakehouse](SETUP-Fabric.md)**
+➡️ **[Start Here — Fabric Lakehouse](SETUP-Fabric.md)**
 
 </td>
 </tr>
@@ -80,7 +82,7 @@ Fabric preserves only records ingested before Dataverse deletes them and require
 
 > 🧪 **Just exploring?** Start with **CSV Upload** and the fabricated files in [`SampleData`](SampleData/). No customer data is required.
 
-### Compare all three paths and see what to run
+### Compare the data paths and see what to run
 
 | | 🟢 **CSV Upload** | 🔵 **Dataverse Direct** | 🟣 **Fabric Lakehouse** |
 |---|---|---|---|
@@ -102,9 +104,10 @@ Fabric preserves only records ingested before Dataverse deletes them and require
 
 ### After you choose
 
-1. Follow the selected setup guide above.
-2. Complete the guide's minimum first run before adding optional data.
-3. Use the in-report **Agent** filter to focus the analysis after loading.
+1. Click **Start Here** under the selected data path.
+2. Follow only that guide, in order, from its **Before you start** section through validation.
+3. Complete the guide's minimum first run before adding optional data.
+4. Use the in-report **Agent** filter to focus the analysis after loading.
 
 ---
 
