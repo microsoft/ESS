@@ -23,7 +23,7 @@ A drop-in Power BI template purpose-built for the **Microsoft ESS agent**, with 
 > ### 🚀 Start Here
 > **1.** [Download the package](#download-the-complete-self-service-package) → **2.** [Choose one data path](#choose-your-data-path) → **3.** Click **Start Here** for that path → **4.** Follow its step-by-step guide from top to bottom.
 >
-> **Jump to:** [Download the package](#download-the-complete-self-service-package) · [Choose your data path](#choose-your-data-path) · [Common prerequisites](#common-prerequisites) · [Troubleshooting](#validation--troubleshooting)
+> **Jump to:** [Download the package](#download-the-complete-self-service-package) · [Choose your data path](#choose-your-data-path) · [Get your data and confirm access](#get-your-data-and-confirm-access) · [Common prerequisites](#common-prerequisites) · [Troubleshooting](#validation--troubleshooting)
 
 ---
 
@@ -91,9 +91,6 @@ Fabric preserves only records ingested before Dataverse deletes them and require
 | **Typical setup** | 20–30 minutes | 15–25 minutes | 30–60+ minutes plus administrator setup |
 | **Refresh** | Replace the CSV and refresh | Schedule Power BI refresh | Schedule notebook ingestion, then semantic-model refresh |
 | **Power BI gateway** | None for SharePoint/OneDrive; required for local or network paths | None | None for the Lakehouse SQL analytics endpoint |
-| **Minimum required access** | **Bot Transcript Viewer** in the agent's Dataverse environment, or a custom role with organization-level Read on `conversationtranscript` | **Bot Transcript Viewer** in the agent's Dataverse environment, or the same custom Read role | **Contributor, Member, or Admin** in the Fabric workspace, plus a Dataverse **Application User** with Bot Transcript Viewer (or equivalent organization-level Read) in every source environment |
-| **Administrator help for setup** | A Dataverse admin must assign the transcript role | A Dataverse admin must assign the transcript role | An account allowed to create app registrations, plus a Power Platform/Dataverse admin who can add the Application User and assign its role |
-| **Optional-source access** | Org export: source-dependent; Microsoft 365 export supports Global Reader, User Admin, or Global Admin. Credits: Power Platform Administrator recommended. Product Feedback: a Microsoft 365 administrator or reader. | Same optional-source roles as CSV Upload; Power BI workspace Contributor or higher is also needed only when publishing | Credits: Power Platform Administrator recommended. Product Feedback: a Microsoft 365 administrator or reader. Power BI publication uses the existing Fabric workspace role |
 | **Historical behavior** | Snapshot contains only records retained when exported | Queries only records still retained in Dataverse | Merge preserves records already ingested into Delta |
 | **Template** | `ESS Dashboard - Dynamic Topics (CSV) V18.pbit` | Service-refresh PBIT generated from `ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit` | `ESS - Fabric V2.pbit` |
 | **First package action** | [Create `agent-registry.json`, then open the included CSV PBIT](SETUP-CSV-Download.md#step-4--build-the-registry-and-open-the-included-template) | [Double-click `START-HERE-DATAVERSE.cmd`](SETUP-Dataverse.md#step-4--create-the-validated-desktop-template) | [Complete the administrator setup, then import the included notebooks](SETUP-Fabric.md#one-time-administrator-setup--create-the-dataverse-application-user) |
@@ -103,6 +100,32 @@ Fabric preserves only records ingested before Dataverse deletes them and require
 | **Optional Microsoft 365 feedback** | Follow the [feedback guide](FEEDBACK-INGESTION.md), then paste the prepared JSON parameter | Follow the [feedback guide](FEEDBACK-INGESTION.md), then rerun the first launcher and select the prepared files | Follow the [feedback guide](FEEDBACK-INGESTION.md), then upload the prepared CSV to `Files/feedback` |
 | **Python use** | Registry and optional local preparation only; no packages required | The launchers run Python for you; no coding or packages required | Registry and optional local preparation only; no packages required |
 | **Complete instructions** | [CSV Upload guide](SETUP-CSV-Download.md) | [Dataverse Direct guide](SETUP-Dataverse.md) | [Fabric Lakehouse guide](SETUP-Fabric.md) |
+
+### Get your data and confirm access
+
+Start with the one **required** row for your selected path. Add the optional files only after the first conversation-data refresh succeeds.
+
+#### Required for your selected path
+
+| Path | Required input and access | Where to get or configure it | Full steps |
+|---|---|---|---|
+| **CSV Upload** | `ConversationTranscript.csv`; exporter needs **Bot Transcript Viewer** (or equivalent organization-level Read) in the agent's Dataverse environment | [make.powerapps.com](https://make.powerapps.com) → agent environment → **Tables → All → ConversationTranscript → Export → Export data → Download exported data** | [CSV guide — Step 1](SETUP-CSV-Download.md#step-1--export-your-conversation-transcripts--required) |
+| **Dataverse Direct** | Environment URL; the Power BI Dataverse account needs **Bot Transcript Viewer** (or equivalent organization-level Read) | [make.powerapps.com](https://make.powerapps.com) → agent environment → **Settings → Session details → Instance URL** | [Dataverse guide — Step 1](SETUP-Dataverse.md#step-1--find-your-dataverse-environment-url--required) |
+| **Fabric Lakehouse** | Capacity-backed Fabric workspace and Lakehouse; **Contributor, Member, or Admin** workspace role; Dataverse **Application User** with transcript Read access in every source environment | Create the workspace/Lakehouse in [Microsoft Fabric](https://app.fabric.microsoft.com/), then have Entra and Dataverse administrators provision the ingestion identity | [Fabric prerequisites](SETUP-Fabric.md#before-you-start) · [Application User setup](SETUP-Fabric.md#one-time-administrator-setup--create-the-dataverse-application-user) |
+
+> A Dataverse administrator must assign transcript access. **Environment Maker alone is not sufficient**, and a tenant-wide administrator role does not replace the environment security role.
+
+#### Optional files
+
+| Optional input | Used by | Access needed | Exact export path and instructions |
+|---|---|---|---|
+| **Users / organization data** (`OrgData.csv`) | CSV Upload and Dataverse Direct Desktop validation | For the Microsoft 365 export: **Global Reader**, **User Administrator**, or **Global Administrator**. Other sources use their own access model. | [admin.microsoft.com](https://admin.microsoft.com) → **Users → Active users → Export users → Confirm** · [CSV Step 2](SETUP-CSV-Download.md#step-2--recommended-export-your-org-data-) · [Dataverse Step 2](SETUP-Dataverse.md#step-2--desktopmanual-refresh-only-export-your-org-data) |
+| **Copilot Credits / consumption** | CSV and Dataverse use **User-Level Credit Consumption**; Fabric uses Environment, Agent-Level, and User-Level files | **Power Platform Administrator** is recommended; tenant administrator or **Dynamics 365 Administrator** also works | [Power Platform admin center](https://admin.powerplatform.microsoft.com) → **Licensing → Copilot Studio → Summary → Download report** · [CSV Step 3](SETUP-CSV-Download.md#step-3--optional-download-copilot-credits-reports) · [Dataverse Step 3](SETUP-Dataverse.md#step-3--desktopmanual-refresh-or-fabric-only-download-copilot-credits-reports) · [Fabric steps](SETUP-Fabric.md#land-the-three-copilot-credits-exports) |
+| **Microsoft 365 Product Feedback** | All paths | Any appropriate Microsoft 365 administrator or reader; **Compliance Administrator** or **Global Administrator** only for identity details or deletion | [admin.microsoft.com](https://admin.microsoft.com) → **Health → Product feedback → Export to CSV** · [Feedback export and load guide](FEEDBACK-INGESTION.md#step-3---export-product-feedback-from-microsoft-365) |
+
+> **Fabric Users data:** the included Fabric notebooks do not ingest a Users file. See [optional Fabric organization enrichment](SETUP-Fabric.md#optional--add-users--organization-enrichment) before planning that source.
+>
+> **Publishing is optional:** Power BI Service publication typically requires **Contributor** or higher in the destination workspace plus the applicable Power BI license. Desktop-only use does not require workspace access.
 
 ### After you choose
 
@@ -209,7 +232,7 @@ Confirm the common requirements below before following the guide for your select
 
 - [ ] **Power BI Desktop installed** (Windows) — [details ↓](#1-power-bi-desktop-installed)
 - [ ] **Complete ESS package downloaded and extracted** — [download ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip)
-- [ ] **Transcript access configured for the selected path** — Bot Transcript Viewer (or equivalent Read) on the interactive account for CSV/Dataverse Direct, or on the Fabric Dataverse Application User
+- [ ] **Required access configured for the selected path** — see [Get your data and confirm access](#get-your-data-and-confirm-access)
 - [ ] **Agent environment is Production, Sandbox, or Default** *(not Teams or M365 Copilot)* — [details ↓](#2-supported-environment-types)
 - [ ] **Agent configured to capture transcripts + node-level details** — [details ↓](#3-agent-configuration)
 

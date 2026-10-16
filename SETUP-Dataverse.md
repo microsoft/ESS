@@ -20,15 +20,7 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 
 > ⚠️ **Environment Maker is NOT enough.** Without the Bot Transcript Viewer role, the connector signs in successfully but returns zero `conversationtranscript` rows.
 
-### Access and roles for this path
-
-| Purpose | Access needed |
-|---|---|
-| Read live transcripts (required) | The Power BI sign-in account needs **Bot Transcript Viewer** in the agent's Dataverse environment, or a customer-approved custom role with organization-level **Read** access to `conversationtranscript`. A Dataverse admin must assign it. |
-| Export organization data (optional) | Depends on the source. For **Microsoft 365 admin center → Active users**, use **Global Reader**, **User Administrator**, or **Global Administrator**. HR, Viva Insights, and Graph sources have their own access requirements. |
-| Download Copilot Credits (optional) | **Power Platform Administrator** is recommended least privilege; a tenant administrator or **Dynamics 365 Administrator** is also accepted by the export page. |
-| Export Microsoft 365 Product Feedback (optional) | A Microsoft 365 administrator or reader account can view and export Product feedback. **Compliance Administrator** or **Global Administrator** is needed only to see identity details or delete feedback. |
-| Publish and schedule refresh (optional) | An appropriate Power BI workspace role, typically **Contributor** or higher, plus the applicable Power BI license. Dataverse remains authenticated with the account that has transcript access. |
+> 📋 See the landing page's single [required and optional data-access table](README.md#get-your-data-and-confirm-access). This guide repeats each role only where you use it.
 
 ### Plain-language terms
 
@@ -80,7 +72,7 @@ Get the **ESS Insights dashboard** running on your own Copilot Studio agent data
 **Where to get it** (pick one):
 
 - 🅰️ **From HR, Viva Insights, or Microsoft Graph** — preferred when Department, Country, and JobTitle are required.
-- 🅱️ **From the [Microsoft 365 admin center](https://admin.microsoft.com)** — select **Users → Active users → Export users**, then confirm the downloaded header before continuing. The default export can contain only basic identity fields and may omit Department, Country, and JobTitle.
+- 🅱️ **From the [Microsoft 365 admin center](https://admin.microsoft.com)** — sign in with **Global Reader**, **User Administrator**, or **Global Administrator**, select **Users → Active users → Export users**, then confirm the downloaded header before continuing. The default export can contain only basic identity fields and may omit Department, Country, and JobTitle.
 - 🅲 **Skip for now** — the template loads cleanly without it.
 
 `UserPrincipalName`, `UPN`, or `PersonId` is required when the file is supplied. Missing Department, Country, JobTitle, or DisplayName is reported as a warning and renders as blank; it does not invalidate the transcript data.
