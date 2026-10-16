@@ -2,7 +2,7 @@
 
 Get the **ESS Insights dashboard** running on your own Copilot Studio agent data, connected directly to Dataverse. Allow about **15–25 minutes** for the first setup.
 
-> **Choose this path for:** ongoing production reporting from one supported Dataverse environment. Use the Desktop-validation build to prove every available source, then publish the separate Service-refresh build. For automated Org Data and Credits enrichment, use Fabric. For a one-time snapshot, use [CSV Upload](SETUP-CSV-Download.md). [Compare all paths](README.md#choose-your-path).
+> **Choose this path for:** ongoing production reporting from one supported Dataverse environment. Use the Desktop-validation build to prove every available source, then publish the separate Service-refresh build. For automated Org Data and Credits enrichment, use Fabric. For a one-time snapshot, use [CSV Upload](SETUP-CSV-Download.md). [Compare all data paths](README.md#choose-your-data-path).
 
 > ⚠️ Extend Dataverse transcript retention to the history period you need; the report lookback parameter cannot restore records that Dataverse has deleted.
 

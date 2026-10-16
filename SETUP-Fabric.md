@@ -1,6 +1,6 @@
 # Step-by-Step Setup Guide — Fabric
 
-> **Choose this path for:** independently governed history, multiple Dataverse environments in one report, very large-scale ingestion, or Lakehouse-based credit analytics. If you have one environment and need scheduled refresh, use [Dataverse Direct](SETUP-Dataverse.md) with [scheduled refresh](AUTO-REFRESH.md) instead. [Compare all paths](README.md#choose-your-path).
+> **Choose this path for:** independently governed history, multiple Dataverse environments in one report, very large-scale ingestion, or Lakehouse-based credit analytics. If you have one environment and need scheduled refresh, use [Dataverse Direct](SETUP-Dataverse.md) with [scheduled refresh](AUTO-REFRESH.md) instead. [Compare all data paths](README.md#choose-your-data-path).
 
 This path adds a **Fabric/Lakehouse ingestion layer** in front of the same ESS Insights dashboard, for teams that have outgrown the CSV Upload and Dataverse Direct paths. It is **not** a replacement for either — most customers should keep using whichever of those two they're already on.
 
@@ -246,5 +246,5 @@ This path adapts the community, MIT-licensed **[StudioLens-for-Copilot-Studio](h
 ## Need more help?
 
 - 🐛 [Open an issue](https://github.com/microsoft/ESS/issues)
-- 📘 Not sure this is the right path? See [Choose your path ↗](README.md#choose-your-path)
+- 📘 Not sure this is the right path? See [Choose your data path ↗](README.md#choose-your-data-path)
 - 📖 The **Metric Glossary** page (inside the dashboard) has every measure's definition

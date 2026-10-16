@@ -2,7 +2,7 @@
 
 Get the **ESS Insights dashboard** running on your own Copilot Studio agent data. Allow about **20–30 minutes** for the first setup; later transcript refreshes are much faster.
 
-> **Choose this path for:** evaluation, one-time snapshots, offline copies, or controlled sharing. For scheduled production reporting from one environment, use [Dataverse Direct](SETUP-Dataverse.md). [Compare all paths](README.md#choose-your-path).
+> **Choose this path for:** evaluation, one-time snapshots, offline copies, or controlled sharing. For scheduled production reporting from one environment, use [Dataverse Direct](SETUP-Dataverse.md). [Compare all data paths](README.md#choose-your-data-path).
 
 ---
 
