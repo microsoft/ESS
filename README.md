@@ -80,8 +80,7 @@ Fabric preserves only records ingested before Dataverse deletes them and require
 
 > 🧪 **Just exploring?** Start with **CSV Upload** and the fabricated files in [`SampleData`](SampleData/). No customer data is required.
 
-<details>
-<summary><strong>Compare all three paths</strong></summary>
+### Compare all three paths and see what to run
 
 | | 🟢 **CSV Upload** | 🔵 **Dataverse Direct** | 🟣 **Fabric Lakehouse** |
 |---|---|---|---|
@@ -93,8 +92,13 @@ Fabric preserves only records ingested before Dataverse deletes them and require
 | **Primary access** | Dataverse transcript read/export access | Bot Transcript Viewer | Fabric access plus a Dataverse application user |
 | **Historical behavior** | Snapshot contains only records retained when exported | Queries only records still retained in Dataverse | Merge preserves records already ingested into Delta |
 | **Template** | `ESS Dashboard - Dynamic Topics (CSV) V18.pbit` | Service-refresh PBIT generated from `ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit` | `ESS - Fabric V2.pbit` |
-
-</details>
+| **First package action** | [Create `agent-registry.json`, then open the included CSV PBIT](SETUP-CSV-Download.md#step-4--build-the-registry-and-open-the-included-template) | [Double-click `START-HERE-DATAVERSE.cmd`](SETUP-Dataverse.md#step-4--create-the-validated-desktop-template) | [Complete the administrator setup, then import the included notebooks](SETUP-Fabric.md#one-time-administrator-setup--create-the-dataverse-application-user) |
+| **After the first validation** | Keep the validated report; replace the CSV and refresh when newer data is needed | [Run `BUILD-SERVICE-REFRESH.cmd` only when ready to publish for cloud refresh](SETUP-Dataverse.md#step-8--publish-to-power-bi-service-only-when-ready) | [Schedule the transcript notebook, then refresh the semantic model](SETUP-Fabric.md#step-3--run-or-schedule-the-notebooks) |
+| **Agent registry** | Required for the recommended safe/selected scope; the guide creates JSON | Not required for basic setup; add only for custom labels or cross-system aliases | Required; upload the validated CSV to `Files/config` |
+| **Optional customer-specific topics** | Follow the [topic tuner guide](TOPIC-TUNER.md), then paste the approved JSON parameter | Follow the [topic tuner guide](TOPIC-TUNER.md), then rerun the first launcher and select the approved JSON | Follow the [topic tuner guide](TOPIC-TUNER.md), then upload the approved CSV to `Files/config` |
+| **Optional Microsoft 365 feedback** | Follow the [feedback guide](FEEDBACK-INGESTION.md), then paste the prepared JSON parameter | Follow the [feedback guide](FEEDBACK-INGESTION.md), then rerun the first launcher and select the prepared files | Follow the [feedback guide](FEEDBACK-INGESTION.md), then upload the prepared CSV to `Files/feedback` |
+| **Python use** | Registry and optional local preparation only; no packages required | The launchers run Python for you; no coding or packages required | Registry and optional local preparation only; no packages required |
+| **Complete instructions** | [CSV Upload guide](SETUP-CSV-Download.md) | [Dataverse Direct guide](SETUP-Dataverse.md) | [Fabric Lakehouse guide](SETUP-Fabric.md) |
 
 ### After you choose
 
