@@ -174,7 +174,7 @@ If you need only Desktop/manual refresh, save the validated report as a PBIX and
 <summary><strong>Publish and schedule gateway-free Dataverse refresh</strong></summary>
 
 1. Complete the baseline checklist before publishing.
-2. Return to the extracted package and run `BUILD-SERVICE-REFRESH.cmd`. This publication helper reuses the saved URL and approved registry, feedback, and topic selections while excluding local Organization and Credits files.
+2. Return to the extracted package and run `BUILD-SERVICE-REFRESH.cmd`. This publication helper supplies the saved URL through the report's Dataverse parameter and embeds approved registry, feedback, and topic selections while excluding local Organization and Credits files. It does not hard-code the URL into the query.
 3. Open the prepared report, wait until every prefilled value is visible and stable, then select **Load**.
 4. Sign in if prompted and select **Home -> Refresh**.
 5. Save as PBIX, select **Home -> Publish**, and choose a workspace where you have Contributor, Member, or Admin access.
@@ -194,7 +194,7 @@ Use Fabric instead when organization or credit files must refresh automatically.
 | Agent label is technical | No registry is embedded | Add a reviewed registry and rerun guided setup |
 | Organization or credit visuals are blank in Service | These local file sources are intentionally removed | Use Desktop/manual refresh for these files or Fabric for automated enrichment |
 | Credit visuals are blank in Desktop | No `Agent Id` matches the selected agent or registry `CreditId` | Check the export and guided validation summary |
-| Need to switch environments | Saved choices point to the previous URL | Run the guided setup and decline reuse of saved choices |
+| Need to switch environments | The report parameter and credentials point to the previous environment | Run the guided setup with the new URL, then update Dataverse credentials after publishing |
 | Orange Apply changes banner remains | The report was prepared with an older package | Download the current package and repeat the guided setup |
 | Queries are blocked or a cyclic reference appears immediately after Load | Load was selected before the prefilled parameter values finished initializing | Close the report without saving, reopen it from the guided setup, wait for every value to appear and stabilize, then select Load |
 
