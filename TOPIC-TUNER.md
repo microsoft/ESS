@@ -49,15 +49,31 @@ Do not open or save the transcript CSV in Excel. Excel can corrupt the JSON in i
 2. Press **Alt+D** to select the File Explorer address bar. The complete folder path should become highlighted.
 3. Type `powershell.exe` exactly, including `.exe`, and press **Enter**. Do not use the **Search ESS-main** box or select an address suggestion.
 4. Confirm that a PowerShell terminal window opens and its prompt ends with `\ESS-main>`. If another File Explorer folder opens, return to `ESS-main` and repeat steps 2-3 using `powershell.exe`.
-5. Run:
+5. Run the following three commands **one at a time**. Press **Enter** and wait for the result before moving to the next command.
+
+**Command 1 - Check the Python version**
 
 ```powershell
 python --version
+```
+
+The result must be `Python 3.10` or later.
+
+**Command 2 - Confirm that the tuner script is in the current folder**
+
+```powershell
 Test-Path .\tools\ess_topic_tuner.py
+```
+
+The result must be `True`.
+
+**Command 3 - Run the tuner**
+
+```powershell
 python tools\ess_topic_tuner.py --input "C:\AgentData\ConversationTranscripts.csv" --output-dir "C:\AgentData\topic-review" --min-frequency 5
 ```
 
-Python must report version 3.10 or later, and `Test-Path` must return `True`. The final command creates `C:\AgentData\topic-review` and the six files described below.
+The third command creates `C:\AgentData\topic-review` and the six files described below.
 
 Open `topic-learning-audit.csv` and check `Status`:
 
@@ -147,14 +163,19 @@ Use the transcript export steps in [CSV setup - Step 1](SETUP-CSV-Download.md#st
 2. Press **Alt+D** to select the address bar. The complete folder path should become highlighted.
 3. Type `powershell.exe` exactly, including `.exe`, and press **Enter**. Do not use the search box or select an address suggestion.
 4. Confirm that a PowerShell terminal window opens and its prompt ends with `\ESS-main>`.
-5. Run:
+5. Run these commands **one at a time**, pressing **Enter** after each command:
 
 ```powershell
 python --version
+```
+
+The result must be `Python 3.10` or later.
+
+```powershell
 Test-Path .\tools\ess_topic_tuner.py
 ```
 
-The expected results are `Python 3.10` or later and `True`. If `Test-Path` returns `False`, the terminal is not open in the complete extracted package. If Windows says that Python is not recognized, install Python from [python.org](https://www.python.org/downloads/windows/), select **Add Python to PATH** during setup, close PowerShell, and repeat these steps.
+The result must be `True`. If `Test-Path` returns `False`, the terminal is not open in the complete extracted package. If Windows says that Python is not recognized, install Python from [python.org](https://www.python.org/downloads/windows/), select **Add Python to PATH** during setup, close PowerShell, and repeat these steps.
 
 No Python packages need to be installed.
 
