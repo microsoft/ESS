@@ -45,7 +45,7 @@ Do not open or save the transcript CSV in Excel. Excel can corrupt the JSON in i
 
 ### Step 2 - Create the topic-rule files
 
-1. Open the extracted `ESS-main` folder in File Explorer. Confirm that the file list includes the `tools` folder and `START-HERE-DATAVERSE.cmd`.
+1. Open the extracted package in File Explorer. Windows can create an outer folder such as `ESS-main (3)` that contains another `ESS-main` folder. If you see another `ESS-main` folder instead of `tools`, open it. The correct folder directly contains `tools` and `START-HERE-DATAVERSE.cmd`.
 2. Press **Alt+D** to select the File Explorer address bar. The complete folder path should become highlighted.
 3. Type `powershell.exe` exactly, including `.exe`, and press **Enter**. Do not use the **Search ESS-main** box or select an address suggestion.
 4. Confirm that a PowerShell terminal window opens and its prompt ends with `\ESS-main>`. If another File Explorer folder opens, return to `ESS-main` and repeat steps 2-3 using `powershell.exe`.
@@ -130,6 +130,8 @@ Topic overrides apply to every agent included in the current report scope. For s
 - `tools/ess_topic_tuner.py`;
 - `tools/topic_classifier.py`; and
 - `taxonomy/topics-taxonomy.csv`.
+
+The extraction process can create an outer folder such as `ESS-main (3)` containing an inner `ESS-main` folder. Run the commands from the inner folder that directly contains `tools`, not from the outer container folder.
 
 > Do not download `ess_topic_tuner.py` by itself. It imports the companion classifier and loads the shared taxonomy using repository-relative paths.
 
@@ -261,7 +263,7 @@ Run `Copilot_Agent_Transcript_Parser.ipynb`. The notebook reads only rows where 
 | Symptom | Cause | Fix |
 |---|---|---|
 | Typing `powershell` opens another File Explorer folder such as `Documents\PowerShell` | File Explorer interpreted the text as a folder name instead of the PowerShell executable | Return to the extracted `ESS-main` folder, press **Alt+D**, type `powershell.exe` including `.exe`, and press **Enter** without selecting a suggestion |
-| `python: can't open file 'tools\ess_topic_tuner.py'` | PowerShell is open in the wrong folder, or only the script was downloaded | Open PowerShell from the extracted `ESS-main` folder and keep the complete package structure intact |
+| `python: can't open file 'tools\ess_topic_tuner.py'` | PowerShell is open in an outer extraction folder or only the script was downloaded | If the current folder contains another `ESS-main` folder, run `Set-Location ".\ESS-main"` and then confirm that `Test-Path .\tools\ess_topic_tuner.py` returns `True`; otherwise open the inner package folder and keep the complete package structure intact |
 | PowerShell says `python` is not recognized | Python is not installed or not on PATH | Install Python 3.10+ with **Add Python to PATH**, then reopen PowerShell |
 | `Input file not found` | The transcript path is incomplete or mistyped | In File Explorer, Shift+right-click the file and select **Copy as path**, then paste that path after `--input` |
 | No automatic customer rules are produced | The export has no usable native topic evidence, too few distinct conversations, or the observed precision is below the threshold | Check `topic-learning-audit.csv`; keep the corrected built-in fallback or review disabled items locally |
