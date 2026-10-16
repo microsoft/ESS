@@ -9,6 +9,87 @@ Use this optional tool when recurring customer terminology remains unclassified 
 
 Start with the report's existing topic results. This tool does not unlock the baseline report and is not required for transcript, adoption, outcome, feedback, or business-impact analysis.
 
+> [!IMPORTANT]
+> The **Optional topic tuner** link opens this guide; it does not run the tuner or change the report. The tuner is a separate local preparation step. It reads an exported transcript CSV and creates `customer-topic-overrides.json`. You then run the Dataverse guided setup again and select that JSON under **Approved topic rules**.
+
+The transcript CSV is used only to learn and review topic rules locally. Dataverse V21 continues to read report data directly from Dataverse; the CSV is not added as a report data source.
+
+## Dataverse V21 customer path
+
+If you arrived here from the Dataverse setup guide, use this sequence:
+
+| Stage | Customer action | Result |
+|---|---|---|
+| 1. Confirm the baseline | Complete the URL-only Dataverse setup first | A working report before optional topic changes |
+| 2. Export evidence | Export the untouched `ConversationTranscript` table | Local CSV used only by the tuner |
+| 3. Run and review | Run the tuner and review its results | Approved `customer-topic-overrides.json` |
+| 4. Add the rules | Run `START-HERE-DATAVERSE.cmd` again and select the JSON | New Desktop Validation PBIT with the rules embedded |
+| 5. Validate and publish | Check topic results, then use the normal Service publication step if needed | Validated PBIX or Service Refresh PBIT |
+
+Do not continue with the tuner until the transcript-only Dataverse report loads successfully. Optional topic rules cannot repair an incorrect environment URL, missing transcript access, expired records, or disabled transcript capture.
+
+### Step 1 - Export representative topic evidence
+
+Use a representative set of retained conversations. To test automatic learning, include at least five distinct conversations in which recurring customer terminology is associated with the same meaningful native Copilot Studio topic. Use **Start over** between business questions so each question is retained as a separate conversation.
+
+1. Sign in to [Power Apps](https://make.powerapps.com).
+2. Select the same environment used by the Dataverse report.
+3. Select **Tables**.
+4. Select **All**, search for `conversation`, and open **ConversationTranscript**.
+5. Select **Export -> Export data**.
+6. Wait for the export to finish, then select **Download exported data**.
+7. Extract the downloaded ZIP.
+8. Create `C:\AgentData`, move the CSV there, and rename it `ConversationTranscripts.csv`.
+
+Do not open or save the transcript CSV in Excel. Excel can corrupt the JSON in its `Content` column.
+
+### Step 2 - Create the topic-rule files
+
+Open the extracted `ESS-main` folder in File Explorer. Select the address bar, type `powershell`, and press **Enter**. Then run:
+
+```powershell
+python --version
+python tools\ess_topic_tuner.py --input "C:\AgentData\ConversationTranscripts.csv" --output-dir "C:\AgentData\topic-review" --min-frequency 5
+```
+
+Python must report version 3.10 or later. The second command creates `C:\AgentData\topic-review` and the six files described below.
+
+Open `topic-learning-audit.csv` and check `Status`:
+
+- If every required rule is `AutoValidated` and its validation metrics are acceptable, use `C:\AgentData\topic-review\customer-topic-overrides.json`.
+- If a required rule is `NeedsReview` or `Candidate`, complete the review process in [Review only unresolved items](#3-review-only-unresolved-items). Use the `customer-topic-overrides.json` from the resulting `topic-review-approved` folder.
+- If the result is `InsufficientEvidence`, collect more representative conversations or skip the custom rule. Do not lower safety thresholds merely to force a result.
+
+### Step 3 - Add the approved JSON to Dataverse V21
+
+The tuner does not update a report that is already open. After choosing the approved JSON:
+
+1. Return to the extracted `ESS-main` folder.
+2. Double-click `START-HERE-DATAVERSE.cmd`.
+3. Select **Yes** to reuse the saved setup choices.
+4. Confirm the saved Dataverse Environment URL.
+5. Select **Yes** when asked whether to choose or replace optional files.
+6. Keep or skip the Agent registry, Organization data, and Copilot credit files as appropriate for the current test.
+7. At **Approved topic rules**, select **Yes** and choose `customer-topic-overrides.json`.
+8. Keep or skip Microsoft 365 feedback as appropriate for the current test.
+9. Confirm that the validation summary reports **Approved topic rules** with a non-zero row count.
+10. Open the generated Desktop Validation PBIT, wait until every parameter value is visible and stable, and then select **Load**.
+
+The guided setup validates and embeds the JSON. It also saves the approved file selection for the same environment, so `BUILD-SERVICE-REFRESH.cmd` can reuse it later.
+
+### Step 4 - Validate the customer experience
+
+Confirm:
+
+- native Copilot Studio topics remain unchanged;
+- the expected customer rule classifies the intended previously unresolved conversations;
+- unrelated conversations do not move into the customer topic;
+- ambiguous conversations remain unassigned rather than being forced into a topic;
+- topic counts are plausible on **Conversation Details**, **Improvement Opportunities**, and **Adjust Topic Assumptions**; and
+- the **Glossary** load-diagnostics entry shows no blocking topic-rule error.
+
+If the Desktop result is correct and shared Service access is required, close the report, run `BUILD-SERVICE-REFRESH.cmd`, open the generated Service Refresh PBIT, refresh it, save it as PBIX, and publish it. The publication helper reuses the saved approved topic rules; you do not run the tuner again.
+
 `tools/ess_topic_tuner.py` learns customer-specific topic rules from the customer's own Copilot Studio native-topic evidence and applies those rules to similar conversations that have no native topic. It processes every user turn locally, uses only the Python standard library, and makes no network, LLM, or external API calls.
 
 Native Copilot Studio topics remain authoritative. The corrected built-in English, Spanish, and Chinese taxonomy remains the fallback when Python is not used or when the local evidence is insufficient. The tuner does not force an assignment when evidence is ambiguous.
