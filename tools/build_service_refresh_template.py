@@ -85,11 +85,12 @@ DATAVERSE_HOST_PATTERNS = tuple(
 )
 STATIC_DESCRIPTION = (
     "Required. This Service-refresh build is fixed to {url}. To target another "
-    "environment, rebuild the PBIT with tools/build_service_refresh_template.py."
+    "environment, run START-HERE-DATAVERSE.cmd with the new URL, then run "
+    "BUILD-SERVICE-REFRESH.cmd."
 )
 DESKTOP_DESCRIPTION = (
-    "Required. Dataverse Environment URL used by this Desktop validation build. "
-    "The connector remains parameterized; use the Service-refresh mode before publishing."
+    "Required. Dataverse Environment URL used by this Desktop-validation build. "
+    "After validating this report, run BUILD-SERVICE-REFRESH.cmd before publishing."
 )
 CONTENT_TYPES_NAMESPACE = (
     "http://schemas.openxmlformats.org/package/2006/content-types"

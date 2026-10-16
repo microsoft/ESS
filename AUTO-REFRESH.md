@@ -36,7 +36,7 @@ The Dataverse Direct Service-refresh build connects the service **directly to on
 
    The launcher does not include Org Data or Credits in the Service template. Use Fabric when those sources must refresh automatically.
 
-2. Open the generated PBIT, confirm the environment URL and embedded optional JSON, load it successfully in Desktop, and **Publish** it to your workspace.
+2. Open the generated PBIT, confirm the environment URL and embedded optional JSON, wait until every prefilled parameter value is visible and stable, then select **Load**. Refresh it successfully in Desktop and **Publish** it to your workspace.
 3. In the service, open the **semantic model → Settings**.
 4. Expand **Data source credentials** and click **Edit credentials** on the Dataverse source:
    - **Authentication method:** `OAuth2`
@@ -113,6 +113,7 @@ If the parameter points at a **local file** (`C:\Data\…`) or a **network share
 | **Refresh succeeds but data is stale.** | New export saved under a new name/path. | Overwrite the file at the **same URL/path** the parameter points to. |
 | **Refresh very slow / times out (Dataverse).** | Lookback window too wide. | Lower **Transcript Lookback Days**. |
 | **“The remote name could not be resolved” / “Invalid URL.”** | The environment URL supplied to the builder was wrong. | Re-copy the Instance URL and rebuild the Service-refresh PBIT. |
+| **Queries are blocked / “A cyclic reference was encountered” immediately after Load.** | Load was selected before the prefilled parameter values finished initializing. | Close the report without saving, reopen the generated PBIT, wait for every value to appear and stabilize, then select **Load**. |
 
 ---
 
