@@ -1,8 +1,16 @@
-# Private topic tuner
+# Private adaptive topic tuner
 
-`tools/ess_topic_tuner.py` helps customers find repeated gaps in a Copilot Studio topic taxonomy without sending conversation transcripts outside their environment. It is agent-agnostic, uses only the Python standard library, and makes no network, LLM, or external API calls.
+`tools/ess_topic_tuner.py` learns customer-specific topic rules from the customer's own Copilot Studio native-topic evidence and applies those rules to similar conversations that have no native topic. It processes every user turn locally, uses only the Python standard library, and makes no network, LLM, or external API calls.
 
-Topic overrides apply to every agent included in the current report scope. For substantially different agent domains, use **Selected Agents** while reviewing candidates or maintain a shared taxonomy whose rules are valid across all included agents.
+Native Copilot Studio topics remain authoritative. The corrected built-in English, Spanish, and Chinese taxonomy remains the fallback when Python is not used or when the local evidence is insufficient. The tuner does not force an assignment when evidence is ambiguous.
+
+When an enabled customer rule and a built-in rule both match, the customer rule wins. Score and priority resolve collisions only among rules from the same source.
+
+Automatic rules must pass deterministic conversation-level five-fold validation. Each conversation is excluded from the training data for one fold, the rule is relearned, and its prediction is checked against that held-out native topic. This prevents the reported precision from being only a measurement of the same rows used to learn the phrases.
+
+The tuner can automatically reuse topic labels that are present in native `IntentRecognition` events. It cannot safely invent an authoritative business label for a topic that has never appeared in native evidence; those remaining repeated gaps are written as disabled review candidates instead.
+
+Topic overrides apply to every agent included in the current report scope. For substantially different agent domains, use **Selected Agents** or maintain rules that are valid across all included agents.
 
 ## Download the tuner
 
@@ -18,13 +26,14 @@ Topic overrides apply to every agent included in the current report scope. For s
 
 | File | Purpose | Contains transcript text? |
 |---|---|---|
-| `customer-topic-overrides.csv` | Review queue for candidate keywords and approved customer rules | No full prompts; candidate terms can still be sensitive |
-| `customer-topic-overrides.json` | Enabled rules ready to paste into CSV/Dataverse templates | No |
+| `customer-topic-overrides.csv` | Auto-validated rules plus any disabled items requiring review | No prompt field; a learned phrase can equal a short prompt |
+| `customer-topic-overrides.json` | Enabled auto-validated and customer-approved rules ready for the templates | No |
 | `topic-enrichment.csv` | Hashed conversation key plus assigned topic and confidence | No |
 | `classification-audit.csv` | Hashed conversation key plus rule, score, ambiguity, and version diagnostics | No |
+| `topic-learning-audit.csv` | Native-topic support, in-sample screening, out-of-fold precision/coverage, and enablement decision | No prompt field; includes learned phrases |
 | `privacy-report.json` | Aggregate counts, suppression threshold, and redaction summary | No |
 
-> **Privacy boundary:** the tool removes common email, URL, phone, GUID, IP-address, and long-number patterns before candidate extraction and suppresses terms below the minimum frequency. This reduces exposure but does not guarantee anonymity: repeated project names or other business-sensitive terms can still become candidates. Review all output locally before sharing it.
+> **Privacy boundary:** the tool removes common email, URL, phone, GUID, IP-address, and long-number patterns before learning or candidate extraction. It also requires evidence from multiple distinct conversations. This reduces exposure but does not guarantee anonymity: repeated project names or other business-sensitive terms can still appear. Keep all output inside the customer environment and review it before sharing.
 
 ## Before you start
 
@@ -51,65 +60,82 @@ The expected result is `Python 3.10` or later. If Windows says that Python is no
 
 No Python packages need to be installed.
 
-## 1. Run the first review
+## 1. Run the tuner
 
 A raw Dataverse `ConversationTranscript` CSV is detected automatically. From the PowerShell window opened above, run:
 
 ```powershell
-python tools\ess_topic_tuner.py `
-  --input "C:\AgentData\ConversationTranscripts.csv" `
-  --output-dir "C:\AgentData\topic-review" `
-  --min-frequency 5
+python tools\ess_topic_tuner.py --input "C:\AgentData\ConversationTranscripts.csv" --output-dir "C:\AgentData\topic-review" --min-frequency 5
 ```
 
-Replace the input path with the full path to your transcript CSV. The output folder is created automatically. A successful run prints a summary and creates the five files listed above.
+Replace the input path with the full path to your transcript CSV. The output folder is created automatically. A successful run prints a summary and creates the six files listed above.
 
-The tool also accepts a flat CSV containing a first-user-prompt column such as `first_user_prompt`, `FirstUserMessage`, or `Prompt`. Use `--prompt-column`, `--locale-column`, `--id-column`, or `--native-topic-column` when the column names are different.
+The raw transcript path is preferred because it lets the tuner learn from every user turn and its paired native topic. The tool also accepts a flat CSV containing a prompt column such as `first_user_prompt`, `FirstUserMessage`, or `Prompt`. Include a native-topic column to enable adaptive learning. Use `--prompt-column`, `--locale-column`, `--id-column`, or `--native-topic-column` when the column names are different.
 
-Rows with a native Copilot Studio topic remain native. Candidate extraction only examines non-ambiguous conversations that the shared classifier leaves uncategorized.
+The default automatic acceptance rules are:
 
-## 2. Review candidates
+- evidence from at least five distinct conversations;
+- at least 90% in-sample cross-topic precision;
+- at least 90% conversation-level out-of-fold precision with at least three correctly matched validation conversations;
+- privacy reduction before phrase learning; and
+- no forced label when the evidence is weak or ambiguous.
 
-Open `C:\AgentData\topic-review\customer-topic-overrides.csv` and review each candidate. This output is safe to open in Excel because it does not contain the raw transcript JSON.
+Use `--min-native-topic-precision`, `--validation-folds`, or `--min-validation-conversations` only when the customer deliberately accepts a different validation policy. Lowering a threshold can increase coverage but also increases the risk of incorrect assignments.
 
-1. Set `Vertical` and `CanonicalTopic` to the approved business labels.
-2. Edit `Keywords` and add any `Exclusions` needed to prevent collisions.
-3. Keep `Priority` above the matching built-in rule when the customer rule should win; generated candidates default to `110`.
-4. Change `Enabled` to `true` only after review.
+## 2. Verify the automatic result
 
-Do not enable a row with blank `Vertical`, `CanonicalTopic`, or `Keywords`.
+Open `topic-learning-audit.csv` and check the `Status` column:
 
-Keep labels short and understandable to report users. Avoid customer names, employee names, case numbers, and other identifying values in `CanonicalTopic`, `Keywords`, and `Exclusions`.
+| Status | Meaning | Loaded into JSON? |
+|---|---|---|
+| `AutoValidated` | Label came from native evidence and met the support and precision thresholds | Yes |
+| `NeedsReview` | Native label is known, but the phrases did not meet the automatic precision threshold | No |
+| `InsufficientEvidence` | Too few repeated phrases were available | No |
+| `ExistingOverride` | The supplied override file already contains this topic and locale | Uses the existing enabled setting |
 
-## 3. Re-run with approved rules
+Then check:
+
+- `privacy-report.json` for processed rows, automatic rule counts, and redaction counts;
+- `topic-learning-audit.csv` for `ValidationStatus = Passed`, `ValidationPrecision`, `ValidationCoverage`, and zero or acceptably low `ValidationFalsePositiveConversations`;
+- `classification-audit.csv` for collisions, ambiguity, native-topic preservation, and rule source; and
+- `topic-enrichment.csv` for assigned topic counts by hashed conversation key.
+
+If every required customer topic is `AutoValidated` and its out-of-fold metrics are acceptable, use the first run's `customer-topic-overrides.json` directly. Low coverage is safe but incomplete: unmatched conversations continue to the built-in taxonomy or remain uncategorized. A false positive is more serious than an unassigned row.
+
+## 3. Review only unresolved items
+
+Open `customer-topic-overrides.csv` only when `NeedsReview` or `Candidate` rows require customer judgment:
+
+1. For `NeedsReview`, confirm the native `CanonicalTopic`, edit its keywords or exclusions, and change `Enabled` to `true` only when the rule is safe.
+2. For `Candidate`, provide the customer-approved `Vertical` and `CanonicalTopic`, edit the keywords or exclusions, and change `Enabled` to `true`.
+3. Keep labels short and understandable. Do not use employee names, case numbers, or other identifying values.
+4. Re-run the tuner with the reviewed file:
 
 ```powershell
-python tools\ess_topic_tuner.py `
-  --input "C:\AgentData\ConversationTranscripts.csv" `
-  --overrides "C:\AgentData\topic-review\customer-topic-overrides.csv" `
-  --output-dir "C:\AgentData\topic-review-approved" `
-  --min-frequency 5
+python tools\ess_topic_tuner.py --input "C:\AgentData\ConversationTranscripts.csv" --overrides "C:\AgentData\topic-review\customer-topic-overrides.csv" --output-dir "C:\AgentData\topic-review-approved" --min-frequency 5
 ```
 
-The second run tests the approved rules and writes `customer-topic-overrides.json` containing only enabled rules.
-
-Before loading the rules, check:
-
-- `privacy-report.json` for the number of processed, redacted, and suppressed items;
-- `classification-audit.csv` for unexpected collisions or ambiguous matches; and
-- `topic-enrichment.csv` for the resulting topic counts by hashed conversation key.
-
-Do not share these files outside the customer environment without customer review.
+The new `customer-topic-overrides.json` includes the reviewed enabled rules plus any automatically validated rules not already represented in the supplied file.
 
 ## 4. Apply without a template release
 
-### CSV V18 and Dataverse V21
+### CSV V18
 
 Open **Transform data → Edit parameters** and paste the full contents of `customer-topic-overrides.json` into **Customer Topic Overrides JSON (optional)**. Refresh the model. Because the override is a parameter, it does not add a second data source or create a Formula Firewall dependency.
 
+### Dataverse V21
+
+Embed the validated file with the supported builder instead of manually editing the PBIT:
+
+```powershell
+python tools\build_service_refresh_template.py --mode desktop-validation --input "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit" --environment-url "https://orgabc12345.crm.dynamics.com" --topic-overrides-json "C:\AgentData\topic-review\customer-topic-overrides.json" --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Desktop Validation.pbit"
+```
+
+For production scheduled refresh, change `--mode desktop-validation` to `--mode service-refresh`. The builder validates the rule schema and embeds the JSON contents; the PBIT parameter contains JSON, not the file path.
+
 ### Fabric V2
 
-Upload the reviewed `customer-topic-overrides.csv` to:
+Upload `customer-topic-overrides.csv` to:
 
 ```text
 Files/config/customer-topic-overrides.csv
@@ -124,10 +150,21 @@ Run `Copilot_Agent_Transcript_Parser.ipynb`. The notebook reads only rows where 
 | `python: can't open file 'tools\ess_topic_tuner.py'` | PowerShell is open in the wrong folder, or only the script was downloaded | Open PowerShell from the extracted `ESS-main` folder and keep the complete package structure intact |
 | PowerShell says `python` is not recognized | Python is not installed or not on PATH | Install Python 3.10+ with **Add Python to PATH**, then reopen PowerShell |
 | `Input file not found` | The transcript path is incomplete or mistyped | In File Explorer, Shift+right-click the file and select **Copy as path**, then paste that path after `--input` |
-| No candidate rules are produced | Repeated terms did not meet `--min-frequency`, or conversations already have native/derived topics | Review the privacy report; if appropriate, rerun with a lower value such as `3` |
-| A candidate contains a sensitive business term | Redaction reduces common PII but cannot identify every customer-specific term | Leave it disabled, remove the term, and keep all outputs inside the customer environment |
+| No automatic customer rules are produced | The export has no usable native topic evidence, too few distinct conversations, or the observed precision is below the threshold | Check `topic-learning-audit.csv`; keep the corrected built-in fallback or review disabled items locally |
+| A known topic is `NeedsReview` after previously appearing strong | It did not match at least three held-out conversations or fell below the out-of-fold precision threshold | Check `ValidationStatus`, `ValidationPrecision`, and `ValidationCoverage`; collect more resolved examples or keep the rule disabled |
+| A learned term contains a sensitive business term | Redaction reduces common PII but cannot identify every customer-specific term | Disable or remove the term and keep all outputs inside the customer environment |
 | Approved rules do not appear in the report | The edited CSV was not supplied on the second run, or `Enabled` is not `true` | Rerun with `--overrides`, then load the newly generated JSON/CSV and refresh |
+| One retained thread contains several business questions | The report has one primary topic per conversation | Use **Start over** so each question is retained as a separate conversation; the tuner still learns from all paired user turns |
+
+## Production validation cycle
+
+1. Start with the built-in classifier and confirm native Copilot Studio topics are present.
+2. Export a representative resolved transcript set; for large tenants, use a window that includes ordinary, rare, and seasonally important requests.
+3. Run the tuner and promote only `AutoValidated` rules with `ValidationStatus = Passed`.
+4. Build a Desktop validation PBIT and confirm native topics remain unchanged, enabled customer rules classify only unresolved rows, ambiguous rows remain unassigned, and topic counts are plausible.
+5. Build the Service-refresh PBIT from the same source template and the same approved JSON. Do not reuse a manually edited or test-only PBIT.
+6. Re-run the tuner after material topic or wording changes. Replace the approved JSON deliberately; do not append every historical candidate indefinitely.
 
 ## Sharing guidance
 
-Keep raw transcripts, `topic-enrichment.csv`, and `classification-audit.csv` inside the customer environment. If taxonomy help is needed, the smallest useful package is the reviewed `customer-topic-overrides.csv` plus `privacy-report.json`; both still require customer review and approval before sharing.
+Keep raw transcripts and all tuner outputs inside the customer environment. If taxonomy help is needed, the smallest useful package is the reviewed `customer-topic-overrides.csv`, `topic-learning-audit.csv`, and `privacy-report.json`; all still require customer review and approval before sharing.

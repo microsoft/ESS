@@ -198,15 +198,13 @@ Replace `production-us` with the exact `EnvironmentKey` in your CSV.
 
 ### Dataverse V21
 
-No registry is required for normal transcript and consumption reporting. Use the synchronized **Agent** slicer in the report filter drawer. Advanced registry values can be embedded when building a controlled template for Microsoft 365 feedback attribution.
+No registry is required to discover transcript agents in `All Agents` mode. A registry is recommended when the Copilot Studio technical name must display as a stable friendly label, when a credits export must be checked against a known `CreditId`, or when Microsoft 365 feedback uses a `T_...` title ID.
 
 ```powershell
-python tools\build_service_refresh_template.py `
-  --input "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit" `
-  --environment-url "https://orgabc12345.crm.dynamics.com" `
-  --agent-registry-json "C:\AgentData\agent-registry.json" `
-  --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Service Refresh.pbit"
+python tools\build_service_refresh_template.py --mode desktop-validation --input "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit" --environment-url "https://orgabc12345.crm.dynamics.com" --agent-registry-json "C:\AgentData\agent-registry.json" --output "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Desktop Validation.pbit"
 ```
+
+After the Desktop result is validated, rerun with `--mode service-refresh` and a different output name for publication. The builder validates and embeds the JSON; `Agent Registry JSON` remains hidden from the normal Power BI parameter dialog.
 
 ### Fabric V2
 

@@ -1,4 +1,7 @@
 import json
+import os
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -7,6 +10,11 @@ from pathlib import Path
 from build_service_refresh_template import (
     build_package,
     normalize_environment_url,
+    serialize_registry,
+    validate_credits,
+    validate_feedback_events,
+    validate_org_data,
+    validate_topic_overrides,
 )
 
 
@@ -50,20 +58,43 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
 
             with zipfile.ZipFile(output) as package:
                 self.assertIsNone(package.testzip())
+                names = package.namelist()
+                self.assertNotIn("UnappliedChanges", names)
+                self.assertNotIn(
+                    b"/UnappliedChanges",
+                    package.read("[Content_Types].xml"),
+                )
+                self.assertNotIn(
+                    b"UnappliedChanges",
+                    package.read("_rels/.rels"),
+                )
                 schema = json.loads(
                     package.read("DataModelSchema").decode("utf-16-le")
                 )
-                changes = json.loads(
-                    package.read("UnappliedChanges").decode("utf-16-le")
+
+            model_expressions = {
+                item["name"]: (
+                    "\n".join(item["expression"])
+                    if isinstance(item["expression"], list)
+                    else item["expression"]
+                )
+                for item in schema["model"].get("expressions", [])
+            }
+            for table in schema["model"]["tables"]:
+                partitions = table.get("partitions", [])
+                if len(partitions) != 1:
+                    continue
+                source = partitions[0].get("source", {})
+                expression = source.get("expression")
+                if expression is None:
+                    continue
+                model_expressions[table["name"]] = (
+                    "\n".join(expression)
+                    if isinstance(expression, list)
+                    else expression
                 )
 
-            queries = {
-                query["name"]: query
-                for query in changes["queries"]
-            }
-            agent_text = "\n".join(
-                queries["Agent Performance"]["text"]
-            )
+            agent_text = model_expressions["Agent Performance"]
             self.assertIn(
                 f'Cds.Entities("{environment_url}", null)',
                 agent_text,
@@ -71,7 +102,7 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             self.assertNotIn("Cds.Entities(_EnvUrl", agent_text)
 
             for name in ("Chat + Agent Org Data", "AgentCredits"):
-                text = "\n".join(queries[name]["text"])
+                text = model_expressions[name]
                 self.assertNotIn("Web.Contents", text)
                 self.assertNotIn("File.Contents", text)
 
@@ -85,12 +116,27 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                     "Dataverse Environment URL (required)"
                 ]["expression"],
             )
-            self.assertNotIn("Org Data File", queries)
-            self.assertNotIn("Agent Credits  (optional)", queries)
             self.assertNotIn("Org Data File", model_parameters)
             self.assertNotIn(
                 "Agent Credits  (optional)",
                 model_parameters,
+            )
+
+            with zipfile.ZipFile(SOURCE) as source_package:
+                source_changes = json.loads(
+                    source_package.read("UnappliedChanges").decode("utf-16-le")
+                )
+            source_queries = {
+                query["name"]: (
+                    "\n".join(query["text"])
+                    if isinstance(query["text"], list)
+                    else query["text"]
+                )
+                for query in source_changes["queries"]
+            }
+            self.assertEqual(
+                model_expressions["ConversationFeedback"],
+                source_queries["ConversationFeedback"],
             )
 
     def test_embeds_optional_validated_registry(self):
@@ -126,6 +172,187 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 "IsParameterQuery=true",
                 registry_expression,
             )
+
+    def test_builds_prefilled_desktop_validation_template(self):
+        environment_url = "https://orgexample.crm.dynamics.com"
+        org_data = ROOT / "SampleData" / "OrgData.csv"
+        credits = (
+            ROOT
+            / "SampleData"
+            / "EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv"
+        )
+        registry_path = ROOT / "SampleData" / "agent-registry.json"
+        feedback_path = ROOT / "SampleData" / "feedback-events.json"
+        registry_rows, registry_json = serialize_registry(registry_path)
+        feedback_json, feedback_audit = validate_feedback_events(
+            feedback_path,
+            registry_rows,
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary_path = Path(temporary)
+            overrides_path = temporary_path / "customer-topic-overrides.json"
+            overrides_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "Locale": "en",
+                            "Vertical": "Customer",
+                            "CanonicalTopic": "Benefits Enrollment",
+                            "Keywords": "benefits enrollment",
+                            "Exclusions": "",
+                            "Priority": 120,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            overrides_json, overrides_audit = validate_topic_overrides(
+                overrides_path
+            )
+            output = temporary_path / "desktop-validation.pbit"
+            build_package(
+                SOURCE,
+                output,
+                environment_url,
+                registry_json,
+                mode="desktop-validation",
+                org_data_file=org_data,
+                credits_file=credits,
+                overrides_json=overrides_json,
+                feedback_json=feedback_json,
+            )
+
+            with zipfile.ZipFile(output) as package:
+                self.assertIsNone(package.testzip())
+                self.assertNotIn("UnappliedChanges", package.namelist())
+                schema = json.loads(
+                    package.read("DataModelSchema").decode("utf-16-le")
+                )
+
+        expressions = {
+            item["name"]: (
+                "\n".join(item["expression"])
+                if isinstance(item["expression"], list)
+                else item["expression"]
+            )
+            for item in schema["model"]["expressions"]
+        }
+        tables = {table["name"]: table for table in schema["model"]["tables"]}
+        transcript_expression = tables["Agent Performance"]["partitions"][0][
+            "source"
+        ]["expression"]
+        transcript_text = (
+            "\n".join(transcript_expression)
+            if isinstance(transcript_expression, list)
+            else transcript_expression
+        )
+
+        self.assertIn("Cds.Entities(_EnvUrl, null)", transcript_text)
+        self.assertIn(str(org_data.resolve()), expressions["Org Data File"])
+        self.assertIn(
+            str(credits.resolve()),
+            expressions["Agent Credits  (optional)"],
+        )
+        self.assertIn(
+            "Benefits Enrollment",
+            expressions["Customer Topic Overrides JSON (optional)"],
+        )
+        self.assertIn(
+            "synthetic-external-unique",
+            expressions["Feedback Events JSON (optional)"],
+        )
+        self.assertIn("ess-synthetic", expressions["Agent Registry JSON"])
+        self.assertEqual(overrides_audit["enabledRules"], 1)
+        self.assertEqual(feedback_audit["events"], 2)
+
+    def test_validates_desktop_source_contracts_and_registry_match(self):
+        registry_rows, _ = serialize_registry(
+            ROOT / "SampleData" / "agent-registry.json"
+        )
+        org_audit = validate_org_data(
+            ROOT / "SampleData" / "OrgData.csv"
+        )
+        credits_audit = validate_credits(
+            ROOT
+            / "SampleData"
+            / "EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv",
+            registry_rows,
+        )
+
+        self.assertEqual(org_audit["missingOptionalAttributes"], [])
+        self.assertEqual(org_audit["warning"], "")
+        self.assertEqual(
+            credits_audit["matchedRegistryCreditIds"],
+            ["f1d40245-f319-4e2d-8023-9e7b6f6456ac"],
+        )
+        self.assertEqual(credits_audit["warning"], "")
+
+    def test_rejects_local_files_in_service_refresh_mode(self):
+        with self.assertRaisesRegex(ValueError, "not supported"):
+            build_package(
+                SOURCE,
+                Path("unused.pbit"),
+                "https://orgexample.crm.dynamics.com",
+                mode="service-refresh",
+                org_data_file=ROOT / "SampleData" / "OrgData.csv",
+            )
+
+    def test_accepts_multiple_rules_for_one_customer_topic(self):
+        rules = [
+            {
+                "Locale": "en",
+                "Vertical": "HR",
+                "CanonicalTopic": "Payroll Help",
+                "Keywords": "pay statement",
+                "Exclusions": "",
+                "Priority": 120,
+            },
+            {
+                "Locale": "en",
+                "Vertical": "HR",
+                "CanonicalTopic": "Payroll Help",
+                "Keywords": "salary correction",
+                "Exclusions": "",
+                "Priority": 120,
+            },
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "customer-topic-overrides.json"
+            path.write_text(json.dumps(rules), encoding="utf-8")
+
+            serialized, audit = validate_topic_overrides(path)
+
+        self.assertEqual(json.loads(serialized), rules)
+        self.assertEqual(audit["enabledRules"], 2)
+
+    def test_cli_output_is_ascii_safe_for_unicode_paths(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "客户" / "service-refresh.pbit"
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "tools" / "build_service_refresh_template.py"),
+                    "--mode",
+                    "service-refresh",
+                    "--input",
+                    str(SOURCE),
+                    "--environment-url",
+                    "https://orgexample.crm.dynamics.com",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                env={**os.environ, "PYTHONIOENCODING": "cp1252"},
+            )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertTrue(completed.stdout.isascii())
+        self.assertEqual(
+            json.loads(completed.stdout.decode("ascii"))["output"],
+            str(output.resolve()),
+        )
 
 
 if __name__ == "__main__":

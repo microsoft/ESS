@@ -3,7 +3,7 @@ Locale,Vertical,CanonicalTopic,Keywords,Exclusions,Priority
 *,IT,IT Ticketing & Incidents,it ticket|support ticket|service ticket|ticket|tickets|incident|incidents|service desk|help desk|helpdesk|servicenow|service now|open tickets|my tickets,,95
 *,IT,Accounts & Password,password|passkey|password reset|reset my password|unlock account|locked out|mfa|multi-factor authentication|authenticator|sign in|signin|login|credentials,,90
 *,IT,Access & Permissions,request access|grant access|permissions|permission|admin rights|security group|distribution group|shared drive access|application access,,86
-*,IT,Enterprise Apps & Systems,workday|concur|sap|oracle|ariba|virtual desktop|power platform|copilot studio|enterprise application,,82
+*,IT,Enterprise Apps & Systems,workday|concur|sap|oracle|virtual desktop|power platform|copilot studio|enterprise application,,82
 *,IT,Software & Downloads,software|application install|install application|install software|software license|application license|download software|microsoft 365|office 365|adobe|docusign,,78
 *,IT,Device & Hardware,laptop|desktop computer|computer replacement|monitor|printer|keyboard|mouse|headset|webcam|hardware|company phone|mobile device|intune|company portal,,80
 *,IT,Network & Connectivity,vpn|wifi|wi-fi|network connection|internet connection|proxy|remote access|network outage|connectivity,,80
@@ -11,8 +11,9 @@ Locale,Vertical,CanonicalTopic,Keywords,Exclusions,Priority
 *,HR,Benefits & Retirement,benefits|health insurance|medical plan|dental plan|vision plan|insurance coverage|401k|pension|hsa|fsa|open enrollment|beneficiary|cobra,,90
 *,HR,Disability & Leave of Absence,short term disability|long term disability|leave of absence|fmla|workers compensation|workers comp|jury duty|bereavement leave,,88
 *,HR,Payroll & Compensation,payroll|paycheck|pay date|payday|salary|direct deposit|w-2|w2|paystub|pay stub|compensation|bonus|tax withholding,,88
-*,HR,Time Off & Attendance,pto|vacation|holiday|sick day|sick leave|time off|annual leave|attendance|timesheet|time sheet|time entry|parental leave|maternity leave|paternity leave,,86
-*,HR,Policy & Handbook,hr policy|employee policy|handbook|code of conduct|remote work policy|dress code|employment verification|company policy,,74
+*,HR,Time Off & Attendance,pto|vacation|holiday|holidays|sick day|sick leave|time off|annual leave|attendance|timesheet|time sheet|time entry|parental leave|maternity leave|paternity leave,,86
+*,HR,Personal Information & Profile,home address|mailing address|update my address|change my address|personal details|employee profile|contact information,,84
+*,HR,Policy & Handbook,hr policy|employee policy|handbook|remote work policy|dress code|employment verification|company policy,,74
 *,HR,Onboarding & Offboarding,onboarding|new hire|orientation|first day|offboarding|resignation|last day|exit process|termination process,,80
 *,HR,Learning & Development,training|course|learning|mentorship|tuition reimbursement|education reimbursement|professional development|certification program,,72
 *,HR,Recruiting & Referrals,employee referral|job posting|open position|recruiting|resume|candidate|hiring process,,68
@@ -24,8 +25,8 @@ Locale,Vertical,CanonicalTopic,Keywords,Exclusions,Priority
 *,Finance,Project & Billing Codes,billing code|charge code|project code|phase and task|rate code|rate sheet|project cost|billing category,,78
 *,Finance,Expenses & Reimbursement,expense|expenses|expense report|reimbursement|receipt|mileage|corporate card|company credit card|per diem,,86
 *,Finance,Procurement & Vendors,procurement|purchase order|purchase orders|po|ariba|vendor|supplier|requisition|purchasing|invoice approval,,88
-*,Finance,Travel,travel booking|travel policy|business travel|flight|hotel booking|rental car|itinerary|per diem|visa,,76
-*,Finance,Accounting & Tax,accounting|tax form|w-9|w9|invoice|accounts payable|accounts receivable|certificate of insurance,,70
+*,Finance,Travel,travel booking|travel policy|business travel|flight|hotel booking|rental car|itinerary|visa,,76
+*,Finance,Accounting & Tax,accounting|tax form|w-9|w9|invoice|accounts payable|accounts receivable,,70
 *,Legal,Contracts & Agreements,contract|agreement|nda|confidentiality agreement|clause|change order|proposal review|signature request,,80
 *,Legal,Insurance & Certifications,professional liability|additional insured|liability policy|certificate of insurance|state certification|licensed to work,,74
 *,Legal,Compliance & Ethics,anti-corruption|ethics|code of conduct|compliance|legal hold|governance|conflict of interest,,72

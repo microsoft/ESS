@@ -219,26 +219,30 @@ def build_classifier() -> str:
                         ),
                         hits = List.Select(keywords, each ContainsTerm(normalizedText, _, language)),
                         excluded = List.AnyTrue(List.Transform(exclusions, each ContainsTerm(normalizedText, _, language))),
-                        score = if excluded then 0 else List.Sum(List.Transform(hits, each TermWeight(_, language)))
+                        score = if excluded then 0 else List.Sum(List.Transform(hits, each TermWeight(_, language))),
+                        sourceRank = if rule[RuleSource] = "Customer" then 1 else 0
                     in
-                        [Rule = rule, Hits = hits, Score = score]
+                        [Rule = rule, Hits = hits, Score = score, SourceRank = sourceRank]
             ),
             positiveRules = List.Select(scoredRules, each [Score] > 0),
             sortedRules = List.Sort(
                 positiveRules,
                 (left, right) =>
-                    if left[Score] > right[Score] then -1
+                    if left[SourceRank] > right[SourceRank] then -1
+                    else if left[SourceRank] < right[SourceRank] then 1
+                    else if left[Score] > right[Score] then -1
                     else if left[Score] < right[Score] then 1
                     else if left[Rule][Priority] > right[Rule][Priority] then -1
                     else if left[Rule][Priority] < right[Rule][Priority] then 1
                     else Value.Compare(left[Rule][CanonicalTopic], right[Rule][CanonicalTopic])
             ),
             top = List.First(sortedRules, null),
+            topSourceRank = if top = null then null else top[SourceRank],
             topScore = if top = null then 0 else top[Score],
             topPriority = if top = null then null else top[Rule][Priority],
             tiedRules = if top = null then {{}} else List.Select(
                 sortedRules,
-                each [Score] = topScore and [Rule][Priority] = topPriority
+                each [SourceRank] = topSourceRank and [Score] = topScore and [Rule][Priority] = topPriority
             ),
             tiedTopics = List.Distinct(List.Transform(
                 tiedRules,
@@ -265,7 +269,7 @@ def build_classifier() -> str:
                     Confidence = 1.0,
                     Ambiguous = false,
                     Language = language,
-                    RuleSource = null,
+                    RuleSource = "",
                     ClassifierVersion = ClassifierVersion
                 ]
                 else if chosen = null then [
@@ -279,7 +283,7 @@ def build_classifier() -> str:
                     Confidence = confidence,
                     Ambiguous = ambiguous,
                     Language = language,
-                    RuleSource = null,
+                    RuleSource = "",
                     ClassifierVersion = ClassifierVersion
                 ]
                 else [

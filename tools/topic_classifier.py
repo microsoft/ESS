@@ -94,7 +94,8 @@ def classify(prompt: str | None, locale: str | None, rules: list[dict]) -> dict:
         excluded = any(contains_term(text, term, language) for term in exclusions)
         score = 0 if excluded else sum(term_weight(term, language) for term in hits)
         if score:
-            scored.append((score, int(rule["Priority"]), rule, hits))
+            source_rank = 1 if rule.get("RuleSource") == "Customer" else 0
+            scored.append((source_rank, score, int(rule["Priority"]), rule, hits))
 
     if not scored:
         return _result(
@@ -104,12 +105,16 @@ def classify(prompt: str | None, locale: str | None, rules: list[dict]) -> dict:
             source="uncategorized",
         )
 
-    scored.sort(key=lambda item: (-item[0], -item[1], item[2]["CanonicalTopic"]))
-    top_score, top_priority = scored[0][0], scored[0][1]
-    tied = [item for item in scored if item[0] == top_score and item[1] == top_priority]
-    tied_topics = {(item[2]["Vertical"], item[2]["CanonicalTopic"]) for item in tied}
+    scored.sort(key=lambda item: (-item[0], -item[1], -item[2], item[3]["CanonicalTopic"]))
+    top_source_rank, top_score, top_priority = scored[0][0], scored[0][1], scored[0][2]
+    tied = [
+        item
+        for item in scored
+        if item[0] == top_source_rank and item[1] == top_score and item[2] == top_priority
+    ]
+    tied_topics = {(item[3]["Vertical"], item[3]["CanonicalTopic"]) for item in tied}
     if len(tied_topics) > 1:
-        terms = sorted({term for item in tied for term in item[3]})
+        terms = sorted({term for item in tied for term in item[4]})
         return _result(
             topic="Other / Uncategorized",
             vertical="Unknown",
@@ -121,7 +126,7 @@ def classify(prompt: str | None, locale: str | None, rules: list[dict]) -> dict:
             source="uncategorized",
         )
 
-    _, _, rule, hits = scored[0]
+    _, _, _, rule, hits = scored[0]
     confidence = 0.98 if top_score >= 6 else 0.93 if top_score >= 4 else 0.85 if top_score >= 2 else 0.70
     rule_source = rule.get("RuleSource", "BuiltIn")
     version = CLASSIFIER_VERSION + ("+CUSTOMER" if rule_source == "Customer" else "")

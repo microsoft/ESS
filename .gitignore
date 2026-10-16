@@ -34,3 +34,7 @@ Original Templates/
 Updated Template/
 tools/__pycache__/
 *.pyc
+Generated Templates/
+How2Demo/
+Topic-Tuner-Validation/
+ESS Dashboard - Dynamic Topics (Dataverse) V21 - *.pbit
