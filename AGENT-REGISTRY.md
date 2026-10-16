@@ -165,14 +165,19 @@ Only CSV V18 requires this manual conversion to `agent-registry.json`. Dataverse
 2. Press **Alt+D** to select the File Explorer address bar. The complete folder path should become highlighted.
 3. Type `powershell.exe` exactly, including `.exe`, and press **Enter**. Do not use the search box or select an address suggestion.
 4. Confirm that a PowerShell terminal window opens and its prompt ends with `\ESS-main>`.
-5. Confirm Python and the script path:
+5. Confirm Python and the script path by running these commands **one at a time**, pressing **Enter** after each command:
 
 ```powershell
 python --version
+```
+
+The result must be `Python 3.10` or later.
+
+```powershell
 Test-Path .\tools\agent_registry.py
 ```
 
-Python 3.10 or later is sufficient, `Test-Path` must return `True`, and no packages need to be installed. If `python` is not recognized, install Python from [python.org](https://www.python.org/downloads/windows/), select **Add Python to PATH**, reopen PowerShell, and retry.
+The result must be `True`. No packages need to be installed. If `python` is not recognized, install Python from [python.org](https://www.python.org/downloads/windows/), select **Add Python to PATH**, reopen PowerShell, and retry.
 
 6. Run:
 
