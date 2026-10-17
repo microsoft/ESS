@@ -80,7 +80,7 @@ If Copilot Studio Monitor also provides a reaction export, save that CSV in the 
 
 The guided setup filters, deduplicates, validates, and embeds matching rows locally. Product Feedback requires an approved registry match. A Monitor reaction uses a registry Bot/Agent ID when present; otherwise the report includes it only after its exported Conversation ID matches one exact loaded conversation. Rows with neither form of identity are excluded.
 
-If the report will be published, follow [Publish only if needed](SETUP-Dataverse.md#action-3---publish-only-if-needed) after the Desktop result is correct.
+If the report will be published, follow [Build and publish the Service report](SETUP-Dataverse.md#action-3---build-and-publish-the-service-report) after the Desktop result is correct.
 
 ### CSV V18 or Fabric V2
 

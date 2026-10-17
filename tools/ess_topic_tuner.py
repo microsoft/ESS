@@ -3,10 +3,18 @@ import csv
 import hashlib
 import json
 import re
+import subprocess
 import sys
+import tempfile
 from collections import Counter, defaultdict
+from itertools import product
 from pathlib import Path
 
+from build_service_refresh_template import validate_topic_overrides
+from guided_dataverse_setup import (
+    DEFAULT_SETTINGS, GENERATED_DIR, PREPARED_FEEDBACK, SOURCE_TEMPLATE, TOPIC_OUTPUT_NAME,
+    feedback_output_paths, load_settings, reject_output_collisions, setup_input_paths,
+)
 from topic_classifier import (
     CLASSIFIER_VERSION,
     RULE_COLUMNS,
@@ -15,10 +23,17 @@ from topic_classifier import (
     language_prefix,
     load_rules,
     normalize,
+    rule_locale,
 )
 
 
 TUNER_VERSION = "ESS-TOPIC-TUNER-2026.12"
+PRODUCT_TRUTH = (
+    "This local tool learns terminology from usable native Copilot Studio topic evidence.\n"
+    "It cannot invent authoritative business topics from unlabeled conversations, even 500 of them.\n"
+    "Repeated unlabeled phrases need customer review. Weak or ambiguous rules stay disabled.\n"
+    "Native topics remain authoritative; not every unclassified conversation will receive a topic."
+)
 OVERRIDE_COLUMNS = (
     "Enabled",
     *RULE_COLUMNS,
@@ -64,6 +79,14 @@ NON_LEARNABLE_NATIVE_TOPICS = {
     "unknownintent",
 }
 TRUE_VALUES = {"1", "true", "yes", "y"}
+ENGLISH_NOUN_FORMS = {
+    "ticket": "tickets", "request": "requests", "day": "days",
+    "account": "accounts", "device": "devices", "invoice": "invoices",
+    "expense": "expenses", "policy": "policies", "benefit": "benefits",
+    "password": "passwords", "document": "documents", "laptop": "laptops",
+    "printer": "printers", "holiday": "holidays",
+}
+ENGLISH_SINGULARS = {plural: singular for singular, plural in ENGLISH_NOUN_FORMS.items()}
 STOPWORDS = {
     "en": {
         "about", "after", "again", "also", "been", "before", "being", "book", "can", "change", "could",
@@ -96,13 +119,22 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Analyze ESS transcripts locally, learn high-precision customer rules from native topic evidence, "
-            "and create privacy-reduced review candidates for remaining gaps."
+            "and create privacy-reduced review candidates for remaining gaps. " + PRODUCT_TRUTH
         )
     )
-    parser.add_argument("--input", type=Path, required=True, help="Raw transcript CSV or flat session CSV.")
+    parser.add_argument("--input", type=Path, help="Raw transcript CSV or flat session CSV.")
     parser.add_argument("--taxonomy", type=Path, default=default_taxonomy)
     parser.add_argument("--overrides", type=Path, help="Previously reviewed customer-topic-overrides.csv.")
-    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path)
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument("--apply", type=Path, help="Apply non-empty approved JSON using saved Dataverse setup choices.")
+    action.add_argument("--review", type=Path, help="Validate the reviewed CSV, export enabled rules, and apply them.")
+    parser.add_argument("--settings-file", type=Path, default=DEFAULT_SETTINGS)
+    parser.add_argument("--template-output", type=Path, help="Optional destination for the new Desktop Validation PBIT.")
+    parser.add_argument("--no-open", action="store_true", help="Build without opening Power BI Desktop.")
+    parser.add_argument("--non-interactive", action="store_true", help="Never prompt for customer review; print a recovery command instead.")
+    parser.add_argument("--analyze-only", action="store_true", help="Generate rules without building a Dataverse template.")
+    parser.add_argument("--json", action="store_true", help="Print the machine-readable analysis summary instead of customer guidance.")
     parser.add_argument("--input-format", choices=("auto", "transcript", "flat"), default="auto")
     parser.add_argument("--prompt-column")
     parser.add_argument("--locale-column")
@@ -139,7 +171,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--hash-salt", default="")
     parser.add_argument("--skip-invalid", action="store_true")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if (args.json or args.analyze_only) and (args.apply or args.review):
+        parser.error("--json and --analyze-only cannot be combined with --apply or --review.")
+    if args.json:
+        args.analyze_only = True
+    if not (args.apply or args.review) and (args.input is None or args.output_dir is None):
+        parser.error("Analysis requires --input and --output-dir.")
+    return args
 
 
 def read_csv(path: Path) -> tuple[list[str], list[dict]]:
@@ -485,6 +524,8 @@ def extract_terms(value: str, language: str) -> list[str]:
         for token in re.findall(r"[^\W\d_]+", value.lower(), flags=re.UNICODE)
         if len(token) <= 40
     ]
+    if language == "en":
+        tokens = [ENGLISH_SINGULARS.get(token, token) for token in tokens]
     stopwords = STOPWORDS.get(language, set())
 
     def meaningful(token: str) -> bool:
@@ -497,6 +538,33 @@ def extract_terms(value: str, language: str) -> list[str]:
             if meaningful(phrase_tokens[0]) and meaningful(phrase_tokens[-1]):
                 terms.append(" ".join(phrase_tokens))
     return terms
+
+
+def customer_match_text(value: str, language: str) -> str:
+    tokens = normalize(value).split()
+    if language == "en":
+        tokens = [ENGLISH_SINGULARS.get(token, token) for token in tokens]
+    return " ".join(tokens)
+
+
+def expand_customer_terms(value: str, language: str) -> str:
+    expanded = []
+    for term in value.split("|"):
+        normalized_term = normalize(term)
+        if not normalized_term:
+            continue
+        if language != "en":
+            expanded.append(normalized_term)
+            continue
+        options = []
+        for token in normalized_term.split():
+            singular = ENGLISH_SINGULARS.get(token, token)
+            options.append((singular, ENGLISH_NOUN_FORMS[singular])
+                           if singular in ENGLISH_NOUN_FORMS else (token,))
+        if sum(len(choices) > 1 for choices in options) > 6:
+            raise ValueError("Use shorter keyword/exclusion phrases: at most six inflecting nouns per phrase are supported.")
+        expanded.extend(" ".join(words) for words in product(*options))
+    return "|".join(dict.fromkeys(expanded))
 
 
 def build_term_indexes(
@@ -735,7 +803,7 @@ def learn_native_topic_rules(
                     "locale": str(example.get("locale") or ""),
                     "language": language,
                     "native_topic": topic,
-                    "normalized_text": normalize(redacted),
+                    "normalized_text": customer_match_text(redacted, language),
                     "terms": terms,
                 }
             )
@@ -746,7 +814,7 @@ def learn_native_topic_rules(
 
     existing_topic_keys = {
         (
-            str(row.get("Locale") or "*").strip().lower() or "*",
+            rule_locale(row.get("Locale")),
             normalize(row.get("CanonicalTopic")),
         )
         for row in existing_override_rows
@@ -935,7 +1003,44 @@ def read_override_rows(path: Path | None) -> list[dict]:
 
 
 def approved_rules(path: Path | None) -> list[dict]:
-    return load_rules(path, enabled_only=True, rule_source="Customer") if path else []
+    return rules_from_override_rows(read_override_rows(path))
+
+
+def saved_override_rows(settings_file: Path) -> list[dict]:
+    stored = load_settings(settings_file)
+    if stored is None or not stored.topic_overrides_json:
+        return []
+    path = Path(stored.topic_overrides_json)
+    try:
+        payload, validation = validate_topic_overrides(path, canonicalize=False)
+        if not validation["enabledRules"]:
+            raise ValueError("The saved approved-rule list is empty.")
+        rules = json.loads(payload)
+        rules_from_override_rows([{**row, "Enabled": "true"} for row in rules])
+    except (OSError, ValueError) as error:
+        raise ValueError(f"Saved topic rules {path} are missing or invalid: {error}") from error
+    return [{**rule, "Enabled": "true", "ReviewStatus": "PreviouslyApproved"} for rule in rules]
+
+
+def customer_rule_key(rule: dict) -> tuple:
+    locale = rule_locale(rule.get("Locale"))
+    terms = [
+        tuple(sorted({normalize(term) for term in expand_customer_terms(str(rule.get(column) or ""), language_prefix(locale)).split("|")
+                      if normalize(term)}))
+        for column in ("Keywords", "Exclusions")
+    ]
+    return locale, *terms
+
+
+def merge_customer_rules(saved: list[dict], explicit: list[dict], learned: list[dict]) -> list[dict]:
+    merged = {}
+    for group in (learned, saved, explicit):
+        preferred = {}
+        for rule in sorted(group, key=lambda item: (-int(item["Priority"]), str(item["CanonicalTopic"]).casefold(),
+                                                   str(item["Vertical"]).casefold(), tuple(str(item[column]) for column in RULE_COLUMNS))):
+            preferred.setdefault(customer_rule_key(rule), rule)
+        merged.update(preferred)
+    return [merged[key] for key in sorted(merged)]
 
 
 def rules_from_override_rows(rows: list[dict]) -> list[dict]:
@@ -953,13 +1058,16 @@ def rules_from_override_rows(rows: list[dict]) -> list[dict]:
             priority = int(row.get("Priority") or "")
         except (TypeError, ValueError) as error:
             raise ValueError("Enabled override row has an invalid Priority") from error
+        keywords = expand_customer_terms(str(row["Keywords"]).strip(), rule_locale(row.get("Locale")))
+        if not keywords:
+            raise ValueError("Enabled override row has no Keywords after normalization")
         rules.append(
             {
-                "Locale": str(row.get("Locale") or "*").strip().lower() or "*",
+                "Locale": rule_locale(row.get("Locale")),
                 "Vertical": str(row["Vertical"]).strip(),
                 "CanonicalTopic": str(row["CanonicalTopic"]).strip(),
-                "Keywords": str(row["Keywords"]).strip(),
-                "Exclusions": str(row.get("Exclusions") or "").strip(),
+                "Keywords": keywords,
+                "Exclusions": expand_customer_terms(str(row.get("Exclusions") or "").strip(), language_prefix(row.get("Locale")) or "*"),
                 "Priority": priority,
                 "RuleSource": "Customer",
             }
@@ -975,8 +1083,191 @@ def write_csv(path: Path, rows: list[dict], fieldnames: tuple[str, ...]) -> None
         writer.writerows(rows)
 
 
+def next_command(args: argparse.Namespace, action: str, path: Path) -> str:
+    command = [sys.executable, str(Path(__file__).resolve()), action, str(path.resolve())]
+    if args.settings_file != DEFAULT_SETTINGS:
+        command.extend(("--settings-file", str(args.settings_file.resolve())))
+    if args.template_output:
+        command.extend(("--template-output", str(args.template_output.resolve())))
+    if args.no_open:
+        command.append("--no-open")
+    return "& " + " ".join("'" + value.replace("'", "''") + "'" for value in command)
+
+
+def workflow_outcome(report: dict, rows: list[dict], args: argparse.Namespace) -> dict:
+    enabled = report["enabledCustomerRulesWritten"]
+    pending = sum(str(row.get("Enabled") or "").strip().lower() not in TRUE_VALUES for row in rows)
+    outcome = {"approvedRules": enabled, "reviewItems": pending}
+    if report.get("publicationRequired", report.get("newOrUpdatedApprovedRules", enabled)):
+        outcome.update(
+            status="ready",
+            message=f"READY: {enabled} approved rule(s) can be applied. Disabled items are not included.",
+        )
+        if args.analyze_only:
+            outcome["action"] = next_command(args, "--apply", tuner_output_paths(args.output_dir)["rules"])
+    elif pending:
+        reason = (
+            "No usable native topic evidence was found; repeated phrases have no authoritative business label."
+            if not report["nativeTopicTrainingExamples"]
+            else "The terminology is ambiguous or did not meet the automatic validation gates."
+        )
+        review = tuner_output_paths(args.output_dir)["review"]
+        outcome.update(
+            status="review-required",
+            message="REVIEW REQUIRED: No rules are ready yet. " + reason,
+            reviewFile=str(review.resolve()),
+            action=next_command(args, "--review", review),
+        )
+    else:
+        if report["ambiguousRows"]:
+            reason = "Ambiguous matches cannot be labeled safely. Gather distinct native-labeled examples for each meaning."
+        elif not report["uncategorizedRowsAnalyzed"]:
+            reason = "No unclassified rows remain to analyze. Existing native or built-in topics already cover this export."
+        elif not report["nativeTopicTrainingExamples"]:
+            reason = "No usable native topic evidence and insufficient repeated unresolved phrases were found. Gather repeated native-labeled examples and matching unresolved conversations."
+        else:
+            reason = "Insufficient repeated evidence was found. Gather more distinct conversations with consistent native topic evidence."
+        outcome.update(status="stop", message="STOP: No useful customer rules were produced. Keep the existing template unchanged. " + reason)
+    return outcome
+
+
+def print_outcome(outcome: dict) -> None:
+    print("\n" + outcome["message"])
+    if outcome["status"] == "review-required":
+        print("Review only this file: " + outcome["reviewFile"])
+        print("Fill in Vertical and CanonicalTopic; adjust Keywords or Exclusions if needed.")
+        print("Set Enabled=true only for rules you approve; leave unsafe or ambiguous rows disabled.")
+        print("Save and close the CSV. If finishing later, use this recovery command:")
+    elif outcome["status"] == "ready":
+        if "action" in outcome:
+            print("Analysis only. Run this command when you want to apply the rules:")
+        else:
+            print("Building a new Desktop Validation PBIT automatically using saved setup choices.")
+        print("Do not import the JSON or enter its path in Power BI. Its contents will be embedded.")
+    if "action" in outcome:
+        print(outcome["action"])
+        print("Do not import the JSON or enter its path in Power BI. Rules are embedded in the new template.")
+    elif outcome["status"] == "stop":
+        print("Do not import the empty JSON. No template was created or changed.")
+
+
+def tuner_output_paths(output_dir: Path) -> dict[str, Path]:
+    return {
+        "enrichment": output_dir / "topic-enrichment.csv",
+        "classification_audit": output_dir / "classification-audit.csv",
+        "learning_audit": output_dir / "topic-learning-audit.csv",
+        "review": output_dir / "customer-topic-overrides.csv",
+        "rules": output_dir / "customer-topic-overrides.json",
+        "privacy_report": output_dir / "privacy-report.json",
+    }
+
+
+def validate_tuner_output(args: argparse.Namespace, *additional_inputs: Path) -> Path:
+    output = args.template_output or GENERATED_DIR / TOPIC_OUTPUT_NAME
+    stored = load_settings(args.settings_file)
+    protected = [SOURCE_TEMPLATE, args.settings_file, *setup_input_paths(stored), *additional_inputs]
+    protected.extend(getattr(args, name, None) for name in ("input", "taxonomy", "overrides", "apply", "review"))
+    output_dir = getattr(args, "output_dir", None)
+    artifact_directories = set()
+    if output_dir is not None:
+        artifact_directories.add(Path(output_dir).resolve())
+    for action_name in ("apply", "review"):
+        action_path = getattr(args, action_name, None)
+        if action_path is not None:
+            artifact_directories.add(Path(action_path).resolve().parent)
+    for artifact_directory in artifact_directories:
+        protected.extend(tuner_output_paths(artifact_directory).values())
+    prepared_outputs = feedback_output_paths(PREPARED_FEEDBACK)
+    reject_output_collisions(output, [*prepared_outputs, *protected])
+    if stored is not None and stored.feedback_input_files:
+        for destination in prepared_outputs:
+            reject_output_collisions(destination, [output, *protected])
+    return output
+
+
+def apply_dataverse_rules(path: Path, args: argparse.Namespace) -> int:
+    output = validate_tuner_output(args, path)
+    _, validation = validate_topic_overrides(path)
+    if not validation["enabledRules"]:
+        raise ValueError("No approved rules are available. Keep the existing template unchanged; do not import the empty JSON.")
+    settings = args.settings_file.resolve()
+    stored = load_settings(settings)
+    if stored is None or not stored.environment_url:
+        raise ValueError("No saved Dataverse setup was found. Complete START-HERE-DATAVERSE.cmd for the baseline report first, then retry this action.")
+    command = [
+        sys.executable, str(Path(__file__).with_name("guided_dataverse_setup.py")),
+        "--mode", "desktop-validation", "--non-interactive",
+        "--settings-file", str(settings), "--topic-overrides-json", str(path.resolve()),
+        "--output", str(output.resolve()), "--no-open" if args.no_open else "--open",
+    ]
+    print(f"Applying {validation['enabledRules']} approved rule(s) using saved Dataverse choices.", flush=True)
+    return subprocess.run(command, check=False).returncode
+
+
+def review_and_apply(path: Path, args: argparse.Namespace) -> int:
+    validate_tuner_output(args, path)
+    rules = rules_from_override_rows(read_override_rows(path))
+    if not rules:
+        print("STOP: No approved rules are available. Keep the existing template unchanged. Leave unsafe rows disabled.")
+        return 0
+    output = None
+    applied = False
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix="approved-", suffix=".json",
+                                         dir=path.parent, delete=False) as candidate:
+            output = Path(candidate.name)
+            json.dump([{column: rule[column] for column in RULE_COLUMNS} for rule in rules], candidate,
+                      ensure_ascii=False, separators=(",", ":"))
+            candidate.write("\n")
+        result = apply_dataverse_rules(output, args)
+        applied = result == 0
+        if not applied:
+            print("ERROR: Reviewed rules could not be activated; the template build or commit failed.", file=sys.stderr)
+        return result
+    finally:
+        if output is not None and not applied:
+            try:
+                stored = load_settings(args.settings_file)
+            except (OSError, ValueError):
+                print(f"ERROR: Cannot verify saved settings; candidate retained for recovery: {output}", file=sys.stderr)
+            else:
+                if stored and stored.topic_overrides_json and Path(stored.topic_overrides_json).resolve() == output.resolve():
+                    print(f"ERROR: Saved settings still reference candidate rules; retained for recovery: {output}", file=sys.stderr)
+                else:
+                    output.unlink(missing_ok=True)
+
+
+def finish_analysis(outcome: dict, args: argparse.Namespace) -> int:
+    if args.analyze_only:
+        return 0
+    if outcome["status"] == "ready":
+        return apply_dataverse_rules(tuner_output_paths(args.output_dir)["rules"], args)
+    if outcome["status"] == "review-required" and not args.non_interactive and sys.stdin.isatty():
+        print("You can finish review in this session; another run is not needed.")
+        try:
+            answer = input("Edit, save and close the review CSV. Press Enter to validate and build, or type skip to leave the template unchanged: ")
+        except EOFError:
+            print("No review response received. Template unchanged. Use the printed review command later.")
+            return 0
+        if not answer.strip():
+            return review_and_apply(Path(outcome["reviewFile"]), args)
+        print("Template unchanged. You can use the printed review command later.")
+    return 0
+
+
 def main() -> int:
     args = parse_args()
+    if sys.version_info < (3, 10):
+        raise ValueError("Python 3.10 or later is required.")
+    validate_tuner_output(args)
+    if args.apply:
+        return apply_dataverse_rules(args.apply, args)
+    if args.review:
+        return review_and_apply(args.review, args)
+    saved_rows = saved_override_rows(args.settings_file)
+    published_rules = [{column: row[column] for column in RULE_COLUMNS} for row in saved_rows]
+    if not args.json:
+        print(PRODUCT_TRUTH, flush=True)
     if args.min_frequency < 2:
         raise ValueError("--min-frequency must be at least 2 to suppress unique or rare phrases")
     if args.max_candidates < 1:
@@ -991,8 +1282,15 @@ def main() -> int:
         raise ValueError("--min-validation-conversations must be positive")
 
     built_in_rules = load_rules(args.taxonomy)
-    existing_override_rows = read_override_rows(args.overrides)
-    approved_customer_rules = approved_rules(args.overrides)
+    explicit_rows = read_override_rows(args.overrides)
+    saved_rules = rules_from_override_rows(saved_rows)
+    approved_customer_rules = merge_customer_rules(saved_rules, rules_from_override_rows(explicit_rows), [])
+    approved_metadata = {customer_rule_key(row): row for row in saved_rows + explicit_rows
+                         if str(row.get("Enabled") or "").strip().lower() in TRUE_VALUES}
+    existing_override_rows = [
+        {**approved_metadata[customer_rule_key(rule)], **rule, "Enabled": "true"}
+        for rule in approved_customer_rules
+    ] + [row for row in explicit_rows if str(row.get("Enabled") or "").strip().lower() not in TRUE_VALUES]
     records, input_stats = load_input(args)
     learned_rows, learned_rules, learning_audit, learning_pii_counts = learn_native_topic_rules(
         records,
@@ -1004,7 +1302,7 @@ def main() -> int:
         validation_folds=args.validation_folds,
         min_validation_conversations=args.min_validation_conversations,
     )
-    customer_rules = approved_customer_rules + learned_rules
+    customer_rules = merge_customer_rules(saved_rules, rules_from_override_rows(explicit_rows), learned_rules)
     all_rules = customer_rules + built_in_rules
     enrichments, audits, uncategorized = classify_records(records, all_rules, args.hash_salt)
     candidates, candidate_pii_counts = candidate_terms(
@@ -1021,24 +1319,42 @@ def main() -> int:
         if normalize(term)
     }
     candidates = [row for row in candidates if normalize(row["Keywords"]) not in existing_keywords]
-    override_rows = existing_override_rows + learned_rows + candidates
+    approved_metadata = {customer_rule_key(row): row for row in learned_rows + existing_override_rows
+                         if str(row.get("Enabled") or "").strip().lower() in TRUE_VALUES}
+    override_rows = [
+        {**approved_metadata[customer_rule_key(rule)], **rule, "Enabled": "true"}
+        for rule in customer_rules
+    ] + [row for row in existing_override_rows + learned_rows
+         if str(row.get("Enabled") or "").strip().lower() not in TRUE_VALUES] + candidates
+    override_rows = [
+        {**{column: row.get(column, "") for column in OVERRIDE_COLUMNS},
+         **{column: expand_customer_terms(str(row.get(column) or ""), language_prefix(row.get("Locale")) or "*")
+                   for column in ("Keywords", "Exclusions")}}
+        for row in override_rows
+    ]
 
     output_dir = args.output_dir
-    write_csv(output_dir / "topic-enrichment.csv", enrichments, tuple(enrichments[0].keys()) if enrichments else (
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if any(output_dir.iterdir()):
+        output_dir = Path(tempfile.mkdtemp(prefix="run-", dir=output_dir))
+    args.output_dir = output_dir
+    validate_tuner_output(args)
+    outputs = tuner_output_paths(output_dir)
+    write_csv(outputs["enrichment"], enrichments, tuple(enrichments[0].keys()) if enrichments else (
         "ConversationHash", "Topic", "Vertical", "Language", "Confidence", "Source", "RuleSource", "ClassifierVersion"
     ))
-    write_csv(output_dir / "classification-audit.csv", audits, tuple(audits[0].keys()) if audits else (
+    write_csv(outputs["classification_audit"], audits, tuple(audits[0].keys()) if audits else (
         "ConversationHash", "NativeTopic", "PredictedTopic", "PredictedVertical", "Language", "MatchedTerms",
         "MatchScore", "Confidence", "Ambiguous", "Source", "RuleSource", "ClassifierVersion"
     ))
-    write_csv(output_dir / "topic-learning-audit.csv", learning_audit, LEARNING_AUDIT_COLUMNS)
-    write_csv(output_dir / "customer-topic-overrides.csv", override_rows, OVERRIDE_COLUMNS)
+    write_csv(outputs["learning_audit"], learning_audit, LEARNING_AUDIT_COLUMNS)
+    write_csv(outputs["review"], override_rows, OVERRIDE_COLUMNS)
 
     public_rules = [
         {column: rule[column] for column in RULE_COLUMNS}
         for rule in customer_rules
     ]
-    (output_dir / "customer-topic-overrides.json").write_text(
+    outputs["rules"].write_text(
         json.dumps(public_rules, ensure_ascii=False, separators=(",", ":")) + "\n",
         encoding="utf-8",
     )
@@ -1058,9 +1374,12 @@ def main() -> int:
         "classificationCounts": dict(sorted(source_counts.items())),
         "languageCounts": dict(sorted(language_counts.items())),
         "uncategorizedRowsAnalyzed": len(uncategorized),
+        "ambiguousRows": sum(row["Ambiguous"] for row in audits),
         "minimumCandidateFrequency": args.min_frequency,
         "candidateRulesGenerated": len(candidates),
         "approvedCustomerRules": len(approved_customer_rules),
+        "newOrUpdatedApprovedRules": sum(rule not in published_rules for rule in public_rules),
+        "publicationRequired": public_rules != published_rules,
         "nativeTopicTrainingExamples": sum(
             is_learnable_native_topic(example.get("native_topic"))
             for record in records
@@ -1089,12 +1408,16 @@ def main() -> int:
             "repeated business-sensitive terms. Keep outputs inside the customer environment and review before sharing."
         ),
     }
-    (output_dir / "privacy-report.json").write_text(
+    report["outcome"] = workflow_outcome(report, override_rows, args)
+    outputs["privacy_report"].write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0
+    if args.json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print_outcome(report["outcome"])
+    return finish_analysis(report["outcome"], args)
 
 
 if __name__ == "__main__":

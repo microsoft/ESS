@@ -7,8 +7,8 @@ Dataverse Direct reads the `ConversationTranscript` table through the Dataverse 
 ## Three customer actions
 
 1. **Prepare access and copy the URL.** Confirm transcript capture and read access, then copy the Dataverse Environment URL.
-2. **Run the guided setup and validate the report.** Start with the URL only to isolate access errors, then add the data needed for your report areas one source at a time.
-3. **Publish only if needed.** Keep the validated PBIX for Desktop use, or follow the collapsed publication section for Power BI Service.
+2. **Run the guided setup and validate the report.** Start with the URL only to isolate access errors, then add the data needed for your report areas one source at a time. This creates a **Desktop Validation - DO NOT PUBLISH** report.
+3. **Build a separate Service report if needed.** Run `BUILD-SERVICE-REFRESH.cmd` and publish only the resulting **Power BI Service - PUBLISH THIS** report.
 
 ## Files, portals, and required roles
 
@@ -69,7 +69,7 @@ This solution targets one environment per report. Use Fabric if one report must 
 1. [Download the complete ESS ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip).
 2. Select **Extract All** and keep the extracted folder structure intact.
 3. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/).
-4. Open the extracted `ESS-main` folder and double-click `START-HERE-DATAVERSE.cmd`.
+4. Open the extracted `ESS-main` folder and double-click `START-HERE-DATAVERSE.cmd`. This creates the local **Desktop Validation - DO NOT PUBLISH** report.
 5. Paste the Environment URL and skip optional data for the first run.
 6. When the guided checks complete, open the report.
 
@@ -95,6 +95,9 @@ The report prompts for:
 Power BI may reuse a valid cached credential. To change accounts or environments, use **File -> Options and settings -> Data source settings**.
 
 The lookback parameter limits the server-side query. It does not change retention and cannot restore deleted records.
+
+> [!IMPORTANT]
+> The report created by `START-HERE-DATAVERSE.cmd` is for Desktop validation. It may contain local Organization and Credits paths, so do not publish it for scheduled refresh. Publishing requires the separate report created in Action 3.
 
 ### Confirm the baseline
 
@@ -166,23 +169,22 @@ Do not load the tenant-wide raw export directly. For Product Feedback, blank or 
 
 Native Copilot Studio topics remain authoritative. Uncertain rules remain disabled or unassigned.
 
-## Action 3 - Publish only if needed
+## Action 3 - Build and publish the Service report
 
 If you need only Desktop/manual refresh, save the validated report as a PBIX and stop here.
 
-<details>
-<summary><strong>Publish and schedule gateway-free Dataverse refresh</strong></summary>
-
 1. Complete the baseline checklist before publishing.
 2. Return to the extracted package and run `BUILD-SERVICE-REFRESH.cmd`. This publication helper supplies the saved URL through the report's Dataverse parameter and embeds approved registry, feedback, and topic selections while excluding local Organization and Credits files. It does not hard-code the URL into the query.
-3. Open the prepared report, wait until every prefilled value is visible and stable, then select **Load**.
-4. Sign in if prompted and select **Home -> Refresh**.
-5. Save as PBIX, select **Home -> Publish**, and choose a workspace where you have Contributor, Member, or Admin access.
-6. Configure OAuth credentials and the schedule by following [AUTO-REFRESH.md](./AUTO-REFRESH.md).
+3. Confirm the generated filename ends with **Power BI Service - PUBLISH THIS.pbit**. This is the only Dataverse output intended for Power BI Service publication.
+4. Open the prepared report, wait until every prefilled value is visible and stable, then select **Load**.
+5. Sign in if prompted and select **Home -> Refresh**.
+6. Save it as a clearly named PBIX, select **Home -> Publish**, and choose a workspace where you have Contributor, Member, or Admin access. Do not overwrite or publish the Desktop Validation PBIX.
+7. In Power BI Service, open the published semantic model and select **Settings -> Data source credentials -> Edit credentials**.
+8. Select **OAuth2** as the authentication method and **Organizational** as the privacy level, then sign in with an account that can read `conversationtranscript`.
+9. Select **Refresh now** and confirm **Refresh history** shows **Completed**.
+10. Only after that successful manual Service refresh, enable **Scheduled refresh**, choose the cadence, and select **Apply**. See [AUTO-REFRESH.md](./AUTO-REFRESH.md) for the complete scheduling guide.
 
 Use Fabric instead when organization or credit files must refresh automatically.
-
-</details>
 
 ## Troubleshooting
 

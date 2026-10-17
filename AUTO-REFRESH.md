@@ -20,6 +20,7 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 ## Before you begin (all paths)
 
+- [ ] For Dataverse, you published the **Power BI Service - PUBLISH THIS** report created by `BUILD-SERVICE-REFRESH.cmd`, not the **Desktop Validation - DO NOT PUBLISH** report.
 - [ ] You have **published** the report from Power BI Desktop to a **workspace** in the Power BI service (**Home → Publish**).
 - [ ] You have permission to manage that workspace's datasets (**Member/Admin/Contributor**).
 - [ ] The dataset **refreshes successfully in Desktop first** — fix any load errors locally before scheduling in the cloud.
@@ -32,18 +33,20 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 The report prepared by the Dataverse publication step connects the service directly to the Dataverse environment selected in its parameter - no transcript export and no gateway.
 
-1. Complete [Action 3 in the Dataverse guide](SETUP-Dataverse.md#action-3---publish-only-if-needed). Its included publication helper reuses the validated Environment URL and approved registry, feedback, and topic data.
+1. Complete [Action 3 in the Dataverse guide](SETUP-Dataverse.md#action-3---build-and-publish-the-service-report). Its included publication helper reuses the validated Environment URL and approved registry, feedback, and topic data.
 
    Organization and Credits files are not included in the publishable Dataverse report. Use Fabric when those sources must refresh automatically.
 
-2. Open the prepared report, confirm the Environment URL, wait until every prefilled parameter value is visible and stable, then select **Load**. Refresh it successfully in Desktop and **Publish** it to your workspace.
+2. Confirm the prepared filename ends with **Power BI Service - PUBLISH THIS.pbit**. Open it, confirm the Environment URL, wait until every prefilled parameter value is visible and stable, then select **Load**. Refresh it successfully in Desktop, save it as PBIX, and **Publish** it to your workspace.
 3. In the service, open the **semantic model → Settings**.
 4. Expand **Data source credentials** and click **Edit credentials** on the Dataverse source:
    - **Authentication method:** `OAuth2`
    - **Privacy level:** `Organizational`
    - Sign in with an account that holds the **Bot Transcript Viewer** role (or equivalent read access to the `conversationtranscript` table) on that environment.
 5. Expand **Parameters** to confirm **Dataverse Environment URL** matches the intended environment. The connector references this parameter directly. If you change it, apply the change and update the Dataverse credentials before refreshing.
-6. Expand **Scheduled refresh** → toggle **On** → set your cadence (up to **8×/day** on Pro; more on Premium/Fabric capacity) and time zone → **Apply**.
+6. From the semantic model menu, select **Refresh now**.
+7. Open **Refresh history** and confirm the refresh status is **Completed**. Do not enable a schedule until this manual Service refresh succeeds.
+8. Expand **Scheduled refresh** → toggle **On** → set your cadence (up to **8×/day** on Pro; more on Premium/Fabric capacity) and time zone → **Apply**.
 
 ✅ **Done.** The service now pulls fresh transcripts on your schedule with **no gateway**.
 
@@ -107,7 +110,7 @@ If the parameter points at a **local file** (`C:\Data\…`) or a **network share
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | The report was prepared with an older package, its Dataverse query was modified to compute the URL, or it still contains local file inputs. | Download the current package, repeat [Action 3 in the Dataverse guide](SETUP-Dataverse.md#action-3---publish-only-if-needed), refresh the prepared report in Desktop, and publish that result. |
+| **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | The report was prepared with an older package, its Dataverse query was modified to compute the URL, or it still contains local file inputs. | Download the current package, repeat [Action 3 in the Dataverse guide](SETUP-Dataverse.md#action-3---build-and-publish-the-service-report), refresh the prepared report in Desktop, and publish that result. |
 | **“We couldn't authenticate with the credentials provided.”** | Credentials not bound, or account lacks access. | **dataset → Settings → Data source credentials → Edit credentials**; sign in with an account that has Bot Transcript Viewer (Dataverse) or library read (SharePoint). |
 | **Scheduled refresh option is greyed out.** | Credentials for one or more sources not yet set. | Edit credentials on **every** listed source first, then the schedule unlocks. |
 | **Refresh succeeds but data is stale.** | New export saved under a new name/path. | Overwrite the file at the **same URL/path** the parameter points to. |

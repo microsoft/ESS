@@ -23,6 +23,23 @@ SOURCE = ROOT / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
 
 
 class ServiceRefreshTemplateTests(unittest.TestCase):
+    def test_topic_rule_validation_canonicalizes_locales_but_can_preserve_raw_publication_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "rules.json"
+            for locale, expected in (("en-US", "en"), (" EN-gb ", "en"), ("es-MX", "es"), ("zh-CN", "zh"), ("", "*"), ("*", "*")):
+                original = [{"Locale": locale, "Vertical": "Customer", "CanonicalTopic": "Enrollment",
+                             "Keywords": "Device\u2011Enrollment|device enrollment", "Exclusions": "lost\u2019device", "Priority": 120}]
+                path.write_text(json.dumps(original), encoding="utf-8")
+                preserved = path.read_bytes()
+                payload, _ = validate_topic_overrides(path)
+                canonical = json.loads(payload)[0]
+                self.assertEqual(canonical["Locale"], expected)
+                self.assertEqual(canonical["Keywords"], "device enrollment")
+                self.assertEqual(canonical["Exclusions"], "lost device")
+                raw, _ = validate_topic_overrides(path, canonicalize=False)
+                self.assertEqual(json.loads(raw), original)
+                self.assertEqual(path.read_bytes(), preserved)
+
     def test_accepts_supported_dataverse_clouds(self):
         valid_urls = (
             "https://orgexample.crm.dynamics.com",
@@ -99,7 +116,10 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 'Cds.Entities('
                 '#"Dataverse Environment URL (required)", null)'
             )
-            self.assertEqual(agent_text.count(parameterized_source), 1)
+            all_query_text = "\n".join(model_expressions.values())
+            self.assertEqual(all_query_text.count(parameterized_source), 1)
+            self.assertNotIn("File.Contents", all_query_text)
+            self.assertNotIn("Web.Contents", all_query_text)
             self.assertNotIn("Cds.Entities(_EnvUrl", agent_text)
             self.assertNotIn(environment_url, agent_text)
 
