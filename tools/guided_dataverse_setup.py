@@ -6,12 +6,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
+import zipfile
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 from build_service_refresh_template import normalize_environment_url
+from ess_feedback_normalizer import feedback_output_paths, reject_output_collisions
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,12 +27,18 @@ DEFAULT_SETTINGS = GENERATED_DIR / "dataverse-setup.json"
 PREPARED_FEEDBACK = GENERATED_DIR / "Prepared Inputs" / "feedback-events.csv"
 OUTPUT_NAMES = {
     "desktop-validation": (
-        "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Desktop Validation.pbit"
+        "ESS Dashboard - Dynamic Topics (Dataverse) V21 - "
+        "Desktop Validation - DO NOT PUBLISH.pbit"
     ),
     "service-refresh": (
-        "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Service Refresh.pbit"
+        "ESS Dashboard - Dynamic Topics (Dataverse) V21 - "
+        "Power BI Service - PUBLISH THIS.pbit"
     ),
 }
+TOPIC_OUTPUT_NAME = (
+    "ESS Dashboard - Dynamic Topics (Dataverse) V21 - "
+    "Desktop Validation - Topics - DO NOT PUBLISH.pbit"
+)
 
 
 @dataclass
@@ -88,6 +98,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--org-data-file", type=Path)
     parser.add_argument("--agent-credits-file", type=Path)
     parser.add_argument("--topic-overrides-json", type=Path)
+    parser.add_argument("--tune-topics", action="store_true", help="Tune an exported transcript CSV using saved setup choices.")
+    parser.add_argument("--topic-transcripts", type=Path, help="Optional transcript CSV for --tune-topics; otherwise a file picker opens.")
     parser.add_argument("--feedback-events-json", type=Path)
     parser.add_argument(
         "--feedback-input",
@@ -99,7 +111,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--settings-file", type=Path, default=DEFAULT_SETTINGS)
     parser.add_argument("--non-interactive", action="store_true")
-    parser.add_argument("--no-open", action="store_true")
+    opening = parser.add_mutually_exclusive_group()
+    opening.add_argument("--no-open", action="store_true")
+    opening.add_argument("--open", action="store_true", dest="open_template")
     return parser.parse_args()
 
 
@@ -122,12 +136,68 @@ def load_settings(path: Path) -> SetupOptions | None:
     )
 
 
-def save_settings(path: Path, options: SetupOptions) -> None:
+def setup_input_paths(options: SetupOptions | None) -> list[str]:
+    if options is None:
+        return []
+    return [getattr(options, field_name) for field_name, _, _, _ in OPTIONAL_FILES] + [
+        options.feedback_events_json, *options.feedback_input_files,
+    ]
+
+
+def staging_path(path: Path, suffix: str = ".stage") -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(asdict(options), indent=2) + "\n",
-        encoding="utf-8",
-    )
+    descriptor, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=suffix, dir=path.parent)
+    os.close(descriptor)
+    return Path(name)
+
+
+def save_settings(path: Path, options: SetupOptions) -> None:
+    staged = staging_path(path)
+    try:
+        staged.write_text(json.dumps(asdict(options), indent=2) + "\n", encoding="utf-8")
+        load_settings(staged)
+        os.replace(staged, path)
+    finally:
+        staged.unlink(missing_ok=True)
+
+
+def publish_template(staged_output: Path, output: Path, staged_settings: Path | None = None,
+                     settings_file: Path | None = None) -> None:
+    backup = None
+    settings_committed = False
+    publication_committed = False
+    retain_backup = False
+    try:
+        if staged_settings is not None:
+            if settings_file is None:
+                raise ValueError("A settings destination is required for staged settings.")
+            if settings_file.exists():
+                backup = staging_path(settings_file, ".backup")
+                shutil.copyfile(settings_file, backup)
+            os.replace(staged_settings, settings_file)
+            settings_committed = True
+        os.replace(staged_output, output)
+        publication_committed = True
+    except OSError as error:
+        if settings_committed:
+            try:
+                if backup is not None:
+                    os.replace(backup, settings_file)
+                else:
+                    settings_file.unlink()
+            except OSError as rollback_error:
+                retain_backup = True
+                recovery = f"Original settings backup retained at {backup}." if backup else "Original settings did not exist; the newly created settings could not be removed."
+                raise RuntimeError(f"Template publication failed: {error}. Settings rollback failed for {settings_file}: {rollback_error}. {recovery}") from rollback_error
+        raise RuntimeError(f"Template/settings publication failed; existing active files were preserved or restored: {error}") from error
+    finally:
+        if backup is not None and not retain_backup and not publication_committed:
+            backup.unlink(missing_ok=True)
+    if publication_committed and backup is not None:
+        try:
+            backup.unlink(missing_ok=True)
+        except OSError as error:
+            print(f"WARNING: Template and settings publication succeeded, but backup cleanup failed. Backup retained at {backup}: {error}")
 
 
 def ask_yes_no(prompt: str, *, default: bool) -> bool:
@@ -332,9 +402,11 @@ def build_feedback_command(options: SetupOptions, output: Path) -> list[str]:
     return command
 
 
-def prepare_feedback(options: SetupOptions) -> SetupOptions:
+def prepare_feedback(options: SetupOptions, protected_inputs: list | None = None) -> SetupOptions:
     if not options.feedback_input_files:
         return options
+    for destination in feedback_output_paths(PREPARED_FEEDBACK):
+        reject_output_collisions(destination, [SOURCE_TEMPLATE, *setup_input_paths(options), *(protected_inputs or [])])
     PREPARED_FEEDBACK.parent.mkdir(parents=True, exist_ok=True)
     completed = subprocess.run(
         build_feedback_command(options, PREPARED_FEEDBACK),
@@ -349,7 +421,7 @@ def prepare_feedback(options: SetupOptions) -> SetupOptions:
             "Microsoft 365 feedback preparation failed: "
             f"{last_process_message(completed)}"
         )
-    prepared_json = PREPARED_FEEDBACK.with_suffix(".json")
+    prepared_json = feedback_output_paths(PREPARED_FEEDBACK)[1]
     if not prepared_json.exists():
         raise RuntimeError(
             "Microsoft 365 feedback preparation completed without creating the "
@@ -443,23 +515,69 @@ def last_process_message(completed: subprocess.CompletedProcess[str]) -> str:
     return lines[-1] if lines else "The template builder returned an unknown error."
 
 
+def tune_topics(args: argparse.Namespace) -> int:
+    if args.mode != "desktop-validation":
+        raise ValueError("Topic tuning creates a Desktop Validation template. Use the Desktop launcher.")
+    settings_file = args.settings_file.resolve()
+    stored = load_settings(settings_file)
+    if stored is None or not stored.environment_url:
+        raise ValueError("Complete START-HERE-DATAVERSE.cmd once for the baseline before tuning topics.")
+    source = args.topic_transcripts
+    if source is None:
+        if args.non_interactive:
+            raise ValueError("Non-interactive topic tuning requires --topic-transcripts.")
+        selected = select_file("Select the exported Dataverse ConversationTranscript CSV", (("CSV files", "*.csv"),))
+        if not selected:
+            print("No export selected. Template unchanged.")
+            return 0
+        source = Path(selected)
+    output = args.output or GENERATED_DIR / TOPIC_OUTPUT_NAME
+    protected_inputs = [SOURCE_TEMPLATE, settings_file, source, *setup_input_paths(stored)]
+    reject_output_collisions(output, [*feedback_output_paths(PREPARED_FEEDBACK), *protected_inputs])
+    if stored.feedback_input_files:
+        for destination in feedback_output_paths(PREPARED_FEEDBACK):
+            reject_output_collisions(destination, [output, *protected_inputs])
+    command = [
+        sys.executable, str(ROOT / "tools" / "ess_topic_tuner.py"),
+        "--input", str(source.resolve()), "--output-dir", str(settings_file.parent / "Topic Review"),
+        "--settings-file", str(settings_file),
+        "--template-output", str(output.resolve()),
+    ]
+    if args.no_open:
+        command.append("--no-open")
+    if args.non_interactive:
+        command.append("--non-interactive")
+    return subprocess.run(command, check=False).returncode
+
+
 def main() -> int:
     args = parse_args()
     validate_runtime()
+    if args.tune_topics:
+        return tune_topics(args)
     settings_file = args.settings_file.resolve()
     stored = load_settings(settings_file)
 
+    protected_inputs = [SOURCE_TEMPLATE, settings_file, args.topic_transcripts, *setup_input_paths(stored)]
     print("\nESS Insights - Guided Dataverse Setup")
     print("=" * 39)
     if args.mode == "desktop-validation":
         print(
-            "This creates the template used to test Dataverse and any "
-            "optional local files in Power BI Desktop."
+            "This creates a LOCAL DESKTOP VALIDATION template used to test "
+            "Dataverse and optional local files."
+        )
+        print(
+            "Do not publish this file for scheduled refresh. After validation, "
+            "run BUILD-SERVICE-REFRESH.cmd to create the publishable report."
         )
     else:
         print(
-            "This creates the Dataverse-only template that can be published "
-            "for scheduled Power BI Service refresh."
+            "This creates the Power BI Service publication template for "
+            "scheduled Dataverse refresh."
+        )
+        print(
+            "Organization and credit files are intentionally excluded because "
+            "Power BI Service cannot refresh those local files without a gateway."
         )
         if not stored and not args.environment_url:
             raise RuntimeError(
@@ -479,43 +597,61 @@ def main() -> int:
         if args.output
         else GENERATED_DIR / OUTPUT_NAMES[args.mode]
     )
-    output.parent.mkdir(parents=True, exist_ok=True)
+    protected_inputs.extend(setup_input_paths(options))
+    reject_output_collisions(output, [*feedback_output_paths(PREPARED_FEEDBACK), *protected_inputs])
 
     print("\nChecking the supplied information and building the template...")
-    prepared_options = prepare_feedback(options)
-    completed = subprocess.run(
-        build_command(args.mode, prepared_options, output),
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if completed.returncode:
-        print(
-            "\nSetup stopped because one of the supplied values or files "
-            "did not pass validation."
-        )
-        print(f"Details: {last_process_message(completed)}")
-        return completed.returncode
+    prepared_options = prepare_feedback(options, [output, *protected_inputs])
+    staged_output = staging_path(output)
+    staged_settings = None
     try:
-        validation = json.loads(completed.stdout)
-    except json.JSONDecodeError:
-        print(
-            "\nSetup stopped because the template builder returned an "
-            "unexpected result."
+        completed = subprocess.run(
+            build_command(args.mode, prepared_options, staged_output),
+            check=False,
+            capture_output=True,
+            text=True,
         )
-        return 1
+        if completed.returncode:
+            print(
+                "\nSetup stopped because one of the supplied values or files "
+                "did not pass validation."
+            )
+            print(f"Details: {last_process_message(completed)}")
+            return completed.returncode
+        try:
+            validation = json.loads(completed.stdout)
+        except json.JSONDecodeError:
+            print(
+                "\nSetup stopped because the template builder returned an "
+                "unexpected result."
+            )
+            return 1
+        if not isinstance(validation, dict):
+            raise ValueError("The template builder did not return a validation object.")
+        summary = validation_summary(validation)
+        with zipfile.ZipFile(staged_output) as package:
+            if "DataModelSchema" not in package.namelist() or package.testzip() is not None:
+                raise ValueError("The staged PBIT failed package integrity validation.")
+        if args.mode == "desktop-validation":
+            staged_settings = staging_path(settings_file)
+            save_settings(staged_settings, options)
+            if load_settings(staged_settings) != options:
+                raise ValueError("The staged settings did not preserve the selected setup choices.")
+        publish_template(staged_output, output, staged_settings,
+                         settings_file if staged_settings is not None else None)
+    finally:
+        staged_output.unlink(missing_ok=True)
+        if staged_settings is not None:
+            staged_settings.unlink(missing_ok=True)
 
     print("\nValidation complete:")
-    for line in validation_summary(validation):
+    for line in summary:
         print(f"  - {line}")
     warnings = validation.get("warnings") or []
     if warnings:
         print("\nImportant notes:")
         for warning in warnings:
             print(f"  - {warning}")
-
-    if args.mode == "desktop-validation":
-        save_settings(settings_file, options)
 
     print(f"\nTemplate created successfully:\n{output}")
     if args.mode == "desktop-validation":
@@ -524,24 +660,37 @@ def main() -> int:
             "and stable. Then select Load, sign in with Organizational account, "
             "and refresh."
         )
+        print(
+            "\nDESKTOP VALIDATION ONLY - DO NOT PUBLISH THIS FILE FOR SCHEDULED "
+            "REFRESH.\nIf you need Power BI Service, run "
+            "BUILD-SERVICE-REFRESH.cmd after validation."
+        )
     else:
         print(
-            "\nRefresh this template in Power BI Desktop before saving it "
-            "as PBIX and publishing it to Power BI Service."
+            "\nPOWER BI SERVICE PUBLICATION FILE - PUBLISH THIS VERSION.\n"
+            "Refresh it in Power BI Desktop, save it as PBIX, and publish it. "
+            "In Power BI Service, configure the Dataverse credentials as OAuth2 "
+            "/ Organizational, run Refresh now, confirm Refresh history shows "
+            "Completed, and only then enable Scheduled refresh."
         )
 
-    if (
-        not args.no_open
-        and not args.non_interactive
-        and ask_yes_no("Open the generated template now?", default=True)
-    ):
-        os.startfile(output)
+    open_template = args.open_template
+    if not open_template and not args.no_open and not args.non_interactive:
+        try:
+            open_template = ask_yes_no("Open the generated template now?", default=True)
+        except EOFError:
+            print("Template and settings were saved. No open response received; open the template manually.")
+    if open_template:
+        try:
+            os.startfile(output)
+        except OSError as error:
+            print(f"WARNING: The template and settings were saved, but Desktop could not be opened: {error}. Open {output} manually.")
     return 0
 
 
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (FileNotFoundError, RuntimeError, ValueError, json.JSONDecodeError) as error:
+    except (OSError, RuntimeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:
         print(f"\nSetup could not continue: {error}")
         raise SystemExit(1) from error

@@ -6,7 +6,7 @@ import uuid
 import zipfile
 from pathlib import Path
 
-from topic_classifier import CLASSIFIER_VERSION
+from topic_classifier import CLASSIFIER_VERSION, SEPARATOR_CHARACTERS, canonical_terms, rule_locale
 
 DIAGNOSTIC_COLUMNS = (
     ("TopicMatchedTerms", "string"),
@@ -48,7 +48,7 @@ def load_taxonomy(path: Path) -> list[dict[str, str]]:
 
     for row in rows:
         row["Priority"] = int(row["Priority"])
-        if not row["Keywords"].strip():
+        if not canonical_terms(row["Keywords"]):
             raise ValueError(f"Taxonomy rule has no keywords: {row}")
     return rows
 
@@ -60,11 +60,11 @@ def build_topic_rules(rows: list[dict[str, str]]) -> str:
             "            {"
             + ", ".join(
                 [
-                    m_string(row["Locale"].strip().lower()),
+                    m_string(rule_locale(row["Locale"])),
                     m_string(row["Vertical"].strip()),
                     m_string(row["CanonicalTopic"].strip()),
-                    m_string(row["Keywords"].strip()),
-                    m_string(row["Exclusions"].strip()),
+                    m_string(canonical_terms(row["Keywords"])),
+                    m_string(canonical_terms(row["Exclusions"])),
                     str(row["Priority"]),
                     m_string("BuiltIn"),
                 ]
@@ -101,8 +101,30 @@ in
 """ % ",\n".join(values)
 
 
+def build_normalization() -> str:
+    separators = "".join(f"#({ord(character):04X})" for character in sorted(set(SEPARATOR_CHARACTERS)) if ord(character) <= 0xFFFF)
+    supplementary = ", ".join(m_string(character) for character in sorted(set(SEPARATOR_CHARACTERS)) if ord(character) > 0xFFFF)
+    return f'''    Separators = "{separators}",
+    SupplementarySeparators = {{{supplementary}}},
+    NormalizeText = (value as nullable text) as text =>
+        let
+            lower = if value = null then "" else Text.Lower(Text.From(value)),
+            separated = List.Accumulate(SupplementarySeparators, lower, (state, separator) => Text.Replace(state, separator, " ")),
+            tokens = List.Select(Text.SplitAny(separated, Separators), each _ <> "")
+        in
+            Text.Combine(tokens, " "),
+    NormalizeTerms = (value as nullable text) as list =>
+        List.Distinct(List.Select(List.Transform(Text.Split(if value = null then "" else value, "|"), NormalizeText), each _ <> "")),
+    LocalePrefix = (locale as nullable text) as text =>
+        Text.Start(Text.Lower(Text.Trim(if locale = null then "" else locale)), 2),
+    RuleLocale = (locale as nullable text) as text =>
+        let language = LocalePrefix(locale) in if language = "" then "*" else language,
+'''
+
+
 def build_customer_topic_rules() -> str:
     return f'''let
+{build_normalization()}
     Empty = #table(
         type table [
             Locale = text,
@@ -123,8 +145,10 @@ def build_customer_topic_rules() -> str:
     Checked =
         if not Value.Is(Parsed, type list) then
             error "Customer Topic Overrides JSON must contain a JSON array."
+        else if not List.AllTrue(List.Transform(Parsed, each Value.Is(_, type record))) then
+            error "Customer Topic Overrides JSON must contain an array of records."
         else Parsed,
-    Records = List.Select(Checked, each Value.Is(_, type record)),
+    Records = Checked,
     AsTable =
         if List.IsEmpty(Records) then Empty
         else Table.FromRecords(
@@ -152,9 +176,15 @@ def build_customer_topic_rules() -> str:
     ),
     NormalizedLocale = Table.TransformColumns(
         Typed,
-        {{{{"Locale", each if _ = null or Text.Trim(_) = "" then "*" else Text.Lower(Text.Trim(_)), type text}}}}
+        {{{{"Locale", RuleLocale, type text}},
+          {{"Keywords", each Text.Combine(NormalizeTerms(_), "|"), type text}},
+          {{"Exclusions", each Text.Combine(NormalizeTerms(_), "|"), type text}}}}
     ),
-    WithSource = Table.AddColumn(NormalizedLocale, "RuleSource", each "Customer", type text)
+    Invalid = Table.SelectRows(NormalizedLocale, each [Keywords] = "" or [Vertical] = null or Text.Trim([Vertical]) = ""
+        or [CanonicalTopic] = null or Text.Trim([CanonicalTopic]) = "" or [Priority] = null),
+    Validated = if Table.RowCount(Invalid) > 0 then error "Customer Topic Overrides rule has no Keywords after normalization or is otherwise invalid."
+        else NormalizedLocale,
+    WithSource = Table.AddColumn(Validated, "RuleSource", each "Customer", type text)
 in
     WithSource
 '''
@@ -162,29 +192,19 @@ in
 
 def build_classifier() -> str:
     return f'''let
-    Rules = List.Buffer(Table.ToRecords(TopicRules)),
+{build_normalization()}
+    Rules = List.Buffer(List.Transform(Table.ToRecords(TopicRules), (rule) =>
+        let
+            keywords = NormalizeTerms(rule[Keywords]),
+            exclusions = NormalizeTerms(rule[Exclusions])
+        in
+            if List.IsEmpty(keywords) then error "Topic rule has no Keywords after normalization."
+            else Record.TransformFields(rule, {{{{"Locale", RuleLocale}}, {{"Keywords", each keywords}}, {{"Exclusions", each exclusions}}}}))),
     ClassifierVersion = {m_string(CLASSIFIER_VERSION)},
-    Separators = " #(tab)#(cr)#(lf).,;:!?()[]{{}}<>/\\-_+=*&^%$#@~`'""",
-
-    NormalizeText = (value as nullable text) as text =>
-        let
-            lower = if value = null then "" else Text.Lower(Text.From(value)),
-            tokens = List.Select(
-                List.Transform(Text.SplitAny(lower, Separators), Text.Trim),
-                each _ <> ""
-            )
-        in
-            Text.Combine(tokens, " "),
-
-    LocalePrefix = (locale as nullable text) as text =>
-        let
-            normalized = Text.Lower(Text.Trim(if locale = null then "" else Text.From(locale)))
-        in
-            if Text.Length(normalized) >= 2 then Text.Start(normalized, 2) else normalized,
 
     ContainsTerm = (normalizedText as text, term as text, language as text) as logical =>
         let
-            normalizedTerm = NormalizeText(term)
+            normalizedTerm = term
         in
             if normalizedTerm = "" then false
             else if language = "zh" then Text.Contains(normalizedText, normalizedTerm, Comparer.OrdinalIgnoreCase)
@@ -192,7 +212,7 @@ def build_classifier() -> str:
 
     TermWeight = (term as text, language as text) as number =>
         let
-            normalizedTerm = NormalizeText(term),
+            normalizedTerm = term,
             wordCount = List.Count(List.Select(Text.Split(normalizedTerm, " "), each _ <> ""))
         in
             if language = "zh" then (if Text.Length(normalizedTerm) >= 4 then 3 else 2)
@@ -209,14 +229,8 @@ def build_classifier() -> str:
                 eligibleRules,
                 (rule) =>
                     let
-                        keywords = List.Select(
-                            List.Transform(Text.Split(Text.From(rule[Keywords]), "|"), Text.Trim),
-                            each _ <> ""
-                        ),
-                        exclusions = List.Select(
-                            List.Transform(Text.Split(Text.From(rule[Exclusions]), "|"), Text.Trim),
-                            each _ <> ""
-                        ),
+                        keywords = rule[Keywords],
+                        exclusions = rule[Exclusions],
                         hits = List.Select(keywords, each ContainsTerm(normalizedText, _, language)),
                         excluded = List.AnyTrue(List.Transform(exclusions, each ContainsTerm(normalizedText, _, language))),
                         score = if excluded then 0 else List.Sum(List.Transform(hits, each TermWeight(_, language))),

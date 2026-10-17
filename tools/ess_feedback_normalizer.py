@@ -2,6 +2,7 @@ import argparse
 import csv
 import hashlib
 import json
+import ntpath
 import re
 import sys
 from collections import Counter
@@ -76,6 +77,21 @@ def parse_args() -> argparse.Namespace:
         help="Registry scope applied when --agent-registry is used.",
     )
     return parser.parse_args()
+
+
+def feedback_output_paths(output: Path, audit: Path | None = None) -> tuple[Path, Path, Path]:
+    return output, output.with_suffix(".json"), audit if audit is not None else output.with_suffix(".audit.json")
+
+
+def reject_output_collisions(output: Path, protected_inputs: list) -> None:
+    resolved_output = output.resolve()
+    output_key = ntpath.normcase(str(resolved_output)).casefold()
+    for value in protected_inputs:
+        if not value:
+            continue
+        protected = Path(value).resolve()
+        if output_key == ntpath.normcase(str(protected)).casefold():
+            raise ValueError(f"Output path {resolved_output} conflicts with protected input {protected}. Choose a separate output path.")
 
 
 def normalized_key(value: str) -> str:
@@ -511,6 +527,9 @@ def normalize_files(
 
 def main() -> int:
     args = parse_args()
+    outputs = feedback_output_paths(args.output, args.audit)
+    for index, destination in enumerate(outputs):
+        reject_output_collisions(destination, [*args.input, args.agent_registry, *outputs[:index], *outputs[index + 1:]])
     registry_rows = load_registry(args.agent_registry) if args.agent_registry else None
     events, audit = normalize_files(
         args.input,
@@ -518,16 +537,16 @@ def main() -> int:
         registry_rows,
         args.scope_mode,
     )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    with args.output.open("w", encoding="utf-8-sig", newline="") as handle:
+    csv_path, json_path, audit_path = outputs
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    with csv_path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=CANONICAL_COLUMNS)
         writer.writeheader()
         writer.writerows(events)
-    args.output.with_suffix(".json").write_text(
+    json_path.write_text(
         json.dumps(events, ensure_ascii=False, separators=(",", ":")) + "\n",
         encoding="utf-8",
     )
-    audit_path = args.audit or args.output.with_suffix(".audit.json")
     audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(audit, ensure_ascii=False, indent=2))
     return 0

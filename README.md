@@ -16,16 +16,18 @@ Complete three actions:
 
 1. **Download and choose one path.** Select [Download ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip), extract it, and choose Dataverse Direct, CSV Upload, or Fabric below.
 2. **Validate the transcript-only baseline.** Follow only that path's guide and confirm the report works before adding other data.
-3. **Enable the report areas you need.** Add their data one source at a time, and publish only when shared Service access is required.
+3. **Enable the report areas you need.** Add their data one source at a time. For Dataverse, validate with `START-HERE-DATAVERSE.cmd`, but publish only the separate report created by `BUILD-SERVICE-REFRESH.cmd`.
 
 > [!IMPORTANT]
 > Download the complete ZIP rather than individual templates, scripts, or notebooks. The included files were tested together.
+>
+> The Dataverse guided setup creates two intentionally different artifacts. **Desktop Validation - DO NOT PUBLISH** can include local Organization and Credits files. **Power BI Service - PUBLISH THIS** excludes those local sources and is the only Dataverse artifact intended for scheduled Service refresh.
 
 ## Choose your data path
 
 | Path | Best for | First setup | Refresh model | Start |
 |---|---|---:|---|---|
-| **Dataverse Direct - Recommended** | Ongoing reporting from one supported Dataverse environment | 15-25 min | Live cloud connection; gateway-free Service refresh | **[Open the Dataverse guide](./SETUP-Dataverse.md)** |
+| **Dataverse Direct - Recommended** | Ongoing reporting from one supported Dataverse environment | 15-25 min | Two-stage validation and publication; gateway-free Service refresh | **[Open the Dataverse guide](./SETUP-Dataverse.md)** |
 | **CSV Upload** | Evaluation, snapshots, offline copies, or controlled sharing | 20-30 min | Export a new CSV and refresh | **[Open the CSV guide](./SETUP-CSV-Download.md)** |
 | **Fabric - Advanced** | Multiple environments, durable Lakehouse history, or large-scale ingestion | 45-90 min | Scheduled notebooks plus Power BI refresh | **[Open the Fabric guide](./SETUP-Fabric.md)** |
 
@@ -35,7 +37,7 @@ Choose this path when the report will use one Production, Sandbox, or Default Da
 
 **Required access:** Bot Transcript Viewer, or a custom Dataverse role with organization-level Read on `conversationtranscript`. Environment Maker alone is not enough.
 
-**Included setup:** the [Dataverse guide](./SETUP-Dataverse.md) walks through the Environment URL, guided setup, validation, and optional publication.
+**Included setup:** the [Dataverse guide](./SETUP-Dataverse.md) walks through the Environment URL, a local Desktop validation build, and a separate Service publication build. Python prepares the templates; Power BI Service refreshes Dataverse directly and does not run Python.
 
 When the report opens, wait until every prefilled parameter value is visible and stable before selecting **Load**.
 

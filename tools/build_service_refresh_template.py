@@ -17,6 +17,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from agent_registry import load_registry
+from topic_classifier import canonical_terms, rule_locale
 
 
 M_TYPE_BY_TABULAR_TYPE = {
@@ -288,7 +289,7 @@ def load_json_array(path: Path, label: str) -> list[dict]:
     return payload
 
 
-def validate_topic_overrides(path: Path) -> tuple[str, dict]:
+def validate_topic_overrides(path: Path, *, canonicalize: bool = True) -> tuple[str, dict]:
     rows = load_json_array(path, "Customer Topic Overrides")
     for row_number, row in enumerate(rows, start=1):
         missing = [column for column in TOPIC_RULE_COLUMNS if column not in row]
@@ -301,12 +302,18 @@ def validate_topic_overrides(path: Path) -> tuple[str, dict]:
                 raise ValueError(
                     f"Customer Topic Overrides rule {row_number} has no {column}."
                 )
+        if not canonical_terms(str(row["Keywords"])):
+            raise ValueError(f"Customer Topic Overrides rule {row_number} has no Keywords after normalization.")
         try:
             int(row["Priority"])
         except (TypeError, ValueError) as error:
             raise ValueError(
                 f"Customer Topic Overrides rule {row_number} has an invalid Priority."
             ) from error
+    if canonicalize:
+        rows = [{**row, "Locale": rule_locale(str(row.get("Locale") or "")),
+                 "Keywords": canonical_terms(str(row["Keywords"])),
+                 "Exclusions": canonical_terms(str(row.get("Exclusions") or ""))} for row in rows]
     return (
         json.dumps(rows, ensure_ascii=False, separators=(",", ":")),
         {"contract": "Customer Topic Overrides", "enabledRules": len(rows)},
