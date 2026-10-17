@@ -178,7 +178,7 @@ Do not load the tenant-wide raw export directly.
 
 ### Customer-specific topics
 
-1. Follow [Private adaptive topic tuning](./TOPIC-TUNER.md).
+1. Follow [Customer-specific topic tuning](./TOPIC-TUNER.md).
 2. Review proposed rules and enable only approved rows.
 3. Paste `customer-topic-overrides.json` into the optional parameter.
 4. Refresh and review topic diagnostics.

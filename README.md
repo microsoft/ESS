@@ -167,7 +167,7 @@ All CSV and Dataverse pages work from transcript data. Optional sources enrich s
 - The optional private tuner learns only from local transcript evidence and emits reviewed rule files without exporting full prompts.
 - Classification runs locally in Power Query or inside the customer's Fabric workspace. No transcript text is sent to an external classification service.
 
-See [Private adaptive topic tuning](./TOPIC-TUNER.md) for the optional post-validation workflow.
+See [Customer-specific topic tuning](./TOPIC-TUNER.md) for the optional post-validation workflow.
 
 ## Synthetic validation data
 
@@ -187,7 +187,7 @@ The synthetic credit files reconcile to **1,651.75 total credits**. CSV V18 and 
 
 - [Agent registry and reporting scope](./AGENT-REGISTRY.md)
 - [Cross-channel feedback ingestion](./FEEDBACK-INGESTION.md)
-- [Private adaptive topic tuning](./TOPIC-TUNER.md)
+- [Customer-specific topic tuning](./TOPIC-TUNER.md)
 - [Parent and child agent attribution](./CHILD-AGENT-ATTRIBUTION.md)
 - [Automatic refresh and publication](./AUTO-REFRESH.md)
 - [Open a GitHub issue](https://github.com/microsoft/ESS/issues)
