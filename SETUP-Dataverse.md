@@ -162,10 +162,10 @@ Do not load the tenant-wide raw export directly. For Product Feedback, blank or 
 
 ### Customer-specific topics
 
-1. Follow [Private adaptive topic tuning](./TOPIC-TUNER.md).
-2. Review proposed rules and enable only approved rows.
-3. Select `customer-topic-overrides.json` under **Approved topic rules**.
-4. Refresh and review topic diagnostics.
+1. Follow [Customer-specific topic tuning](./TOPIC-TUNER.md).
+2. Double-click `TUNE-TOPICS.cmd` and select the representative transcript export.
+3. Follow the tool's **READY**, **REVIEW REQUIRED**, or **STOP** guidance.
+4. Validate the generated **Desktop Validation - Topics - DO NOT PUBLISH** report.
 
 Native Copilot Studio topics remain authoritative. Uncertain rules remain disabled or unassigned.
 
