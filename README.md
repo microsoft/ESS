@@ -7,6 +7,7 @@ Use this Power BI solution to understand adoption, conversation outcomes, employ
 Preview resources:
 
 - [Short ESS Insights overview video](https://github.com/user-attachments/assets/efa683f8-edec-4a53-897b-8e02fc112f3f)
+- [YouTube overview (1m 41s)](https://youtu.be/dQqgcUs9Ly4)
 - [ESS Insights Dashboard - Interpretation Guide](./ESS%20Insights%20Dashboard%20-%20Interpretation%20Guide.pptx)
 - [Topic to Time Savings companion deck](./Topic%20to%20Time%20Savings.pptx)
 
