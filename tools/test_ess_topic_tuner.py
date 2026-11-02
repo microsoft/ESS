@@ -11,8 +11,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ess_topic_tuner import (
-    OVERRIDE_COLUMNS, apply_dataverse_rules, expand_customer_terms, finish_analysis, next_command,
-    rules_from_override_rows, validate_tuner_output,
+    OVERRIDE_COLUMNS, apply_dataverse_rules, expand_customer_terms, finish_analysis, next_command, print_outcome,
+    review_and_apply, rules_from_override_rows, validate_tuner_output, workflow_outcome,
 )
 from guided_dataverse_setup import SetupOptions, TOPIC_OUTPUT_NAME, load_settings, save_settings
 from topic_classifier import classify, load_rules, normalize
@@ -337,6 +337,104 @@ class TopicTunerTests(unittest.TestCase):
                     self.assertIn(approved_topic, embedded)
                 self.assertEqual(stored.environment_url, "https://savedqa.crm.dynamics.com")
 
+    def test_unsorted_saved_rules_do_not_bypass_pending_review(self) -> None:
+        from ess_topic_tuner import main
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            saved = root / "approved.json"
+            saved_rules = [
+                {
+                    "Locale": "en",
+                    "Vertical": "Customer",
+                    "CanonicalTopic": "Zeta Topic",
+                    "Keywords": "zorbex flindle",
+                    "Exclusions": "",
+                    "Priority": 120,
+                },
+                {
+                    "Locale": "en",
+                    "Vertical": "Customer",
+                    "CanonicalTopic": "Alpha Topic",
+                    "Keywords": "alpha morplex",
+                    "Exclusions": "",
+                    "Priority": 120,
+                },
+            ]
+            saved.write_text(json.dumps(saved_rules), encoding="utf-8")
+            settings = root / "settings.json"
+            save_settings(
+                settings,
+                SetupOptions(
+                    environment_url="https://savedqa.crm.dynamics.com",
+                    topic_overrides_json=str(saved),
+                ),
+            )
+            source = root / "transcripts.csv"
+            with source.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=("session_id", "first_user_prompt", "locale"),
+                )
+                writer.writeheader()
+                writer.writerows(
+                    {
+                        "session_id": f"pending-{index}",
+                        "first_user_prompt": "veltrix snorple",
+                        "locale": "en",
+                    }
+                    for index in range(5)
+                )
+            output = root / "review"
+            template = root / "topics.pbit"
+            template.write_bytes(b"existing template must remain unchanged")
+            preserved = {
+                path: path.read_bytes()
+                for path in (saved, settings, template)
+            }
+            with patch(
+                "sys.argv",
+                [
+                    "tuner",
+                    "--input",
+                    str(source),
+                    "--output-dir",
+                    str(output),
+                    "--settings-file",
+                    str(settings),
+                    "--template-output",
+                    str(template),
+                    "--no-open",
+                ],
+            ), patch(
+                "ess_topic_tuner.sys.stdin.isatty",
+                return_value=True,
+            ), patch(
+                "builtins.input",
+                return_value="skip",
+            ) as prompted, patch("builtins.print"):
+                self.assertEqual(main(), 0)
+            prompted.assert_called_once()
+            report = json.loads(
+                (output / "privacy-report.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(report["newOrUpdatedApprovedRules"], 0)
+            self.assertFalse(report["publicationRequired"])
+            self.assertEqual(report["outcome"]["status"], "review-required")
+            self.assertEqual(report["outcome"]["reviewItems"], 1)
+            generated = json.loads(
+                (output / "customer-topic-overrides.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertNotEqual(generated, saved_rules)
+            self.assertEqual(
+                {rule["CanonicalTopic"] for rule in generated},
+                {"Alpha Topic", "Zeta Topic"},
+            )
+            for path, original in preserved.items():
+                self.assertEqual(path.read_bytes(), original, str(path))
+
     def test_repeated_run_generated_output_collisions_preserve_all_bytes(self) -> None:
         from ess_topic_tuner import main, tuner_output_paths
 
@@ -395,14 +493,14 @@ class TopicTunerTests(unittest.TestCase):
                     with self.subTest(output=destination.name, alias=str(alias)), \
                          patch("sys.argv", ["tuner", "--input", str(source), "--output-dir", str(output), "--settings-file", str(settings),
                                              "--template-output", str(alias), "--no-open"]), \
-                         patch("ess_topic_tuner.tempfile.mkdtemp", return_value=str(selected)) as allocate, \
+                         patch("ess_topic_tuner.select_analysis_output_dir", return_value=selected) as select_output, \
                          patch("ess_topic_tuner.write_csv", side_effect=AssertionError("unexpected diagnostic write")), \
                          patch("ess_topic_tuner.subprocess.run", side_effect=AssertionError("unexpected template build")), patch("builtins.print"):
                         with self.assertRaisesRegex(ValueError, "conflicts with protected input") as failure:
                             main()
                         self.assertIn(destination.name, str(failure.exception).casefold())
                         self.assertIn("run-selected", str(failure.exception).casefold())
-                        allocate.assert_called_once_with(prefix="run-", dir=output)
+                        select_output.assert_called_once_with(output)
                     self.assertEqual({path: path.read_bytes() for path in root.rglob("*") if path.is_file()}, preserved)
                     self.assertEqual({path for path in root.rglob("*") if path.is_dir()}, directories)
 
@@ -653,13 +751,46 @@ class TopicTunerTests(unittest.TestCase):
             reviewed.assert_not_called()
 
     def test_interactive_review_eof_leaves_template_unchanged(self) -> None:
-        args = Namespace(analyze_only=False, non_interactive=False)
+        args = Namespace(
+            analyze_only=False,
+            non_interactive=False,
+            settings_file=Path("settings.json"),
+            template_output=None,
+            no_open=True,
+        )
         outcome = {"status": "review-required", "reviewFile": "review.csv"}
         with patch("ess_topic_tuner.sys.stdin.isatty", return_value=True), \
-             patch("builtins.input", side_effect=EOFError), patch("builtins.print"), \
+             patch("builtins.input", side_effect=EOFError), patch("builtins.print") as printed, \
              patch("ess_topic_tuner.review_and_apply") as reviewed:
             self.assertEqual(finish_analysis(outcome, args), 0)
             reviewed.assert_not_called()
+        messages = "\n".join(str(call.args[0]) for call in printed.call_args_list if call.args)
+        self.assertIn("--review", messages)
+
+    def test_interactive_review_output_stays_in_one_run(self) -> None:
+        args = Namespace(
+            analyze_only=False,
+            non_interactive=False,
+            output_dir=Path("review"),
+            settings_file=Path("settings.json"),
+            template_output=None,
+            no_open=True,
+        )
+        report = {
+            "enabledCustomerRulesWritten": 0,
+            "publicationRequired": False,
+            "nativeTopicTrainingExamples": 0,
+            "ambiguousRows": 0,
+            "uncategorizedRowsAnalyzed": 5,
+        }
+        outcome = workflow_outcome(report, [{"Enabled": "false"}], args)
+        self.assertEqual(outcome["status"], "review-required")
+        self.assertNotIn("action", outcome)
+        with patch("builtins.print") as printed:
+            print_outcome(outcome)
+        messages = "\n".join(str(call.args[0]) for call in printed.call_args_list if call.args)
+        self.assertIn("same window", messages)
+        self.assertNotIn("--review", messages)
 
     def test_stop_and_review_reruns_preserve_applied_rules_settings_and_template(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -713,6 +844,117 @@ class TopicTunerTests(unittest.TestCase):
              patch("ess_topic_tuner.review_and_apply") as reviewed:
             self.assertEqual(finish_analysis(outcome, args), 0)
             reviewed.assert_not_called()
+
+    def test_review_and_ready_apply_reuse_their_validated_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            review = root / "review.csv"
+            with review.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=OVERRIDE_COLUMNS)
+                writer.writeheader()
+                writer.writerow({
+                    "Enabled": "true",
+                    "Locale": "en",
+                    "Vertical": "Customer",
+                    "CanonicalTopic": "Equipment Enrollment",
+                    "Keywords": "zorbex flindle",
+                    "Exclusions": "",
+                    "Priority": 120,
+                })
+            args = Namespace(
+                settings_file=root / "settings.json",
+                template_output=root / "topics.pbit",
+                no_open=True,
+            )
+            validated_output = args.template_output.resolve()
+            with patch(
+                "ess_topic_tuner.validate_tuner_output",
+                return_value=validated_output,
+            ) as validate, patch(
+                "ess_topic_tuner.apply_dataverse_rules",
+                return_value=0,
+            ) as apply:
+                self.assertEqual(review_and_apply(review, args), 0)
+            validate.assert_called_once_with(args, review)
+            self.assertEqual(
+                apply.call_args.kwargs["validated_output"],
+                validated_output,
+            )
+
+            ready_args = Namespace(
+                analyze_only=False,
+                output_dir=root,
+            )
+            rules = root / "customer-topic-overrides.json"
+            with patch(
+                "ess_topic_tuner.apply_dataverse_rules",
+                return_value=0,
+            ) as apply:
+                self.assertEqual(
+                    finish_analysis(
+                        {"status": "ready"},
+                        ready_args,
+                        validated_output,
+                    ),
+                    0,
+                )
+            apply.assert_called_once_with(
+                rules,
+                ready_args,
+                validated_output=validated_output,
+            )
+
+    def test_direct_actions_skip_the_generic_analysis_preflight(self) -> None:
+        from ess_topic_tuner import main
+
+        for action, handler in (
+            ("--apply", "apply_dataverse_rules"),
+            ("--review", "review_and_apply"),
+        ):
+            with self.subTest(action=action), patch(
+                "sys.argv",
+                ["tuner", action, "rules.json"],
+            ), patch(
+                f"ess_topic_tuner.{handler}",
+                return_value=0,
+            ) as delegated, patch(
+                "ess_topic_tuner.validate_tuner_output",
+                side_effect=AssertionError("unexpected generic preflight"),
+            ):
+                self.assertEqual(main(), 0)
+            delegated.assert_called_once()
+
+    def test_analysis_runs_one_consolidated_preflight(self) -> None:
+        from ess_topic_tuner import main
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "transcripts.csv"
+            source.write_text(
+                "session_id,first_user_prompt,locale\nfirst,holidays,en\n",
+                encoding="utf-8",
+            )
+            with patch(
+                "sys.argv",
+                [
+                    "tuner",
+                    "--input",
+                    str(source),
+                    "--output-dir",
+                    str(root / "review"),
+                    "--settings-file",
+                    str(root / "missing-settings.json"),
+                    "--template-output",
+                    str(root / "topics.pbit"),
+                    "--analyze-only",
+                    "--no-open",
+                ],
+            ), patch(
+                "ess_topic_tuner.validate_tuner_output",
+                wraps=validate_tuner_output,
+            ) as validate, patch("builtins.print"):
+                self.assertEqual(main(), 0)
+            self.assertEqual(validate.call_count, 1)
 
     def test_machine_readable_summary_never_applies_or_prompts(self) -> None:
         from ess_topic_tuner import parse_args

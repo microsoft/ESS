@@ -5,6 +5,7 @@ import uuid
 import zipfile
 from pathlib import Path
 
+from build_service_refresh_template import strip_packaged_placeholder_examples
 from update_topic_classifier import insert_query_raw, replace_query_text_raw, upsert_expression
 
 
@@ -33,6 +34,102 @@ FEEDBACK_DIAGNOSTIC_COLUMNS = (
     ("FeedbackVerdict", "string"),
     ("MatchStatus", "string"),
 )
+NATIVE_FEEDBACK_EVENT_COLUMNS = (("FeedbackEventsJson", "string"),)
+
+
+def patch_native_feedback_query(expression: str) -> str:
+    if (
+        "FeedbackEventsJson = nullable text" in expression
+        and "feedbackEventRows = List.RemoveNulls" in expression
+    ):
+        return expression
+
+    schema_marker = (
+        "        Feedback = nullable text, FeedbackComment = nullable text,\n"
+        "        ThumbsUpCount = nullable number, ThumbsDownCount = nullable number,"
+    )
+    schema_replacement = (
+        "        Feedback = nullable text, FeedbackComment = nullable text,\n"
+        "        FeedbackEventsJson = nullable text,\n"
+        "        ThumbsUpCount = nullable number, ThumbsDownCount = nullable number,"
+    )
+    if schema_marker not in expression:
+        raise ValueError("Agent Performance feedback schema marker not found")
+    expression = expression.replace(schema_marker, schema_replacement, 1)
+
+    block_start = "                // ── Feedback (messageReaction activity"
+    block_end = "                rowOut = ["
+    if block_start not in expression or block_end not in expression:
+        raise ValueError("Agent Performance feedback extraction block not found")
+    start = expression.index(block_start)
+    end = expression.index(block_end, start)
+    feedback_block = '''                // Preserve one native row per recognized reaction event.
+                feedbackActs = List.Select(acts, each try _[#"type"] = "messageReaction" otherwise false),
+                feedbackSubmitActs = List.Select(acts, each try (_[#"type"] = "invoke" and _[#"name"] = "message/submitAction" and _[value][actionName] = "feedback") otherwise false),
+                messageReactionRows = List.Transform(List.Positions(feedbackActs), (eventIndex) =>
+                    let
+                        activity = feedbackActs{eventIndex},
+                        reaction = Text.Lower(SafeText(try activity[value][reaction] otherwise null)),
+                        verdict =
+                            if reaction = "thumbsup" or reaction = "like" then "Thumbs Up"
+                            else if reaction = "thumbsdown" or reaction = "dislike" then "Thumbs Down"
+                            else null,
+                        sourceId = SafeText(try activity[id] otherwise null),
+                        eventId = if sourceId <> null and sourceId <> "" then sourceId else "messageReaction-" & Text.From(eventIndex),
+                        comment = SafeText(try activity[value][comment] otherwise null),
+                        submitted = SafeText(try activity[timestamp] otherwise (try activity[localTimestamp] otherwise sessionEnd))
+                    in
+                        if verdict = null then null else [
+                            FeedbackEventId = eventId,
+                            FeedbackVerdict = verdict,
+                            FeedbackComment = comment,
+                            SubmittedUtc = submitted
+                        ]),
+                submittedFeedbackRows = List.Transform(List.Positions(feedbackSubmitActs), (eventIndex) =>
+                    let
+                        activity = feedbackSubmitActs{eventIndex},
+                        reaction = Text.Lower(SafeText(try activity[value][actionValue][reaction] otherwise null)),
+                        verdict =
+                            if reaction = "thumbsup" or reaction = "like" then "Thumbs Up"
+                            else if reaction = "thumbsdown" or reaction = "dislike" then "Thumbs Down"
+                            else null,
+                        sourceId = SafeText(try activity[id] otherwise null),
+                        eventId = if sourceId <> null and sourceId <> "" then sourceId else "submitAction-" & Text.From(eventIndex),
+                        comment = SafeText(try Json.Document(Text.ToBinary(activity[value][actionValue][feedback], TextEncoding.Utf8))[feedbackText] otherwise (try activity[value][actionValue][feedback] otherwise null)),
+                        submitted = SafeText(try activity[timestamp] otherwise (try activity[localTimestamp] otherwise sessionEnd))
+                    in
+                        if verdict = null then null else [
+                            FeedbackEventId = eventId,
+                            FeedbackVerdict = verdict,
+                            FeedbackComment = comment,
+                            SubmittedUtc = submitted
+                        ]),
+                feedbackEventRows = List.RemoveNulls(List.Combine({messageReactionRows, submittedFeedbackRows})),
+                feedbackUps = List.Count(List.Select(feedbackEventRows, each [FeedbackVerdict] = "Thumbs Up")),
+                feedbackDowns = List.Count(List.Select(feedbackEventRows, each [FeedbackVerdict] = "Thumbs Down")),
+                feedbackVal =
+                    if feedbackUps = 0 and feedbackDowns = 0 then null
+                    else if feedbackDowns > 0 and feedbackUps > 0 then "Mixed"
+                    else if feedbackDowns > 0 then "Thumbs Down"
+                    else "Thumbs Up",
+                feedbackCommentsNonEmpty = List.Select(List.Transform(feedbackEventRows, each [FeedbackComment]), each _ <> null and _ <> ""),
+                feedbackComment = if List.Count(feedbackCommentsNonEmpty) > 0
+                    then Text.Combine(feedbackCommentsNonEmpty, " | ")
+                    else null,
+                feedbackEventsJson = if List.IsEmpty(feedbackEventRows) then null
+                    else Text.FromBinary(Json.FromValue(feedbackEventRows), TextEncoding.Utf8),
+
+'''
+    expression = expression[:start] + feedback_block + expression[end:]
+
+    row_marker = "                    FeedbackComment          = feedbackComment,\n"
+    if row_marker not in expression:
+        raise ValueError("Agent Performance feedback output marker not found")
+    return expression.replace(
+        row_marker,
+        row_marker + "                    FeedbackEventsJson       = feedbackEventsJson,\n",
+        1,
+    )
 
 
 def build_external_feedback_query() -> str:
@@ -110,14 +207,30 @@ def build_conversation_feedback_query() -> str:
     KnownConversations = Table.Buffer(
         Table.SelectColumns(Source, {"ConversationTranscriptId", "BotId", "BotName"})
     ),
-    WithFeedback = Table.SelectRows(Source, each [Feedback] <> null and [Feedback] <> ""),
-    TranscriptMapped = Table.AddColumn(WithFeedback, "_fb", each [
-        FeedbackId            = [ConversationTranscriptId],
-        Comment               = [FeedbackComment],
+    WithFeedback = Table.SelectRows(Source, each [FeedbackEventsJson] <> null and [FeedbackEventsJson] <> ""),
+    TranscriptListed = Table.AddColumn(WithFeedback, "_nativeEvent", each
+        let parsed = try Json.Document(Text.ToBinary([FeedbackEventsJson], TextEncoding.Utf8)) otherwise {}
+        in if Value.Is(parsed, type list) then parsed else {}, type list),
+    TranscriptRows = Table.ExpandListColumn(TranscriptListed, "_nativeEvent"),
+    TranscriptFields = Table.ExpandRecordColumn(TranscriptRows, "_nativeEvent",
+        {"FeedbackEventId","FeedbackVerdict","FeedbackComment","SubmittedUtc"},
+        {"NativeFeedbackEventId","NativeFeedbackVerdict","NativeFeedbackComment","NativeSubmittedUtc"}),
+    TranscriptMapped = Table.AddColumn(TranscriptFields, "_fb", each
+        let
+            submitted = try DateTimeZone.RemoveZone(DateTimeZone.FromText([NativeSubmittedUtc]))
+                        otherwise try DateTime.From([NativeSubmittedUtc])
+                        otherwise [SessionEndTimeUtc],
+            sourceEventId = if [NativeFeedbackEventId] = null or Text.Trim(Text.From([NativeFeedbackEventId])) = ""
+                            then Text.Lower(Text.From([NativeFeedbackVerdict]))
+                            else Text.From([NativeFeedbackEventId]),
+            eventId = Text.From([ConversationTranscriptId]) & "|" & sourceEventId
+        in [
+        FeedbackId            = eventId,
+        Comment               = [NativeFeedbackComment],
         TranslatedComment     = null,
         CommentLanguage       = null,
-        DateSubmittedUTC      = [SessionEndTimeUtc],
-        FeedbackType          = [Feedback],
+        DateSubmittedUTC      = submitted,
+        FeedbackType          = [NativeFeedbackVerdict],
         ResponseStatus        = "Completed",
         App                   = [BotName],
         AppLanguage           = [Locale],
@@ -132,25 +245,26 @@ def build_conversation_feedback_query() -> str:
         AIContextResponse     = [LastBotMessage],
         SurveyQuestion        = null,
         SurveyResponseOption  = null,
-        FeedbackDate          = [SessionEndTimeUtc],
-        HasComment            = if [FeedbackComment] <> null and [FeedbackComment] <> "" then 1 else 0,
+        FeedbackDate          = submitted,
+        HasComment            = if [NativeFeedbackComment] <> null and [NativeFeedbackComment] <> "" then 1 else 0,
         PromptLength          = if [LastUserMessage] <> null then Text.Length([LastUserMessage]) else 0,
         IsAgentInteraction    = true,
         AgentName             = [BotName],
         UiHost                = null,
         CopilotType           = "Copilot Studio",
         AiAgentType           = null,
-        FeedbackEventKey      = "Transcript|" & Text.From([ConversationTranscriptId]) & "|" & Text.Lower(Text.From([Feedback])),
+        SourceFeedbackEventId = sourceEventId,
+        FeedbackEventKey      = "Transcript|" & eventId,
         ConversationId       = Text.From([ConversationTranscriptId]),
         AgentId               = [BotId],
         Channel               = "Copilot Studio",
         FeedbackSource        = "Conversation Transcript",
-        FeedbackVerdict       = [Feedback],
+        FeedbackVerdict       = [NativeFeedbackVerdict],
         MatchStatus           = "Native transcript"
     ]),
     TranscriptPicked = Table.SelectColumns(TranscriptMapped, {"_fb"}),
     TranscriptEvents = Table.ExpandRecordColumn(TranscriptPicked, "_fb",
-        {"FeedbackId","Comment","TranslatedComment","CommentLanguage","DateSubmittedUTC","FeedbackType","ResponseStatus","App","AppLanguage","Platform","SourceType","HasLogsAttachments","UserId","UserEmail","Browser","BrowserVersion","AIContextPrompt","AIContextResponse","SurveyQuestion","SurveyResponseOption","FeedbackDate","HasComment","PromptLength","IsAgentInteraction","AgentName","UiHost","CopilotType","AiAgentType","FeedbackEventKey","ConversationId","AgentId","Channel","FeedbackSource","FeedbackVerdict","MatchStatus"}),
+        {"FeedbackId","Comment","TranslatedComment","CommentLanguage","DateSubmittedUTC","FeedbackType","ResponseStatus","App","AppLanguage","Platform","SourceType","HasLogsAttachments","UserId","UserEmail","Browser","BrowserVersion","AIContextPrompt","AIContextResponse","SurveyQuestion","SurveyResponseOption","FeedbackDate","HasComment","PromptLength","IsAgentInteraction","AgentName","UiHost","CopilotType","AiAgentType","SourceFeedbackEventId","FeedbackEventKey","ConversationId","AgentId","Channel","FeedbackSource","FeedbackVerdict","MatchStatus"}),
 
     ExternalJoined = Table.NestedJoin(
         ExternalFeedbackEvents,
@@ -172,9 +286,12 @@ def build_conversation_feedback_query() -> str:
                         otherwise try DateTime.From([SubmittedUtc])
                         otherwise null,
             matched = [MatchedBotId] <> null or [MatchedBotName] <> null,
-            eventId = if [FeedbackEventId] = null or Text.Trim([FeedbackEventId]) = ""
+            sourceEventId = if [FeedbackEventId] = null or Text.Trim(Text.From([FeedbackEventId])) = ""
+                            then null
+                            else Text.From([FeedbackEventId]),
+            eventId = if sourceEventId = null
                       then Text.From([ConversationId]) & "|" & Text.From([FeedbackVerdict])
-                      else [FeedbackEventId]
+                      else sourceEventId
         in [
             FeedbackId            = eventId,
             Comment               = [FeedbackComment],
@@ -208,6 +325,7 @@ def build_conversation_feedback_query() -> str:
                                     else if [Channel] = "Microsoft Teams" then "Microsoft Teams"
                                     else "Copilot Studio",
             AiAgentType           = null,
+            SourceFeedbackEventId = sourceEventId,
             FeedbackEventKey      = "External|" & Text.From(eventId),
             ConversationId       = [ConversationId],
             AgentId               = if [AgentId] <> null and Text.Trim([AgentId]) <> "" then [AgentId] else [MatchedBotId],
@@ -218,7 +336,7 @@ def build_conversation_feedback_query() -> str:
         ]),
     ExternalPicked = Table.SelectColumns(ExternalMapped, {"_fb"}),
     ExternalEvents = Table.ExpandRecordColumn(ExternalPicked, "_fb",
-        {"FeedbackId","Comment","TranslatedComment","CommentLanguage","DateSubmittedUTC","FeedbackType","ResponseStatus","App","AppLanguage","Platform","SourceType","HasLogsAttachments","UserId","UserEmail","Browser","BrowserVersion","AIContextPrompt","AIContextResponse","SurveyQuestion","SurveyResponseOption","FeedbackDate","HasComment","PromptLength","IsAgentInteraction","AgentName","UiHost","CopilotType","AiAgentType","FeedbackEventKey","ConversationId","AgentId","Channel","FeedbackSource","FeedbackVerdict","MatchStatus"}),
+        {"FeedbackId","Comment","TranslatedComment","CommentLanguage","DateSubmittedUTC","FeedbackType","ResponseStatus","App","AppLanguage","Platform","SourceType","HasLogsAttachments","UserId","UserEmail","Browser","BrowserVersion","AIContextPrompt","AIContextResponse","SurveyQuestion","SurveyResponseOption","FeedbackDate","HasComment","PromptLength","IsAgentInteraction","AgentName","UiHost","CopilotType","AiAgentType","SourceFeedbackEventId","FeedbackEventKey","ConversationId","AgentId","Channel","FeedbackSource","FeedbackVerdict","MatchStatus"}),
 
     ExternalDeduplicated = Table.Distinct(Table.Buffer(ExternalEvents), {"FeedbackEventKey"}),
     ExternalWithPairKey = Table.AddColumn(
@@ -229,20 +347,89 @@ def build_conversation_feedback_query() -> str:
              else null,
         type nullable text
     ),
-    ExternalPairKeys = List.Buffer(List.RemoveNulls(Table.Column(ExternalWithPairKey, "_ConversationVerdictKey"))),
+    ExternalWithIdentityKey = Table.AddColumn(
+        ExternalWithPairKey,
+        "_EventIdentityKey",
+        each if [_ConversationVerdictKey] <> null
+                 and [SourceFeedbackEventId] <> null
+                 and Text.Trim(Text.From([SourceFeedbackEventId])) <> ""
+             then [_ConversationVerdictKey] & "|event|" & Text.Lower(Text.From([SourceFeedbackEventId]))
+             else null,
+        type nullable text
+    ),
+    TranscriptDeduplicated = Table.Distinct(Table.Buffer(TranscriptEvents), {"FeedbackEventKey"}),
     TranscriptWithPairKey = Table.AddColumn(
-        TranscriptEvents,
+        TranscriptDeduplicated,
         "_ConversationVerdictKey",
         each "Conversation|" & Text.Lower(Text.From([ConversationId])) & "|" & Text.Lower(Text.From([FeedbackVerdict])),
         type text
     ),
-    TranscriptWithoutExportedCopies = Table.SelectRows(
+    TranscriptWithIdentityKey = Table.AddColumn(
         TranscriptWithPairKey,
-        each not List.Contains(ExternalPairKeys, [_ConversationVerdictKey])
+        "_EventIdentityKey",
+        each if [SourceFeedbackEventId] <> null and Text.Trim(Text.From([SourceFeedbackEventId])) <> ""
+             then [_ConversationVerdictKey] & "|event|" & Text.Lower(Text.From([SourceFeedbackEventId]))
+             else null,
+        type nullable text
     ),
-    Combined = Table.Combine({ExternalWithPairKey, TranscriptWithoutExportedCopies}),
-    RemovedPairKey = Table.RemoveColumns(Combined, {"_ConversationVerdictKey"}),
-    Typed = Table.TransformColumnTypes(RemovedPairKey, {
+    TranscriptIdentityKeys = List.Buffer(List.RemoveNulls(Table.Column(TranscriptWithIdentityKey, "_EventIdentityKey"))),
+    ExternalWithIdentityMatch = Table.AddColumn(
+        ExternalWithIdentityKey,
+        "_HasNativeIdentityMatch",
+        each [_EventIdentityKey] <> null and List.Contains(TranscriptIdentityKeys, [_EventIdentityKey]),
+        type logical
+    ),
+    ExternalExactIdentityKeys = List.Buffer(Table.Column(
+        Table.SelectRows(ExternalWithIdentityMatch, each [_HasNativeIdentityMatch]),
+        "_EventIdentityKey"
+    )),
+    TranscriptWithoutExactCopies = Table.SelectRows(
+        TranscriptWithIdentityKey,
+        each [_EventIdentityKey] = null or not List.Contains(ExternalExactIdentityKeys, [_EventIdentityKey])
+    ),
+    ExternalFallbackCounts = Table.Group(
+        Table.SelectRows(ExternalWithIdentityMatch, each not [_HasNativeIdentityMatch] and [_ConversationVerdictKey] <> null),
+        {"_ConversationVerdictKey"},
+        {{"_ExternalPairCount", each Table.RowCount(_), Int64.Type}}
+    ),
+    TranscriptGrouped = Table.Group(
+        TranscriptWithoutExactCopies,
+        {"_ConversationVerdictKey"},
+        {{"_PairRows", each Table.AddIndexColumn(_, "_PairOrdinal", 0, 1, Int64.Type), type table}}
+    ),
+    TranscriptPairColumns = List.RemoveItems(Table.ColumnNames(TranscriptWithoutExactCopies), {"_ConversationVerdictKey"}),
+    TranscriptRanked = Table.ExpandTableColumn(
+        TranscriptGrouped,
+        "_PairRows",
+        TranscriptPairColumns & {"_PairOrdinal"},
+        TranscriptPairColumns & {"_PairOrdinal"}
+    ),
+    TranscriptCountJoined = Table.NestedJoin(
+        TranscriptRanked,
+        {"_ConversationVerdictKey"},
+        ExternalFallbackCounts,
+        {"_ConversationVerdictKey"},
+        "_externalCount",
+        JoinKind.LeftOuter
+    ),
+    TranscriptCountExpanded = Table.ExpandTableColumn(
+        TranscriptCountJoined,
+        "_externalCount",
+        {"_ExternalPairCount"},
+        {"_ExternalPairCount"}
+    ),
+    TranscriptWithoutExportedCopies = Table.SelectRows(
+        TranscriptCountExpanded,
+        each [_PairOrdinal] >= (if [_ExternalPairCount] = null then 0 else [_ExternalPairCount])
+    ),
+    TranscriptClean = Table.RemoveColumns(TranscriptWithoutExportedCopies, {"_PairOrdinal", "_ExternalPairCount"}),
+    Combined = Table.Combine({ExternalWithIdentityMatch, TranscriptClean}),
+    RemovedInternalColumns = Table.RemoveColumns(
+        Combined,
+        {"_ConversationVerdictKey", "_EventIdentityKey", "_HasNativeIdentityMatch", "SourceFeedbackEventId"},
+        MissingField.Ignore
+    ),
+    Typed = Table.TransformColumnTypes(RemovedInternalColumns, {
         {"DateSubmittedUTC", type datetime},
         {"FeedbackDate", type datetime},
         {"HasComment", Int64.Type},
@@ -269,6 +456,18 @@ def add_model_columns(table: dict, columns: tuple[tuple[str, str], ...], namespa
                 "annotations": [{"name": "SummarizationSetBy", "value": "Automatic"}],
             }
         )
+
+
+def repair_glossary_sort_metadata(model: dict) -> None:
+    glossary = next(
+        table
+        for table in model["tables"]
+        if "glossary" in table["name"].casefold()
+    )
+    metric = next(column for column in glossary["columns"] if column["name"] == "Metric")
+    if metric.get("sortByColumn") not in (None, "MetricOrder"):
+        raise ValueError("Metric Glossary uses an unexpected Metric sort column")
+    metric.pop("sortByColumn", None)
 
 
 def set_partition_expression(model: dict, table_name: str, expression: str) -> None:
@@ -361,7 +560,21 @@ def patch_direct_pbit(source: Path, destination: Path) -> None:
         parts = {info.filename: archive.read(info.filename) for info in infos}
 
     schema = json.loads(parts["DataModelSchema"].decode("utf-16-le"))
+    schema = strip_packaged_placeholder_examples(schema)
     model = schema["model"]
+    existing_feedback_table = next(
+        table for table in model["tables"] if table["name"] == "ConversationFeedback"
+    )
+    existing_feedback_expression = existing_feedback_table["partitions"][0]["source"]["expression"]
+    existing_feedback_text = (
+        "\n".join(existing_feedback_expression)
+        if isinstance(existing_feedback_expression, list)
+        else existing_feedback_expression
+    )
+    if "// Agent registry feedback resolution" in existing_feedback_text:
+        from update_agent_registry import patch_conversation_feedback_query
+
+        feedback_query = patch_conversation_feedback_query(feedback_query)
     old_parameter = next(
         (item for item in model["expressions"] if item["name"] == OLD_FEEDBACK_PARAMETER),
         None,
@@ -397,16 +610,29 @@ def patch_direct_pbit(source: Path, destination: Path) -> None:
         "TopicRules",
     )
     set_partition_expression(model, "ConversationFeedback", feedback_query)
+    agent_performance = next(table for table in model["tables"] if table["name"] == "Agent Performance")
+    agent_source = agent_performance["partitions"][0]["source"]
+    agent_expression = agent_source["expression"]
+    agent_text = "\n".join(agent_expression) if isinstance(agent_expression, list) else agent_expression
+    agent_text = patch_native_feedback_query(agent_text)
+    agent_source["expression"] = agent_text.splitlines() if isinstance(agent_expression, list) else agent_text
     patch_direct_feedback_measures(model)
+    add_model_columns(
+        agent_performance,
+        NATIVE_FEEDBACK_EVENT_COLUMNS,
+        "https://github.com/microsoft/ESS/native-feedback",
+    )
     feedback_table = next(table for table in model["tables"] if table["name"] == "ConversationFeedback")
     add_model_columns(
         feedback_table,
         FEEDBACK_DIAGNOSTIC_COLUMNS,
         "https://github.com/microsoft/ESS/feedback",
     )
+    repair_glossary_sort_metadata(model)
     parts["DataModelSchema"] = json.dumps(schema, ensure_ascii=False, separators=(",", ":")).encode("utf-16-le")
 
     raw = parts["UnappliedChanges"].decode("utf-16-le")
+    raw = strip_packaged_placeholder_examples(raw)
     raw = rename_query_raw(raw, OLD_FEEDBACK_PARAMETER, FEEDBACK_PARAMETER)
     raw = insert_query_raw(
         raw,
@@ -434,6 +660,7 @@ def patch_direct_pbit(source: Path, destination: Path) -> None:
     )
     raw = replace_query_text_raw(raw, FEEDBACK_PARAMETER, lambda _: FEEDBACK_PARAMETER_EXPRESSION)
     raw = replace_query_text_raw(raw, FEEDBACK_QUERY, lambda _: external_query)
+    raw = replace_query_text_raw(raw, "Agent Performance", patch_native_feedback_query)
     raw = replace_query_text_raw(raw, "ConversationFeedback", lambda _: feedback_query)
     json.loads(raw)
     parts["UnappliedChanges"] = raw.encode("utf-16-le")

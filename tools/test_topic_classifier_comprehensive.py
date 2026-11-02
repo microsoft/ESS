@@ -26,6 +26,10 @@ from update_topic_classifier import (
 ROOT = Path(__file__).resolve().parents[1]
 TAXONOMY = ROOT / "taxonomy" / "topics-taxonomy.csv"
 SOURCE = ROOT / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
+DIRECT_SERVICE = (
+    ROOT
+    / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
+)
 LOCALES = {"*": "en-US", "es": "es-MX", "zh": "zh-CN"}
 
 
@@ -176,7 +180,7 @@ in
                 "Priority",
             ],
         )
-        self.assertEqual(len(rows), 74)
+        self.assertEqual(len(rows), 84)
         rule_keys = set()
         for row_number, row in enumerate(rows, start=2):
             with self.subTest(row=row_number):
@@ -491,6 +495,29 @@ in
                 expressions["ClassifyTopic"].rstrip(),
                 build_classifier().rstrip(),
             )
+
+    def test_checked_in_direct_service_pbit_contains_current_classifier(self):
+        with zipfile.ZipFile(DIRECT_SERVICE) as package:
+            self.assertIsNone(package.testzip())
+            model = json.loads(
+                package.read("DataModelSchema").decode("utf-16-le")
+            )["model"]
+        expressions = {
+            item["name"]: expression_text(item["expression"])
+            for item in model["expressions"]
+        }
+        self.assertEqual(
+            expressions["TopicRules"].rstrip(),
+            build_topic_rules(load_taxonomy(TAXONOMY)).rstrip(),
+        )
+        self.assertEqual(
+            expressions["ClassifyTopic"].rstrip(),
+            build_classifier().rstrip(),
+        )
+        self.assertEqual(
+            expressions["CustomerTopicRules"].rstrip(),
+            build_customer_topic_rules().rstrip(),
+        )
 
 
 if __name__ == "__main__":

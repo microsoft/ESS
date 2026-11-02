@@ -13,7 +13,7 @@ The tuner runs locally, proposes reusable topic rules, and creates a new validat
 | A customer can review and approve the proposed business labels. | The baseline report has an access, environment, retention, or loading problem. |
 
 > [!IMPORTANT]
-> Topic tuning is not required for the ESS report. Complete the [Dataverse baseline setup](SETUP-Dataverse.md#action-2---run-the-guided-setup-and-validate-the-report) first. Topic rules cannot repair missing permissions, an incorrect Environment URL, expired transcripts, or disabled transcript capture.
+> Topic tuning is not required for the ESS report. Complete the [guided Dataverse baseline setup](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements) first so the tuner has saved setup state. Topic rules cannot repair missing permissions, an incorrect Environment URL, expired transcripts, or disabled transcript capture.
 
 ## Customer journey
 
@@ -40,7 +40,7 @@ No additional Python packages, PowerShell commands, LLM, or external classificat
 
 ## Step 1 - Confirm the baseline and prepare evidence
 
-1. Complete [Action 2 in the Dataverse setup guide](SETUP-Dataverse.md#action-2---run-the-guided-setup-and-validate-the-report).
+1. Complete [Option B in the Dataverse setup guide](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements).
 2. Confirm that **Total Conversations** is non-zero and the expected agent appears in the Agent filter.
 3. Identify recurring customer terms that are currently unclassified or classified too broadly.
 4. Include several distinct conversations that demonstrate the intended meaning. For automatic learning, the default gate requires at least five distinct supporting conversations.
@@ -193,7 +193,7 @@ The Service builder reuses the approved topic rules. You do not run the tuner ag
 
 | Message or symptom | What to do |
 |---|---|
-| **No saved Dataverse setup** | Complete the [Dataverse baseline](SETUP-Dataverse.md#action-2---run-the-guided-setup-and-validate-the-report) once from this extracted package. |
+| **No saved Dataverse setup** | Complete the [guided Dataverse baseline](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements) once from this extracted package. |
 | **Python is not recognized** | Install [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add Python to PATH**, then reopen the launcher. |
 | `TUNE-TOPICS.cmd` is missing | Download and extract the [complete ESS ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip). Open the inner `ESS-main` folder if Windows created nested folders. |
 | A saved optional file is missing | Restore the saved registry, organization, credits, topic, or feedback input and retry. The tuner does not silently discard saved choices. |

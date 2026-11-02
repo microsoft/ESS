@@ -11,6 +11,7 @@ from build_service_refresh_template import (
     build_package,
     normalize_environment_url,
     serialize_registry,
+    strip_packaged_placeholder_examples,
     validate_credits,
     validate_feedback_events,
     validate_org_data,
@@ -20,9 +21,74 @@ from build_service_refresh_template import (
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
+DIRECT_SERVICE = (
+    ROOT
+    / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
+)
+
+DIRECT_PARAMETER_DEFAULTS = {
+    "Dataverse Environment URL (required)": (
+        '"" meta [IsParameterQuery=true, Type="Text", '
+        'IsParameterQueryRequired=true]'
+    ),
+    "Transcript Lookback Days (defaults to 90 days if left blank)": (
+        'null meta [IsParameterQuery=true, Type="Number", '
+        'IsParameterQueryRequired=false]'
+    ),
+    "Customer Topic Overrides JSON (optional)": (
+        'null meta [IsParameterQuery=true, Type="Text", '
+        'IsParameterQueryRequired=false]'
+    ),
+    "Feedback Events JSON (optional)": (
+        'null meta [IsParameterQuery=true, Type="Text", '
+        'IsParameterQueryRequired=false]'
+    ),
+}
+
+
+def assert_customer_neutral_parameters(test_case: unittest.TestCase, schema: dict) -> None:
+    expressions = {
+        item["name"]: (
+            "\n".join(item["expression"])
+            if isinstance(item.get("expression"), list)
+            else item.get("expression", "")
+        )
+        for item in schema["model"]["expressions"]
+    }
+    parameters = {
+        name: expression
+        for name, expression in expressions.items()
+        if "IsParameterQuery=true" in expression
+    }
+    test_case.assertEqual(parameters, DIRECT_PARAMETER_DEFAULTS)
+    test_case.assertEqual(expressions["Agent Scope Mode"], '"All Agents"')
+    test_case.assertEqual(expressions["Agent Registry JSON"], "null")
+    feedback = next(
+        item
+        for item in schema["model"]["expressions"]
+        if item["name"] == "Feedback Events JSON (optional)"
+    )
+    test_case.assertIn("matches one exact loaded conversation", feedback["description"])
+    test_case.assertIn("guided setup", feedback["description"])
 
 
 class ServiceRefreshTemplateTests(unittest.TestCase):
+    def test_strips_placeholder_urls_from_packaged_metadata(self):
+        value = {
+            "description": (
+                "Use the Environment URL "
+                "(e.g. https://orgabc12345.crm.dynamics.com)."
+            ),
+            "nested": ["Keep this value"],
+        }
+
+        self.assertEqual(
+            strip_packaged_placeholder_examples(value),
+            {
+                "description": "Use the Environment URL.",
+                "nested": ["Keep this value"],
+            },
+        )
     def test_topic_rule_validation_canonicalizes_locales_but_can_preserve_raw_publication_payload(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "rules.json"
@@ -183,6 +249,119 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             self.assertEqual(
                 model_expressions["ConversationFeedback"],
                 source_queries["ConversationFeedback"],
+            )
+
+    def test_builds_customer_neutral_direct_publish_template(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "service-direct.pbit"
+            build_package(SOURCE, output, "", mode="service-direct")
+
+            with zipfile.ZipFile(output) as package:
+                self.assertIsNone(package.testzip())
+                self.assertNotIn("UnappliedChanges", package.namelist())
+                schema = json.loads(
+                    package.read("DataModelSchema").decode("utf-16-le")
+                )
+
+            expressions = {
+                item["name"]: item
+                for item in schema["model"]["expressions"]
+            }
+            environment = expressions["Dataverse Environment URL (required)"]
+            assert_customer_neutral_parameters(self, schema)
+            self.assertTrue(environment["expression"].startswith('"" meta'))
+            self.assertIn("IsParameterQueryRequired=true", environment["expression"])
+            self.assertNotIn("Org Data File", expressions)
+            self.assertNotIn("Agent Credits  (optional)", expressions)
+
+            query_text = []
+            for table in schema["model"]["tables"]:
+                for partition in table.get("partitions", []):
+                    expression = partition.get("source", {}).get("expression")
+                    if expression is not None:
+                        query_text.append(
+                            "\n".join(expression)
+                            if isinstance(expression, list)
+                            else expression
+                        )
+            all_query_text = "\n".join(query_text)
+            self.assertEqual(
+                all_query_text.count(
+                    'Cds.Entities(#"Dataverse Environment URL (required)", null)'
+                ),
+                1,
+            )
+            self.assertNotIn("Cds.Entities(_EnvUrl", all_query_text)
+            self.assertNotIn("File.Contents", all_query_text)
+            self.assertNotIn("Web.Contents", all_query_text)
+
+    def test_checked_in_direct_publish_template_is_service_safe(self):
+        self.assertTrue(DIRECT_SERVICE.is_file())
+        if (ROOT / ".git").exists():
+            direct_ignore = subprocess.run(
+                ["git", "check-ignore", "--no-index", "-q", "--", DIRECT_SERVICE.name],
+                cwd=ROOT,
+                check=False,
+            )
+            customer_ignore = subprocess.run(
+                [
+                    "git",
+                    "check-ignore",
+                    "--no-index",
+                    "-q",
+                    "--",
+                    "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Customer Generated.pbit",
+                ],
+                cwd=ROOT,
+                check=False,
+            )
+            self.assertEqual(direct_ignore.returncode, 1)
+            self.assertEqual(customer_ignore.returncode, 0)
+        with zipfile.ZipFile(DIRECT_SERVICE) as package:
+            self.assertIsNone(package.testzip())
+            self.assertNotIn("UnappliedChanges", package.namelist())
+            schema = json.loads(
+                package.read("DataModelSchema").decode("utf-16-le")
+            )
+
+        expressions = {
+            item["name"]: item
+            for item in schema["model"]["expressions"]
+        }
+        environment = expressions["Dataverse Environment URL (required)"]
+        assert_customer_neutral_parameters(self, schema)
+        self.assertTrue(environment["expression"].startswith('"" meta'))
+        self.assertIn("IsParameterQueryRequired=true", environment["expression"])
+        self.assertNotIn("Org Data File", expressions)
+        self.assertNotIn("Agent Credits  (optional)", expressions)
+
+        all_query_text = "\n".join(
+            "\n".join(expression)
+            if isinstance(expression, list)
+            else expression
+            for table in schema["model"]["tables"]
+            for partition in table.get("partitions", [])
+            if (
+                expression := partition.get("source", {}).get("expression")
+            ) is not None
+        )
+        self.assertEqual(
+            all_query_text.count(
+                'Cds.Entities(#"Dataverse Environment URL (required)", null)'
+            ),
+            1,
+        )
+        self.assertNotIn("Cds.Entities(_EnvUrl", all_query_text)
+        self.assertNotIn("File.Contents", all_query_text)
+        self.assertNotIn("Web.Contents", all_query_text)
+
+    def test_service_direct_rejects_customer_specific_inputs(self):
+        with self.assertRaisesRegex(ValueError, "customer-neutral"):
+            build_package(
+                SOURCE,
+                Path("unused.pbit"),
+                "https://orgexample.crm.dynamics.com",
+                mode="service-direct",
             )
 
     def test_service_query_is_independent_of_customer_url(self):

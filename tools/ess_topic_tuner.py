@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import uuid
 from collections import Counter, defaultdict
 from itertools import product
 from pathlib import Path
@@ -1043,6 +1044,13 @@ def merge_customer_rules(saved: list[dict], explicit: list[dict], learned: list[
     return [merged[key] for key in sorted(merged)]
 
 
+def publication_rule_counts(rules: list[dict]) -> Counter:
+    return Counter(
+        tuple((column, rule.get(column)) for column in RULE_COLUMNS)
+        for rule in rules
+    )
+
+
 def rules_from_override_rows(rows: list[dict]) -> list[dict]:
     rules = []
     for row in rows:
@@ -1116,8 +1124,9 @@ def workflow_outcome(report: dict, rows: list[dict], args: argparse.Namespace) -
             status="review-required",
             message="REVIEW REQUIRED: No rules are ready yet. " + reason,
             reviewFile=str(review.resolve()),
-            action=next_command(args, "--review", review),
         )
+        if args.analyze_only or args.non_interactive:
+            outcome["action"] = next_command(args, "--review", review)
     else:
         if report["ambiguousRows"]:
             reason = "Ambiguous matches cannot be labeled safely. Gather distinct native-labeled examples for each meaning."
@@ -1137,7 +1146,10 @@ def print_outcome(outcome: dict) -> None:
         print("Review only this file: " + outcome["reviewFile"])
         print("Fill in Vertical and CanonicalTopic; adjust Keywords or Exclusions if needed.")
         print("Set Enabled=true only for rules you approve; leave unsafe or ambiguous rows disabled.")
-        print("Save and close the CSV. If finishing later, use this recovery command:")
+        if "action" in outcome:
+            print("Save and close the CSV. Then use this recovery command:")
+        else:
+            print("Save and close the CSV, then return to this same window. Another run is not needed.")
     elif outcome["status"] == "ready":
         if "action" in outcome:
             print("Analysis only. Run this command when you want to apply the rules:")
@@ -1160,6 +1172,15 @@ def tuner_output_paths(output_dir: Path) -> dict[str, Path]:
         "rules": output_dir / "customer-topic-overrides.json",
         "privacy_report": output_dir / "privacy-report.json",
     }
+
+
+def select_analysis_output_dir(output_dir: Path) -> Path:
+    if not output_dir.exists() or not any(output_dir.iterdir()):
+        return output_dir
+    while True:
+        candidate = output_dir / f"run-{uuid.uuid4().hex[:8]}"
+        if not candidate.exists():
+            return candidate
 
 
 def validate_tuner_output(args: argparse.Namespace, *additional_inputs: Path) -> Path:
@@ -1185,8 +1206,13 @@ def validate_tuner_output(args: argparse.Namespace, *additional_inputs: Path) ->
     return output
 
 
-def apply_dataverse_rules(path: Path, args: argparse.Namespace) -> int:
-    output = validate_tuner_output(args, path)
+def apply_dataverse_rules(
+    path: Path,
+    args: argparse.Namespace,
+    *,
+    validated_output: Path | None = None,
+) -> int:
+    output = validated_output or validate_tuner_output(args, path)
     _, validation = validate_topic_overrides(path)
     if not validation["enabledRules"]:
         raise ValueError("No approved rules are available. Keep the existing template unchanged; do not import the empty JSON.")
@@ -1205,7 +1231,7 @@ def apply_dataverse_rules(path: Path, args: argparse.Namespace) -> int:
 
 
 def review_and_apply(path: Path, args: argparse.Namespace) -> int:
-    validate_tuner_output(args, path)
+    validated_output = validate_tuner_output(args, path)
     rules = rules_from_override_rows(read_override_rows(path))
     if not rules:
         print("STOP: No approved rules are available. Keep the existing template unchanged. Leave unsafe rows disabled.")
@@ -1219,7 +1245,11 @@ def review_and_apply(path: Path, args: argparse.Namespace) -> int:
             json.dump([{column: rule[column] for column in RULE_COLUMNS} for rule in rules], candidate,
                       ensure_ascii=False, separators=(",", ":"))
             candidate.write("\n")
-        result = apply_dataverse_rules(output, args)
+        result = apply_dataverse_rules(
+            output,
+            args,
+            validated_output=validated_output,
+        )
         applied = result == 0
         if not applied:
             print("ERROR: Reviewed rules could not be activated; the template build or commit failed.", file=sys.stderr)
@@ -1237,21 +1267,33 @@ def review_and_apply(path: Path, args: argparse.Namespace) -> int:
                     output.unlink(missing_ok=True)
 
 
-def finish_analysis(outcome: dict, args: argparse.Namespace) -> int:
+def finish_analysis(
+    outcome: dict,
+    args: argparse.Namespace,
+    validated_output: Path | None = None,
+) -> int:
     if args.analyze_only:
         return 0
     if outcome["status"] == "ready":
-        return apply_dataverse_rules(tuner_output_paths(args.output_dir)["rules"], args)
+        return apply_dataverse_rules(
+            tuner_output_paths(args.output_dir)["rules"],
+            args,
+            validated_output=validated_output,
+        )
     if outcome["status"] == "review-required" and not args.non_interactive and sys.stdin.isatty():
         print("You can finish review in this session; another run is not needed.")
         try:
             answer = input("Edit, save and close the review CSV. Press Enter to validate and build, or type skip to leave the template unchanged: ")
         except EOFError:
-            print("No review response received. Template unchanged. Use the printed review command later.")
+            print("No review response received. Template unchanged. After saving the review CSV, run:")
+            print(next_command(args, "--review", Path(outcome["reviewFile"])))
             return 0
         if not answer.strip():
             return review_and_apply(Path(outcome["reviewFile"]), args)
-        print("Template unchanged. You can use the printed review command later.")
+        print("Template unchanged.")
+    elif outcome["status"] == "review-required" and "action" not in outcome:
+        print("This session cannot wait for review. After saving the review CSV, run:")
+        print(next_command(args, "--review", Path(outcome["reviewFile"])))
     return 0
 
 
@@ -1259,11 +1301,16 @@ def main() -> int:
     args = parse_args()
     if sys.version_info < (3, 10):
         raise ValueError("Python 3.10 or later is required.")
-    validate_tuner_output(args)
     if args.apply:
         return apply_dataverse_rules(args.apply, args)
     if args.review:
         return review_and_apply(args.review, args)
+    requested_output_dir = args.output_dir
+    args.output_dir = select_analysis_output_dir(requested_output_dir)
+    validated_output = validate_tuner_output(
+        args,
+        *tuner_output_paths(requested_output_dir).values(),
+    )
     saved_rows = saved_override_rows(args.settings_file)
     published_rules = [{column: row[column] for column in RULE_COLUMNS} for row in saved_rows]
     if not args.json:
@@ -1335,10 +1382,6 @@ def main() -> int:
 
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
-    if any(output_dir.iterdir()):
-        output_dir = Path(tempfile.mkdtemp(prefix="run-", dir=output_dir))
-    args.output_dir = output_dir
-    validate_tuner_output(args)
     outputs = tuner_output_paths(output_dir)
     write_csv(outputs["enrichment"], enrichments, tuple(enrichments[0].keys()) if enrichments else (
         "ConversationHash", "Topic", "Vertical", "Language", "Confidence", "Source", "RuleSource", "ClassifierVersion"
@@ -1354,6 +1397,8 @@ def main() -> int:
         {column: rule[column] for column in RULE_COLUMNS}
         for rule in customer_rules
     ]
+    desired_rule_counts = publication_rule_counts(public_rules)
+    published_rule_counts = publication_rule_counts(published_rules)
     outputs["rules"].write_text(
         json.dumps(public_rules, ensure_ascii=False, separators=(",", ":")) + "\n",
         encoding="utf-8",
@@ -1378,8 +1423,10 @@ def main() -> int:
         "minimumCandidateFrequency": args.min_frequency,
         "candidateRulesGenerated": len(candidates),
         "approvedCustomerRules": len(approved_customer_rules),
-        "newOrUpdatedApprovedRules": sum(rule not in published_rules for rule in public_rules),
-        "publicationRequired": public_rules != published_rules,
+        "newOrUpdatedApprovedRules": sum(
+            (desired_rule_counts - published_rule_counts).values()
+        ),
+        "publicationRequired": desired_rule_counts != published_rule_counts,
         "nativeTopicTrainingExamples": sum(
             is_learnable_native_topic(example.get("native_topic"))
             for record in records
@@ -1417,7 +1464,7 @@ def main() -> int:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
         print_outcome(report["outcome"])
-    return finish_analysis(report["outcome"], args)
+    return finish_analysis(report["outcome"], args, validated_output)
 
 
 if __name__ == "__main__":

@@ -40,7 +40,8 @@ DISABLED_FILE_PARAMETERS = (
     ORG_DATA_PARAMETER,
     CREDITS_PARAMETER,
 )
-BUILD_MODES = ("service-refresh", "desktop-validation")
+BUILD_MODES = ("service-refresh", "desktop-validation", "service-direct")
+SERVICE_MODES = ("service-refresh", "service-direct")
 TOPIC_RULE_COLUMNS = (
     "Locale",
     "Vertical",
@@ -117,6 +118,14 @@ PARAMETER_DESCRIPTIONS = {
         "approved agents. Leave blank to use transcript-native reactions only."
     ),
 }
+DIRECT_FEEDBACK_DESCRIPTION = (
+    "Optional. Prepared Monitor feedback events whose Conversation ID matches one "
+    "exact loaded conversation. Use the guided setup for registry-dependent "
+    "Microsoft 365 Product Feedback. Leave blank to use transcript-native reactions only."
+)
+PACKAGED_PLACEHOLDER_EXAMPLES = (
+    " (e.g. https://orgabc12345.crm.dynamics.com)",
+)
 CONTENT_TYPES_NAMESPACE = (
     "http://schemas.openxmlformats.org/package/2006/content-types"
 )
@@ -127,6 +136,20 @@ RELATIONSHIPS_NAMESPACE = (
 
 def m_text(value: str) -> str:
     return f'"{value.replace(chr(34), chr(34) * 2)}"'
+
+
+def strip_packaged_placeholder_examples(value):
+    if isinstance(value, dict):
+        return {
+            key: strip_packaged_placeholder_examples(child)
+            for key, child in value.items()
+        }
+    if isinstance(value, list):
+        return [strip_packaged_placeholder_examples(child) for child in value]
+    if isinstance(value, str):
+        for example in PACKAGED_PLACEHOLDER_EXAMPLES:
+            value = value.replace(example, "")
+    return value
 
 
 def normalize_environment_url(value: str) -> str:
@@ -548,6 +571,10 @@ def update_parameter_metadata(
     for name, parameter_description in PARAMETER_DESCRIPTIONS.items():
         if name in schema_expressions:
             schema_expressions[name]["description"] = parameter_description
+    if mode == "service-direct":
+        schema_expressions[FEEDBACK_PARAMETER]["description"] = (
+            DIRECT_FEEDBACK_DESCRIPTION
+        )
 
     if registry_json is not None:
         registry_expression = m_text(registry_json)
@@ -572,7 +599,7 @@ def update_parameter_metadata(
             '[IsParameterQuery=true, Type="Text", IsParameterQueryRequired=false]'
         )
 
-    if mode == "service-refresh":
+    if mode in SERVICE_MODES:
         schema["model"]["expressions"] = [
             item
             for item in schema["model"]["expressions"]
@@ -643,10 +670,17 @@ def build_package(
 ) -> None:
     if mode not in BUILD_MODES:
         raise ValueError(f"Build mode must be one of: {', '.join(BUILD_MODES)}")
-    if mode == "service-refresh" and (org_data_file or credits_file):
+    if mode in SERVICE_MODES and (org_data_file or credits_file):
         raise ValueError(
             "Org Data and Agent Credits files are not supported in Service-refresh "
             "mode. Use --mode desktop-validation or Fabric."
+        )
+    if mode == "service-direct" and any(
+        (environment_url, registry_json, overrides_json, feedback_json)
+    ):
+        raise ValueError(
+            "Service-direct mode must remain customer-neutral. Enter the Environment "
+            "URL in Power BI and use the guided setup for optional embedded inputs."
         )
     with zipfile.ZipFile(input_path, "r") as source:
         entries = source.infolist()
@@ -661,9 +695,11 @@ def build_package(
     changes = json.loads(
         payloads["UnappliedChanges"].decode("utf-16-le")
     )
+    schema = strip_packaged_placeholder_examples(schema)
+    changes = strip_packaged_placeholder_examples(changes)
     materialize_unapplied_queries(schema, changes)
     schema["name"] = str(uuid.uuid4())
-    if mode == "service-refresh":
+    if mode in SERVICE_MODES:
         build_query_expressions(schema)
     update_parameter_metadata(
         schema,
@@ -711,13 +747,17 @@ def main() -> None:
         )
     )
     parser.add_argument("--input", required=True, type=Path)
-    parser.add_argument("--environment-url", required=True)
+    parser.add_argument("--environment-url")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument(
         "--mode",
         choices=BUILD_MODES,
         default="service-refresh",
-        help="service-refresh removes local file sources; desktop-validation preserves them.",
+        help=(
+            "service-refresh removes local file sources and prefills a validated URL; "
+            "service-direct leaves the required URL blank for a generic publishable "
+            "template; desktop-validation preserves local file sources."
+        ),
     )
     parser.add_argument(
         "--agent-registry-json",
@@ -749,13 +789,34 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    environment_url = normalize_environment_url(args.environment_url)
-    if args.mode == "service-refresh" and (
+    if args.mode == "service-direct":
+        if args.environment_url:
+            raise ValueError(
+                "--environment-url is not accepted in service-direct mode. Enter it "
+                "when the generated PBIT opens in Power BI."
+            )
+        environment_url = ""
+    else:
+        if not args.environment_url:
+            parser.error(
+                "--environment-url is required unless --mode service-direct is used"
+            )
+        environment_url = normalize_environment_url(args.environment_url)
+    if args.mode in SERVICE_MODES and (
         args.org_data_file or args.agent_credits_file
     ):
         raise ValueError(
             "--org-data-file and --agent-credits-file are Desktop-only. "
             "Use --mode desktop-validation or Fabric."
+        )
+    if args.mode == "service-direct" and (
+        args.agent_registry_json
+        or args.topic_overrides_json
+        or args.feedback_events_json
+    ):
+        raise ValueError(
+            "Service-direct mode does not embed customer-specific inputs. Use "
+            "service-refresh through the guided setup for those enhancements."
         )
 
     registry_rows, registry_json = serialize_registry(args.agent_registry_json)
