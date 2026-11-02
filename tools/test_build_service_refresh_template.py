@@ -20,11 +20,11 @@ from build_service_refresh_template import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
 DIRECT_SERVICE = (
     ROOT
     / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
 )
+SOURCE = DIRECT_SERVICE
 
 DIRECT_PARAMETER_DEFAULTS = {
     "Dataverse Environment URL (required)": (
@@ -235,20 +235,23 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 )
 
             with zipfile.ZipFile(SOURCE) as source_package:
-                source_changes = json.loads(
-                    source_package.read("UnappliedChanges").decode("utf-16-le")
+                source_schema = json.loads(
+                    source_package.read("DataModelSchema").decode("utf-16-le")
                 )
-            source_queries = {
-                query["name"]: (
-                    "\n".join(query["text"])
-                    if isinstance(query["text"], list)
-                    else query["text"]
-                )
-                for query in source_changes["queries"]
-            }
+            source_table = next(
+                table
+                for table in source_schema["model"]["tables"]
+                if table["name"] == "ConversationFeedback"
+            )
+            source_expression = source_table["partitions"][0]["source"]["expression"]
+            source_text = (
+                "\n".join(source_expression)
+                if isinstance(source_expression, list)
+                else source_expression
+            )
             self.assertEqual(
                 model_expressions["ConversationFeedback"],
-                source_queries["ConversationFeedback"],
+                source_text,
             )
 
     def test_builds_customer_neutral_direct_publish_template(self):

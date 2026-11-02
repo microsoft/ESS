@@ -438,6 +438,12 @@ def _credit_scope_block() -> str:
 
 def patch_agent_credits_query(expression: str) -> str:
     empty_schema = expression.split("EmptyTable = #table", 1)[0]
+    if (
+        "AgentKey" in empty_schema
+        and "AgentLabel" in empty_schema
+        and "AddedAgentGUID" not in expression
+    ):
+        return expression
     if "AgentKey = nullable text" not in empty_schema:
         expression = expression.replace(
             "ActivityDate = nullable date, AgentGUID = nullable text",
@@ -849,53 +855,54 @@ def patch_pbit(source: Path, destination: Path) -> dict:
         schema, ensure_ascii=False, separators=(",", ":")
     ).encode("utf-16-le")
 
-    raw = parts["UnappliedChanges"].decode("utf-16-le")
-    for query in (
-        {
-            "name": SCOPE_PARAMETER,
-            "lineageTag": SCOPE_PARAMETER_LINEAGE,
-            "description": scope_description,
-            "navigationStepName": "Navigation",
-            "text": [scope_expression],
-            "loadAsTableDisabled": True,
-            "resultType": "Text",
-            "isHidden": is_dataverse_v21,
-        },
-        {
-            "name": REGISTRY_PARAMETER,
-            "lineageTag": REGISTRY_PARAMETER_LINEAGE,
-            "description": registry_description,
-            "navigationStepName": "Navigation",
-            "text": [registry_expression],
-            "loadAsTableDisabled": True,
-            "resultType": "Text",
-            "isHidden": is_dataverse_v21,
-        },
-        {
-            "name": REGISTRY_QUERY,
-            "lineageTag": REGISTRY_QUERY_LINEAGE,
-            "text": registry_query.splitlines(),
-            "loadAsTableDisabled": True,
-            "resultType": "Table",
-            "isHidden": False,
-        },
-    ):
-        raw = insert_query_raw(raw, query)
-    raw = replace_query_text_raw(
-        raw,
-        SCOPE_PARAMETER,
-        lambda _: scope_expression,
-    )
-    raw = replace_query_text_raw(
-        raw,
-        REGISTRY_PARAMETER,
-        lambda _: registry_expression,
-    )
-    raw = replace_query_text_raw(raw, REGISTRY_QUERY, lambda _: registry_query)
-    for table_name, transform in transforms.items():
-        raw = replace_query_text_raw(raw, table_name, transform)
-    json.loads(raw)
-    parts["UnappliedChanges"] = raw.encode("utf-16-le")
+    if "UnappliedChanges" in parts:
+        raw = parts["UnappliedChanges"].decode("utf-16-le")
+        for query in (
+            {
+                "name": SCOPE_PARAMETER,
+                "lineageTag": SCOPE_PARAMETER_LINEAGE,
+                "description": scope_description,
+                "navigationStepName": "Navigation",
+                "text": [scope_expression],
+                "loadAsTableDisabled": True,
+                "resultType": "Text",
+                "isHidden": is_dataverse_v21,
+            },
+            {
+                "name": REGISTRY_PARAMETER,
+                "lineageTag": REGISTRY_PARAMETER_LINEAGE,
+                "description": registry_description,
+                "navigationStepName": "Navigation",
+                "text": [registry_expression],
+                "loadAsTableDisabled": True,
+                "resultType": "Text",
+                "isHidden": is_dataverse_v21,
+            },
+            {
+                "name": REGISTRY_QUERY,
+                "lineageTag": REGISTRY_QUERY_LINEAGE,
+                "text": registry_query.splitlines(),
+                "loadAsTableDisabled": True,
+                "resultType": "Table",
+                "isHidden": False,
+            },
+        ):
+            raw = insert_query_raw(raw, query)
+        raw = replace_query_text_raw(
+            raw,
+            SCOPE_PARAMETER,
+            lambda _: scope_expression,
+        )
+        raw = replace_query_text_raw(
+            raw,
+            REGISTRY_PARAMETER,
+            lambda _: registry_expression,
+        )
+        raw = replace_query_text_raw(raw, REGISTRY_QUERY, lambda _: registry_query)
+        for table_name, transform in transforms.items():
+            raw = replace_query_text_raw(raw, table_name, transform)
+        json.loads(raw)
+        parts["UnappliedChanges"] = raw.encode("utf-16-le")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
@@ -903,7 +910,8 @@ def patch_pbit(source: Path, destination: Path) -> dict:
             archive.writestr(info, parts[info.filename])
     with zipfile.ZipFile(destination, "r") as archive:
         json.loads(archive.read("DataModelSchema").decode("utf-16-le"))
-        json.loads(archive.read("UnappliedChanges").decode("utf-16-le"))
+        if "UnappliedChanges" in archive.namelist():
+            json.loads(archive.read("UnappliedChanges").decode("utf-16-le"))
     return {"source": str(source), "destination": str(destination), "status": "ok"}
 
 

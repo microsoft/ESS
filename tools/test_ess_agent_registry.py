@@ -29,7 +29,7 @@ class AgentRegistryTests(unittest.TestCase):
     def test_direct_pbit_patch_is_idempotent_and_canonical(self) -> None:
         names = (
             "ESS Dashboard - Dynamic Topics (CSV) V18.pbit",
-            "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit",
+            "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit",
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
@@ -40,12 +40,25 @@ class AgentRegistryTests(unittest.TestCase):
                 patch_pbit(first / name, second / name)
                 with zipfile.ZipFile(first / name) as archive:
                     first_schema_raw = archive.read("DataModelSchema")
-                    first_unapplied_raw = archive.read("UnappliedChanges")
+                    first_unapplied_raw = (
+                        archive.read("UnappliedChanges")
+                        if "UnappliedChanges" in archive.namelist()
+                        else None
+                    )
                     schema = json.loads(first_schema_raw.decode("utf-16-le"))
-                    unapplied = json.loads(first_unapplied_raw.decode("utf-16-le"))
+                    unapplied = (
+                        json.loads(first_unapplied_raw.decode("utf-16-le"))
+                        if first_unapplied_raw is not None
+                        else None
+                    )
                 with zipfile.ZipFile(second / name) as archive:
                     self.assertEqual(first_schema_raw, archive.read("DataModelSchema"))
-                    self.assertEqual(first_unapplied_raw, archive.read("UnappliedChanges"))
+                    self.assertEqual(
+                        first_unapplied_raw,
+                        archive.read("UnappliedChanges")
+                        if "UnappliedChanges" in archive.namelist()
+                        else None,
+                    )
 
                 model = schema["model"]
                 expressions = [item["name"] for item in model["expressions"]]
@@ -122,6 +135,35 @@ class AgentRegistryTests(unittest.TestCase):
                     text = "\n".join(expression) if isinstance(expression, list) else expression
                     self.assertNotIn("'Agent Performance'[BotId]", text)
                     self.assertNotIn("AgentCredits[AgentGUID]", text)
+
+                if unapplied is None:
+                    materialized_queries = {}
+                    for table_name in (
+                        "Agent Performance",
+                        "AgentCredits",
+                        "ConversationFeedback",
+                    ):
+                        expression = tables[table_name]["partitions"][0]["source"]["expression"]
+                        materialized_queries[table_name] = (
+                            "\n".join(expression)
+                            if isinstance(expression, list)
+                            else expression
+                        )
+                    self.assertIn(
+                        "Agent registry scope: begin",
+                        materialized_queries["Agent Performance"],
+                    )
+                    self.assertIn(
+                        "Agent registry feedback resolution",
+                        materialized_queries["ConversationFeedback"],
+                    )
+                    self.assertIn(
+                        'resolvedAgentKey = if matched then [MatchedAgentKey] else registryAgentKey',
+                        materialized_queries["ConversationFeedback"],
+                    )
+                    self.assertIn("AgentKey", materialized_queries["AgentCredits"])
+                    self.assertIn("AgentLabel", materialized_queries["AgentCredits"])
+                    continue
 
                 query_names = [query["name"] for query in unapplied["queries"]]
                 self.assertEqual(len(query_names), len(set(query_names)))

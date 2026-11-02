@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import csv
+import gzip
+import hashlib
 import io
 import json
 import os
@@ -126,6 +129,12 @@ DIRECT_FEEDBACK_DESCRIPTION = (
 PACKAGED_PLACEHOLDER_EXAMPLES = (
     " (e.g. https://orgabc12345.crm.dynamics.com)",
 )
+DESKTOP_SOURCE_PAYLOAD_SHA256 = (
+    "c044a61c4d09c4fa93e9b135be53908737999c4fca23d3cef0b6f4608d3dc241"
+)
+DESKTOP_SOURCE_PAYLOAD = (
+    "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"
+)
 CONTENT_TYPES_NAMESPACE = (
     "http://schemas.openxmlformats.org/package/2006/content-types"
 )
@@ -150,6 +159,29 @@ def strip_packaged_placeholder_examples(value):
         for example in PACKAGED_PLACEHOLDER_EXAMPLES:
             value = value.replace(example, "")
     return value
+
+
+def restore_desktop_sources(schema: dict) -> None:
+    payload_bytes = gzip.decompress(base64.b64decode(DESKTOP_SOURCE_PAYLOAD))
+    if hashlib.sha256(payload_bytes).hexdigest() != DESKTOP_SOURCE_PAYLOAD_SHA256:
+        raise ValueError("Desktop source definitions failed their integrity check")
+    payload = json.loads(payload_bytes)
+    expressions = schema["model"]["expressions"]
+    existing = {item["name"] for item in expressions}
+    for parameter in payload["parameters"]:
+        if parameter["name"] not in existing:
+            expressions.append(parameter)
+    tables = {
+        table["name"]: table
+        for table in schema["model"]["tables"]
+    }
+    for table_name, expression in payload["queries"].items():
+        partition = tables[table_name]["partitions"][0]
+        source = partition["source"]
+        source["expression"] = store_expression(
+            source["expression"],
+            expression_text(expression),
+        )
 
 
 def normalize_environment_url(value: str) -> str:
@@ -692,12 +724,15 @@ def build_package(
     schema = json.loads(
         payloads["DataModelSchema"].decode("utf-16-le")
     )
-    changes = json.loads(
-        payloads["UnappliedChanges"].decode("utf-16-le")
-    )
     schema = strip_packaged_placeholder_examples(schema)
-    changes = strip_packaged_placeholder_examples(changes)
-    materialize_unapplied_queries(schema, changes)
+    if "UnappliedChanges" in payloads:
+        changes = json.loads(
+            payloads["UnappliedChanges"].decode("utf-16-le")
+        )
+        changes = strip_packaged_placeholder_examples(changes)
+        materialize_unapplied_queries(schema, changes)
+    if mode == "desktop-validation":
+        restore_desktop_sources(schema)
     schema["name"] = str(uuid.uuid4())
     if mode in SERVICE_MODES:
         build_query_expressions(schema)
@@ -717,7 +752,8 @@ def build_package(
         ensure_ascii=False,
         separators=(",", ":"),
     ).encode("utf-16-le")
-    entries = remove_unapplied_changes(entries, payloads)
+    if "UnappliedChanges" in payloads:
+        entries = remove_unapplied_changes(entries, payloads)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     handle, temporary_name = tempfile.mkstemp(

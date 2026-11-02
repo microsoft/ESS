@@ -631,39 +631,40 @@ def patch_direct_pbit(source: Path, destination: Path) -> None:
     repair_glossary_sort_metadata(model)
     parts["DataModelSchema"] = json.dumps(schema, ensure_ascii=False, separators=(",", ":")).encode("utf-16-le")
 
-    raw = parts["UnappliedChanges"].decode("utf-16-le")
-    raw = strip_packaged_placeholder_examples(raw)
-    raw = rename_query_raw(raw, OLD_FEEDBACK_PARAMETER, FEEDBACK_PARAMETER)
-    raw = insert_query_raw(
-        raw,
-        {
-            "name": FEEDBACK_PARAMETER,
-            "lineageTag": FEEDBACK_PARAMETER_LINEAGE,
-            "description": FEEDBACK_PARAMETER_DESCRIPTION,
-            "navigationStepName": "Navigation",
-            "text": [FEEDBACK_PARAMETER_EXPRESSION],
-            "loadAsTableDisabled": True,
-            "resultType": "Text",
-            "isHidden": False,
-        },
-    )
-    raw = insert_query_raw(
-        raw,
-        {
-            "name": FEEDBACK_QUERY,
-            "lineageTag": FEEDBACK_QUERY_LINEAGE,
-            "text": external_query.splitlines(),
-            "loadAsTableDisabled": True,
-            "resultType": "List",
-            "isHidden": False,
-        },
-    )
-    raw = replace_query_text_raw(raw, FEEDBACK_PARAMETER, lambda _: FEEDBACK_PARAMETER_EXPRESSION)
-    raw = replace_query_text_raw(raw, FEEDBACK_QUERY, lambda _: external_query)
-    raw = replace_query_text_raw(raw, "Agent Performance", patch_native_feedback_query)
-    raw = replace_query_text_raw(raw, "ConversationFeedback", lambda _: feedback_query)
-    json.loads(raw)
-    parts["UnappliedChanges"] = raw.encode("utf-16-le")
+    if "UnappliedChanges" in parts:
+        raw = parts["UnappliedChanges"].decode("utf-16-le")
+        raw = strip_packaged_placeholder_examples(raw)
+        raw = rename_query_raw(raw, OLD_FEEDBACK_PARAMETER, FEEDBACK_PARAMETER)
+        raw = insert_query_raw(
+            raw,
+            {
+                "name": FEEDBACK_PARAMETER,
+                "lineageTag": FEEDBACK_PARAMETER_LINEAGE,
+                "description": FEEDBACK_PARAMETER_DESCRIPTION,
+                "navigationStepName": "Navigation",
+                "text": [FEEDBACK_PARAMETER_EXPRESSION],
+                "loadAsTableDisabled": True,
+                "resultType": "Text",
+                "isHidden": False,
+            },
+        )
+        raw = insert_query_raw(
+            raw,
+            {
+                "name": FEEDBACK_QUERY,
+                "lineageTag": FEEDBACK_QUERY_LINEAGE,
+                "text": external_query.splitlines(),
+                "loadAsTableDisabled": True,
+                "resultType": "List",
+                "isHidden": False,
+            },
+        )
+        raw = replace_query_text_raw(raw, FEEDBACK_PARAMETER, lambda _: FEEDBACK_PARAMETER_EXPRESSION)
+        raw = replace_query_text_raw(raw, FEEDBACK_QUERY, lambda _: external_query)
+        raw = replace_query_text_raw(raw, "Agent Performance", patch_native_feedback_query)
+        raw = replace_query_text_raw(raw, "ConversationFeedback", lambda _: feedback_query)
+        json.loads(raw)
+        parts["UnappliedChanges"] = raw.encode("utf-16-le")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:

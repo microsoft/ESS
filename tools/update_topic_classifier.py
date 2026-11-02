@@ -492,38 +492,39 @@ def patch_pbit(source: Path, destination: Path, topic_rules: str, classifier: st
     patch_partition(model)
     parts["DataModelSchema"] = json.dumps(schema, ensure_ascii=False, separators=(",", ":")).encode("utf-16-le")
 
-    unapplied_raw = parts["UnappliedChanges"].decode("utf-16-le")
-    unapplied_raw = insert_query_raw(
-        unapplied_raw,
-        {
-            "name": OVERRIDES_PARAMETER,
-            "lineageTag": OVERRIDES_PARAMETER_LINEAGE,
-            "description": OVERRIDES_PARAMETER_DESCRIPTION,
-            "navigationStepName": "Navigation",
-            "text": [OVERRIDES_PARAMETER_EXPRESSION],
-            "loadAsTableDisabled": True,
-            "resultType": "Text",
-            "isHidden": False,
-        },
-    )
-    unapplied_raw = insert_query_raw(
-        unapplied_raw,
-        {
-            "name": OVERRIDES_QUERY,
-            "lineageTag": OVERRIDES_QUERY_LINEAGE,
-            "text": customer_topic_rules.splitlines(),
-            "loadAsTableDisabled": True,
-            "resultType": "List",
-            "isHidden": False,
-        },
-    )
-    unapplied_raw = replace_query_text_raw(unapplied_raw, OVERRIDES_PARAMETER, lambda _: OVERRIDES_PARAMETER_EXPRESSION)
-    unapplied_raw = replace_query_text_raw(unapplied_raw, OVERRIDES_QUERY, lambda _: customer_topic_rules)
-    unapplied_raw = replace_query_text_raw(unapplied_raw, "TopicRules", lambda _: topic_rules)
-    unapplied_raw = replace_query_text_raw(unapplied_raw, "ClassifyTopic", lambda _: classifier)
-    unapplied_raw = replace_query_text_raw(unapplied_raw, "Agent Performance", replace_derived_block)
-    json.loads(unapplied_raw)
-    parts["UnappliedChanges"] = unapplied_raw.encode("utf-16-le")
+    if "UnappliedChanges" in parts:
+        unapplied_raw = parts["UnappliedChanges"].decode("utf-16-le")
+        unapplied_raw = insert_query_raw(
+            unapplied_raw,
+            {
+                "name": OVERRIDES_PARAMETER,
+                "lineageTag": OVERRIDES_PARAMETER_LINEAGE,
+                "description": OVERRIDES_PARAMETER_DESCRIPTION,
+                "navigationStepName": "Navigation",
+                "text": [OVERRIDES_PARAMETER_EXPRESSION],
+                "loadAsTableDisabled": True,
+                "resultType": "Text",
+                "isHidden": False,
+            },
+        )
+        unapplied_raw = insert_query_raw(
+            unapplied_raw,
+            {
+                "name": OVERRIDES_QUERY,
+                "lineageTag": OVERRIDES_QUERY_LINEAGE,
+                "text": customer_topic_rules.splitlines(),
+                "loadAsTableDisabled": True,
+                "resultType": "List",
+                "isHidden": False,
+            },
+        )
+        unapplied_raw = replace_query_text_raw(unapplied_raw, OVERRIDES_PARAMETER, lambda _: OVERRIDES_PARAMETER_EXPRESSION)
+        unapplied_raw = replace_query_text_raw(unapplied_raw, OVERRIDES_QUERY, lambda _: customer_topic_rules)
+        unapplied_raw = replace_query_text_raw(unapplied_raw, "TopicRules", lambda _: topic_rules)
+        unapplied_raw = replace_query_text_raw(unapplied_raw, "ClassifyTopic", lambda _: classifier)
+        unapplied_raw = replace_query_text_raw(unapplied_raw, "Agent Performance", replace_derived_block)
+        json.loads(unapplied_raw)
+        parts["UnappliedChanges"] = unapplied_raw.encode("utf-16-le")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
@@ -532,7 +533,8 @@ def patch_pbit(source: Path, destination: Path, topic_rules: str, classifier: st
 
     with zipfile.ZipFile(destination, "r") as archive:
         json.loads(archive.read("DataModelSchema").decode("utf-16-le"))
-        json.loads(archive.read("UnappliedChanges").decode("utf-16-le"))
+        if "UnappliedChanges" in archive.namelist():
+            json.loads(archive.read("UnappliedChanges").decode("utf-16-le"))
 
     return {
         "source": str(source),

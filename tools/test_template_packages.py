@@ -10,7 +10,6 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = {
     "ESS - Fabric V2.pbit": 247,
     "ESS Dashboard - Dynamic Topics (CSV) V18.pbit": 349,
-    "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit": 350,
     "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit": 349,
 }
 PUBLISHABLE_TEMPLATES = {
@@ -27,7 +26,6 @@ BOOKMARK_PATH = (
     "0a1b2c3d4e5f60718294.bookmark.json"
 )
 CUSTOMER_TEMPLATE_NAMES = (
-    "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit",
     "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit",
 )
 FORBIDDEN_CUSTOMER_MARKERS = (
@@ -93,10 +91,7 @@ class TemplatePackageTests(unittest.TestCase):
             "Report/definition/pages/glossary001aabbcc06/visuals/"
             "glossary_table_001/visual.json"
         )
-        for file_name in (
-            "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit",
-            "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit",
-        ):
+        for file_name in CUSTOMER_TEMPLATE_NAMES:
             with self.subTest(file_name=file_name), zipfile.ZipFile(ROOT / file_name) as package:
                 schema = json.loads(package.read("DataModelSchema").decode("utf-16-le"))
                 visual = json.loads(package.read(visual_path).decode("utf-8-sig"))
@@ -188,7 +183,7 @@ class TemplatePackageTests(unittest.TestCase):
     def test_hidden_visual_and_bookmark_state_is_preserved(self):
         for file_name in (
             "ESS Dashboard - Dynamic Topics (CSV) V18.pbit",
-            "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit",
+            "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit",
         ):
             with self.subTest(file_name=file_name):
                 with zipfile.ZipFile(ROOT / file_name) as package:
@@ -201,7 +196,7 @@ class TemplatePackageTests(unittest.TestCase):
 
         with zipfile.ZipFile(
             ROOT
-            / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
+            / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
         ) as package:
             bookmark = json.loads(
                 package.read(BOOKMARK_PATH).decode("utf-8-sig")
@@ -218,14 +213,11 @@ class TemplatePackageTests(unittest.TestCase):
     def test_v21_uses_agent_filter_without_registry_parameters(self):
         path = (
             ROOT
-            / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
+            / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
         )
         with zipfile.ZipFile(path) as package:
             schema = json.loads(
                 package.read("DataModelSchema").decode("utf-16-le")
-            )
-            unapplied = json.loads(
-                package.read("UnappliedChanges").decode("utf-16-le")
             )
             report_json = {
                 name: json.loads(
@@ -258,13 +250,6 @@ class TemplatePackageTests(unittest.TestCase):
             expressions["Agent Registry JSON"]["expression"],
         )
 
-        queries = {
-            item["name"]: item
-            for item in unapplied["queries"]
-        }
-        self.assertTrue(queries["Agent Scope Mode"]["isHidden"])
-        self.assertTrue(queries["Agent Registry JSON"]["isHidden"])
-
         tables = {
             table["name"]: table
             for table in schema["model"]["tables"]
@@ -286,9 +271,10 @@ class TemplatePackageTests(unittest.TestCase):
             else credits_query
         )
         self.assertIn('"raw:agent:"', transcript_text)
-        self.assertIn('"raw:agent:"', credits_text)
         self.assertNotIn('"raw:transcript:"', transcript_text)
-        self.assertNotIn('"raw:credit:"', credits_text)
+        self.assertIn("AgentKey", credits_text)
+        self.assertIn("AgentLabel", credits_text)
+        self.assertNotIn("File.Contents", credits_text)
 
         agent_slicers = []
         for value in report_json.values():
@@ -317,14 +303,11 @@ class TemplatePackageTests(unittest.TestCase):
     def test_v21_dataverse_source_uses_required_parameter_directly(self):
         path = (
             ROOT
-            / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
+            / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
         )
         with zipfile.ZipFile(path) as package:
             schema = json.loads(
                 package.read("DataModelSchema").decode("utf-16-le")
-            )
-            unapplied = json.loads(
-                package.read("UnappliedChanges").decode("utf-16-le")
             )
 
         table = next(
@@ -333,23 +316,17 @@ class TemplatePackageTests(unittest.TestCase):
             if item["name"] == "Agent Performance"
         )
         schema_expression = table["partitions"][0]["source"]["expression"]
-        unapplied_expression = next(
-            item["text"]
-            for item in unapplied["queries"]
-            if item["name"] == "Agent Performance"
-        )
         parameterized_source = (
             'Cds.Entities('
             '#"Dataverse Environment URL (required)", null)'
         )
-        for expression in (schema_expression, unapplied_expression):
-            text = (
-                "\n".join(expression)
-                if isinstance(expression, list)
-                else expression
-            )
-            self.assertEqual(text.count(parameterized_source), 1)
-            self.assertNotIn("Cds.Entities(_EnvUrl, null)", text)
+        text = (
+            "\n".join(schema_expression)
+            if isinstance(schema_expression, list)
+            else schema_expression
+        )
+        self.assertEqual(text.count(parameterized_source), 1)
+        self.assertNotIn("Cds.Entities(_EnvUrl, null)", text)
 
 
 if __name__ == "__main__":

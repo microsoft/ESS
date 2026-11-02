@@ -54,7 +54,7 @@ class TopicTunerTests(unittest.TestCase):
                 commands = (
                     [sys.executable, str(repo / "tools/ess_topic_tuner.py"), "--apply", str(rules), "--settings-file", str(settings),
                      "--template-output", str(output), "--no-open"],
-                    [sys.executable, str(repo / "tools/build_service_refresh_template.py"), "--input", str(repo / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"),
+                    [sys.executable, str(repo / "tools/build_service_refresh_template.py"), "--input", str(repo / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"),
                      "--environment-url", "https://savedqa.crm.dynamics.com", "--output", str(output), "--topic-overrides-json", str(rules)],
                     [sys.executable, str(repo / "tools/guided_dataverse_setup.py"), "--settings-file", str(settings), "--output", str(output),
                      "--topic-overrides-json", str(rules), "--non-interactive", "--no-open"],
