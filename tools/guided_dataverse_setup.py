@@ -19,7 +19,10 @@ from ess_feedback_normalizer import feedback_output_paths, reject_output_collisi
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_TEMPLATE = ROOT / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
+SOURCE_TEMPLATE = (
+    ROOT
+    / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
+)
 BUILDER = ROOT / "tools" / "build_service_refresh_template.py"
 FEEDBACK_NORMALIZER = ROOT / "tools" / "ess_feedback_normalizer.py"
 GENERATED_DIR = ROOT / "Generated Templates"

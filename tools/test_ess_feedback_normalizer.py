@@ -142,13 +142,20 @@ class FeedbackNormalizerTests(unittest.TestCase):
 
     def test_feedback_package_patch_preserves_registry_and_identity_composition(self) -> None:
         repo = Path(__file__).resolve().parents[1]
-        source = repo / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
+        source = (
+            repo
+            / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
+        )
         with tempfile.TemporaryDirectory() as temp_dir:
             destination = Path(temp_dir) / source.name
             patch_direct_pbit(source, destination)
             with zipfile.ZipFile(destination) as package:
                 schema = json.loads(package.read("DataModelSchema").decode("utf-16-le"))
-                unapplied = json.loads(package.read("UnappliedChanges").decode("utf-16-le"))
+                unapplied = (
+                    json.loads(package.read("UnappliedChanges").decode("utf-16-le"))
+                    if "UnappliedChanges" in package.namelist()
+                    else None
+                )
 
         table = next(
             item
@@ -161,13 +168,19 @@ class FeedbackNormalizerTests(unittest.TestCase):
             if isinstance(model_expression, list)
             else model_expression
         )
-        query = next(
-            item
-            for item in unapplied["queries"]
-            if item["name"] == "ConversationFeedback"
-        )
-        query_text = "\n".join(query["text"]) if isinstance(query["text"], list) else query["text"]
-        for expression in (model_text, query_text):
+        expressions = [model_text]
+        if unapplied is not None:
+            query = next(
+                item
+                for item in unapplied["queries"]
+                if item["name"] == "ConversationFeedback"
+            )
+            expressions.append(
+                "\n".join(query["text"])
+                if isinstance(query["text"], list)
+                else query["text"]
+            )
+        for expression in expressions:
             self.assertIn(
                 "resolvedAgentKey = if matched then [MatchedAgentKey] else registryAgentKey",
                 expression,
