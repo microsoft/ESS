@@ -83,12 +83,15 @@ For optional inputs, Customer Topic Overrides JSON can be pasted directly. Feedb
 
 ### Option B - Guided setup with optional enhancements
 
+This option uses the same Service-ready Dataverse PBIT as Option A. The guided Python workflow creates a local **Desktop Validation - DO NOT PUBLISH** report with the selected enhancements and prepares the separate Service publication report; it does not require a second Dataverse source template.
+
 1. [Download the complete ESS ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip).
 2. Select **Extract All** and keep the extracted folder structure intact.
 3. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/).
-4. Open the extracted `ESS-main` folder and double-click `START-HERE-DATAVERSE.cmd`. This creates the local **Desktop Validation - DO NOT PUBLISH** report and preserves the current guided workflow.
-5. Paste the Environment URL and skip optional data for the first run.
-6. When the guided checks complete, open the report.
+4. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
+5. Open the extracted `ESS-main` folder and double-click `START-HERE-DATAVERSE.cmd`. This creates the local **Desktop Validation - DO NOT PUBLISH** report and preserves the current guided workflow.
+6. Paste the Environment URL and skip optional data for the first run.
+7. When the guided checks complete, open the report.
 
 The direct Service-ready PBIT prompts for:
 
@@ -158,13 +161,17 @@ Organization data is available for Desktop/manual refresh. It is excluded from t
 
 1. In the [Power Platform admin center](https://admin.powerplatform.microsoft.com), select **Licensing -> Copilot Studio -> Summary -> Download report**.
 2. Set **Usage type** to `Copilot Credits` and choose a 30-day lookback.
-3. Download **User-Level Credit Consumption**.
+3. Download **User-Level Credit Consumption**, the MAC consumption export.
 4. Select the file under **Copilot Credits** in guided setup.
 5. Review the validation summary and resolve any agent-ID matching warning.
 
-Credits are available for Desktop/manual refresh. Use Fabric when credit ingestion must be automated.
+Fabric is not required to use credit data. The guided workflow validates and loads the MAC consumption export locally for Desktop/manual refresh. Fabric is an optional architecture only when the export must be ingested and refreshed automatically in the cloud.
 
 The export has no conversation ID. Total and billable credits are observed; cost per resolved conversation, net value, and ROI are modeled allocations.
+
+### Business Impact financial controls
+
+On the **Business Impact** page, review the **Hourly rate**, **Minutes per ticket**, and **Price per credit** controls before using modeled financial results. These customer-supplied assumptions affect the report's time-savings value, credit cost, net value, and ROI; they do not change observed conversation or credit-consumption totals.
 
 ### Product Feedback
 
@@ -201,7 +208,7 @@ If you need only Desktop/manual refresh, save the validated report as a PBIX and
 9. Select **Refresh now** and confirm **Refresh history** shows **Completed**.
 10. Only after that successful manual Service refresh, enable **Scheduled refresh**, choose the cadence, and select **Apply**. See [AUTO-REFRESH.md](./AUTO-REFRESH.md) for the complete scheduling guide.
 
-Use Fabric instead when organization or credit files must refresh automatically.
+Organization and MAC credit exports remain available through Desktop/manual refresh. Fabric is an optional automation path when those files must be ingested and refreshed in the cloud; it is not required to use either export locally.
 
 ## Troubleshooting
 
@@ -211,7 +218,7 @@ Use Fabric instead when organization or credit files must refresh automatically.
 | Total Conversations is zero | Unsupported environment, no retained records, or transcript capture disabled | Check environment type, settings, retention, and lookback |
 | Refresh is slow | Lookback is wider than needed | Use a smaller retained lookback |
 | Agent label is technical | No registry is embedded | Add a reviewed registry and rerun guided setup |
-| Organization or credit visuals are blank in Service | These local file sources are intentionally removed | Use Desktop/manual refresh for these files or Fabric for automated enrichment |
+| Organization or credit visuals are blank in Service | These local file sources are intentionally removed | Use Desktop/manual refresh for these files; Fabric is optional for automated cloud enrichment |
 | Credit visuals are blank in Desktop | No `Agent Id` matches the selected agent or registry `CreditId` | Check the export and guided validation summary |
 | Need to switch environments | The report parameter and credentials point to the previous environment | In the direct Service-ready report, update the Environment URL parameter. For guided enhancements, rerun the guided setup with the new URL. Update Dataverse credentials after publishing. |
 | Orange Apply changes banner remains | The report was prepared with an older package | Download the current Service-ready PBIT or repeat the guided setup with the current package |
