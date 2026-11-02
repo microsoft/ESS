@@ -28,7 +28,7 @@ All paths need:
 
 All Microsoft 365 administrators and readers can view and export Product feedback. Only Compliance Administrators and Global Administrators can see user identity details and delete feedback. Use the least-privileged role that meets your needs.
 
-**Dataverse Direct:** use the [guided Dataverse setup](SETUP-Dataverse.md#action-2---run-the-guided-setup-and-validate-the-report). Select the reviewed registry and raw feedback exports; do not prepare a JSON file first.
+**Dataverse with cross-channel feedback:** use [Option B in the guided Dataverse setup](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements). Select the reviewed registry and raw feedback exports; do not prepare a JSON file first. The URL-only direct PBIT has no registry input and therefore cannot safely attribute Microsoft 365 Product Feedback.
 
 **CSV or Fabric:** download and extract the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip). These paths use the included local preparation tool after export.
 
@@ -80,7 +80,7 @@ If Copilot Studio Monitor also provides a reaction export, save that CSV in the 
 
 The guided setup filters, deduplicates, validates, and embeds matching rows locally. Product Feedback requires an approved registry match. A Monitor reaction uses a registry Bot/Agent ID when present; otherwise the report includes it only after its exported Conversation ID matches one exact loaded conversation. Rows with neither form of identity are excluded.
 
-If the report will be published, follow [Build and publish the Service report](SETUP-Dataverse.md#action-3---build-and-publish-the-service-report) after the Desktop result is correct.
+If the report will be published, follow [Publish the Service report](SETUP-Dataverse.md#action-3---publish-the-service-report) after the Desktop result is correct.
 
 ### CSV V18 or Fabric V2
 

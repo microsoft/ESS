@@ -547,7 +547,7 @@ def patch_conversation_feedback_query(expression: str) -> str:
     )
     expression = expression.replace(
         '            matched = [MatchedBotId] <> null or [MatchedBotName] <> null,\n'
-        '            eventId =',
+        '            sourceEventId =',
         '''            matched = [MatchedAgentKey] <> null,
             sourceAgentId = if [AgentId] = null then "" else Text.Trim(Text.From([AgentId])),
             registryAgent = if matched then null else ResolveExternalAgent(sourceAgentId),
@@ -555,7 +555,7 @@ def patch_conversation_feedback_query(expression: str) -> str:
             registryAgentLabel = if registryAgent = null then null else registryAgent[AgentLabel],
             resolvedAgentKey = if matched then [MatchedAgentKey] else registryAgentKey,
             resolvedAgentLabel = if matched then [MatchedAgentLabel] else registryAgentLabel,
-            eventId =''',
+            sourceEventId =''',
         1,
     )
     expression = expression.replace(

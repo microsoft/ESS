@@ -4,13 +4,178 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
+from collections import Counter
 from pathlib import Path
 
 from agent_registry import active_agent_keys, load_registry, validate_registry
 from ess_feedback_normalizer import normalize_files
+from update_agent_registry import patch_conversation_feedback_query
+from update_feedback_ingestion import build_conversation_feedback_query, patch_direct_pbit
 
 
 class FeedbackNormalizerTests(unittest.TestCase):
+    def test_mixed_repeated_feedback_preserves_events_and_removes_only_true_duplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "monitor-reactions.csv"
+            with source.open("w", encoding="utf-8-sig", newline="") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=(
+                        "Reaction Id",
+                        "Conversation ID",
+                        "Reaction",
+                        "Comment",
+                        "Timestamp",
+                    ),
+                )
+                writer.writeheader()
+                writer.writerows(
+                    (
+                        {
+                            "Reaction Id": "up-1",
+                            "Conversation ID": "conversation-1",
+                            "Reaction": "Like",
+                            "Comment": "First up",
+                            "Timestamp": "2026-10-30T10:00:00Z",
+                        },
+                        {
+                            "Reaction Id": "down-1",
+                            "Conversation ID": "conversation-1",
+                            "Reaction": "Dislike",
+                            "Comment": "One down",
+                            "Timestamp": "2026-10-30T10:01:00Z",
+                        },
+                        {
+                            "Reaction Id": "up-2",
+                            "Conversation ID": "conversation-1",
+                            "Reaction": "Like",
+                            "Comment": "Second up",
+                            "Timestamp": "2026-10-30T10:02:00Z",
+                        },
+                        {
+                            "Reaction Id": "up-1",
+                            "Conversation ID": "conversation-1",
+                            "Reaction": "Like",
+                            "Comment": "Duplicate export row",
+                            "Timestamp": "2026-10-30T10:00:00Z",
+                        },
+                    )
+                )
+
+            events, audit = normalize_files([source])
+
+        self.assertEqual(len(events), 3)
+        self.assertEqual(audit["duplicatesRemoved"], 1)
+        self.assertEqual(audit["verdictCounts"], {"Thumbs Down": 1, "Thumbs Up": 2})
+        self.assertEqual(
+            {event["FeedbackComment"] for event in events},
+            {"First up", "One down", "Second up"},
+        )
+
+    def test_conversation_feedback_matches_event_identity_before_count_fallback(self) -> None:
+        query = build_conversation_feedback_query()
+
+        self.assertIn('Table.ExpandListColumn(TranscriptListed, "_nativeEvent")', query)
+        self.assertIn('Table.Distinct(Table.Buffer(TranscriptEvents), {"FeedbackEventKey"})', query)
+        self.assertIn('"_EventIdentityKey"', query)
+        self.assertIn('"_HasNativeIdentityMatch"', query)
+        self.assertIn("ExternalExactIdentityKeys", query)
+        self.assertIn("ExternalFallbackCounts", query)
+        self.assertIn('each not [_HasNativeIdentityMatch] and [_ConversationVerdictKey] <> null', query)
+        self.assertIn('each [_PairOrdinal] >= (if [_ExternalPairCount] = null then 0', query)
+        self.assertNotIn("ExternalPairCounts", query)
+        self.assertNotIn("ExternalPairKeys", query)
+
+        native = [
+            {"conversation": "conversation-1", "verdict": "Thumbs Up", "event": "A", "comment": "native A"},
+            {"conversation": "conversation-1", "verdict": "Thumbs Up", "event": "B", "comment": "native B"},
+        ]
+        external = [
+            {"conversation": "conversation-1", "verdict": "Thumbs Up", "event": "B", "comment": "external B"},
+        ]
+        native_identities = {
+            (row["conversation"].casefold(), row["verdict"].casefold(), row["event"].casefold())
+            for row in native
+        }
+        exact_external = {
+            (row["conversation"].casefold(), row["verdict"].casefold(), row["event"].casefold())
+            for row in external
+            if (row["conversation"].casefold(), row["verdict"].casefold(), row["event"].casefold())
+            in native_identities
+        }
+        remaining_native = [
+            row
+            for row in native
+            if (row["conversation"].casefold(), row["verdict"].casefold(), row["event"].casefold())
+            not in exact_external
+        ]
+        fallback_counts = Counter(
+            (row["conversation"].casefold(), row["verdict"].casefold())
+            for row in external
+            if (row["conversation"].casefold(), row["verdict"].casefold(), row["event"].casefold())
+            not in native_identities
+        )
+        retained_native = []
+        seen_pairs = Counter()
+        for row in remaining_native:
+            pair = (row["conversation"].casefold(), row["verdict"].casefold())
+            if seen_pairs[pair] >= fallback_counts[pair]:
+                retained_native.append(row)
+            seen_pairs[pair] += 1
+        reconciled = [*external, *retained_native]
+
+        self.assertEqual(len(reconciled), 2)
+        self.assertEqual({row["event"] for row in reconciled}, {"A", "B"})
+        self.assertEqual({row["comment"] for row in reconciled}, {"native A", "external B"})
+
+    def test_agent_registry_patch_preserves_event_identity_reconciliation(self) -> None:
+        query = patch_conversation_feedback_query(build_conversation_feedback_query())
+
+        self.assertIn(
+            "resolvedAgentKey = if matched then [MatchedAgentKey] else registryAgentKey",
+            query,
+        )
+        self.assertIn("sourceEventId = if [FeedbackEventId] = null", query)
+        self.assertIn("ExternalExactIdentityKeys", query)
+        self.assertIn("ExternalFallbackCounts", query)
+
+    def test_feedback_package_patch_preserves_registry_and_identity_composition(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        source = repo / "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            destination = Path(temp_dir) / source.name
+            patch_direct_pbit(source, destination)
+            with zipfile.ZipFile(destination) as package:
+                schema = json.loads(package.read("DataModelSchema").decode("utf-16-le"))
+                unapplied = json.loads(package.read("UnappliedChanges").decode("utf-16-le"))
+
+        table = next(
+            item
+            for item in schema["model"]["tables"]
+            if item["name"] == "ConversationFeedback"
+        )
+        model_expression = table["partitions"][0]["source"]["expression"]
+        model_text = (
+            "\n".join(model_expression)
+            if isinstance(model_expression, list)
+            else model_expression
+        )
+        query = next(
+            item
+            for item in unapplied["queries"]
+            if item["name"] == "ConversationFeedback"
+        )
+        query_text = "\n".join(query["text"]) if isinstance(query["text"], list) else query["text"]
+        for expression in (model_text, query_text):
+            self.assertIn(
+                "resolvedAgentKey = if matched then [MatchedAgentKey] else registryAgentKey",
+                expression,
+            )
+            self.assertIn("ExternalExactIdentityKeys", expression)
+            self.assertIn("ExternalFallbackCounts", expression)
+            self.assertNotIn("ExternalPairCounts", expression)
+
     def test_product_feedback_and_monitor_exports_normalize_and_deduplicate(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)

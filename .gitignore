@@ -17,6 +17,7 @@ Data Files/
 *RESTOREPOINT*
 *.bak
 *.bak_*
+.*-neutral-*.pbit
 
 # Local working artifacts — not part of the published repo
 ESS_Dashboard_*_Transcript_*.md
@@ -38,3 +39,4 @@ Generated Templates/
 How2Demo/
 Topic-Tuner-Validation/
 ESS Dashboard - Dynamic Topics (Dataverse) V21 - *.pbit
+!ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit

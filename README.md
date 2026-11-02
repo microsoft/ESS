@@ -17,12 +17,12 @@ Complete three actions:
 
 1. **Download and choose one path.** Select [Download ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip), extract it, and choose Dataverse Direct, CSV Upload, or Fabric below.
 2. **Validate the transcript-only baseline.** Follow only that path's guide and confirm the report works before adding other data.
-3. **Enable the report areas you need.** Add their data one source at a time. For Dataverse, validate with `START-HERE-DATAVERSE.cmd`, but publish only the separate report created by `BUILD-SERVICE-REFRESH.cmd`.
+3. **Enable the report areas you need.** Dataverse URL-only users can open and publish the [Service-ready Dataverse PBIT](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit) without Python. It accepts optional topic-override JSON and prepared Monitor feedback that can reconcile to an exact loaded conversation. Use the guided setup for Microsoft 365 Product Feedback or whenever registry, Organization, or Credits inputs are needed.
 
 > [!IMPORTANT]
-> Download the complete ZIP rather than individual templates, scripts, or notebooks. The included files were tested together.
+> Download the complete ZIP when using scripts, optional enhancements, CSV Upload, or Fabric. Dataverse URL-only users may download the Service-ready Dataverse PBIT directly.
 >
-> The Dataverse guided setup creates two intentionally different artifacts. **Desktop Validation - DO NOT PUBLISH** can include local Organization and Credits files. **Power BI Service - PUBLISH THIS** excludes those local sources and is the only Dataverse artifact intended for scheduled Service refresh.
+> The existing Dataverse guided setup remains available and creates two intentionally different artifacts. **Desktop Validation - DO NOT PUBLISH** can include local Organization and Credits files. Its generated **Power BI Service - PUBLISH THIS** counterpart excludes those local sources.
 
 ## Choose your data path
 
@@ -38,9 +38,9 @@ Choose this path when the report will use one Production, Sandbox, or Default Da
 
 **Required access:** Bot Transcript Viewer, or a custom Dataverse role with organization-level Read on `conversationtranscript`. Environment Maker alone is not enough.
 
-**Included setup:** the [Dataverse guide](./SETUP-Dataverse.md) walks through the Environment URL, a local Desktop validation build, and a separate Service publication build. Python prepares the templates; Power BI Service refreshes Dataverse directly and does not run Python.
+**Included setup:** URL-only users can open the [Service-ready Dataverse PBIT](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit), enter the required Environment URL, optionally set Transcript Lookback Days or Customer Topic Overrides JSON, then validate and publish without Python. The Feedback Events JSON parameter is for prepared Monitor events that identify one exact loaded conversation; registry-dependent Microsoft 365 Product Feedback uses the guided setup. The direct PBIT does not expose registry, Organization, or Credits file parameters. Power BI Service refreshes Dataverse directly and does not run Python.
 
-When the report opens, wait until every prefilled parameter value is visible and stable before selecting **Load**.
+When the direct report opens, paste the Environment URL and leave optional parameters blank for the baseline. Guided users should wait until prefilled values are visible and stable before selecting **Load**.
 
 **[Follow the Dataverse Direct steps ->](./SETUP-Dataverse.md)**
 
@@ -72,7 +72,7 @@ Each path guide shows the portal, exact click path, required role, expected outp
 
 | Path | Required input | Required role | Template and helper | Success checkpoint |
 |---|---|---|---|---|
-| **Dataverse Direct** | Dataverse Environment URL; no transcript CSV export | Bot Transcript Viewer or custom organization-level transcript Read | [Guided Dataverse setup](./SETUP-Dataverse.md) | Total Conversations is non-zero |
+| **Dataverse Direct** | Dataverse Environment URL; no transcript CSV export | Bot Transcript Viewer or custom organization-level transcript Read | [Service-ready PBIT or guided setup](./SETUP-Dataverse.md) | Total Conversations is non-zero |
 | **CSV Upload** | Untouched `ConversationTranscript` CSV and validated `agent-registry.json` | Bot Transcript Viewer or custom organization-level transcript Read | [CSV V18](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) plus [`tools\agent_registry.py`](./tools/agent_registry.py) | Total Conversations is non-zero and the intended agent is shown |
 | **Fabric** | Dataverse URL, application credentials, and `agent-registry.csv` | Fabric Contributor+; Entra/Power Platform admin help; Application User with transcript Read | [Fabric V2](./ESS%20-%20Fabric%20V2.pbit) plus [transcript-parser notebook](./Fabric/notebooks/Copilot_Agent_Transcript_Parser.ipynb) | Eight transcript tables exist and Total Conversations is non-zero |
 
@@ -98,6 +98,7 @@ The downloadable ZIP contains these current report artifacts:
 | File | Use |
 |---|---|
 | [`ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21.pbit) | Approved Dataverse V21 report used by the guided setup |
+| [`ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit) | Customer-neutral, Service-safe Dataverse report for URL-only setup and direct publication without Python |
 | [`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) | CSV Upload template |
 | [`ESS - Fabric V2.pbit`](./ESS%20-%20Fabric%20V2.pbit) | Fabric/Lakehouse template |
 | [`ESS Dashboard - DEMO PBIX.pbix`](./ESS%20Dashboard%20-%20DEMO%20PBIX.pbix) | Synthetic demonstration report; not a customer template |

@@ -1,4 +1,5 @@
 import json
+import re
 import unittest
 import zipfile
 from collections import Counter
@@ -10,6 +11,10 @@ TEMPLATES = {
     "ESS - Fabric V2.pbit": 247,
     "ESS Dashboard - Dynamic Topics (CSV) V18.pbit": 349,
     "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit": 350,
+    "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit": 349,
+}
+PUBLISHABLE_TEMPLATES = {
+    "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit",
 }
 VISUAL_PATHS = (
     "Report/definition/pages/bizimpact001aabbcc03/visuals/"
@@ -20,6 +25,26 @@ VISUAL_PATHS = (
 BOOKMARK_PATH = (
     "Report/definition/bookmarks/"
     "0a1b2c3d4e5f60718294.bookmark.json"
+)
+CUSTOMER_TEMPLATE_NAMES = (
+    "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit",
+    "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit",
+)
+FORBIDDEN_CUSTOMER_MARKERS = (
+    "ess-synthetic",
+    "qa payroll help",
+    "orgfdba31c9",
+    "savedqa.crm",
+    "ess-full-python-qa",
+    "qa-full-python",
+    "how2demo-full-python",
+    "20261102",
+)
+CUSTOMER_DATA_PATTERNS = (
+    re.compile(r"https://[a-z0-9][a-z0-9-]*\.crm\d*\.dynamics\.com", re.IGNORECASE),
+    re.compile(r"[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}", re.IGNORECASE),
+    re.compile(r"[a-z]:\\Users\\", re.IGNORECASE),
+    re.compile(r"\b(?:synthetic|fabricated)\b", re.IGNORECASE),
 )
 
 
@@ -40,6 +65,61 @@ def find_misplaced_display(value, path="$"):
 
 
 class TemplatePackageTests(unittest.TestCase):
+    def test_customer_templates_contain_no_loaded_or_synthetic_customer_data(self):
+        for file_name in CUSTOMER_TEMPLATE_NAMES:
+            with self.subTest(file_name=file_name), zipfile.ZipFile(ROOT / file_name) as package:
+                names = package.namelist()
+                self.assertNotIn("DataModel", names)
+                decoded = []
+                for name in names:
+                    payload = package.read(name)
+                    lowered = payload.lower()
+                    for marker in FORBIDDEN_CUSTOMER_MARKERS:
+                        self.assertNotIn(marker.encode("utf-8"), lowered, (name, marker))
+                        self.assertNotIn(marker.encode("utf-16-le"), lowered, (name, marker))
+                    if name in {"DataModelSchema", "UnappliedChanges"}:
+                        decoded.append(payload.decode("utf-16-le"))
+                    elif (
+                        name.startswith("Report/definition/")
+                        and name.endswith(".json")
+                    ):
+                        decoded.append(payload.decode("utf-8-sig"))
+                searchable_text = "\n".join(decoded)
+                for pattern in CUSTOMER_DATA_PATTERNS:
+                    self.assertIsNone(pattern.search(searchable_text), pattern.pattern)
+
+    def test_metric_glossary_preserves_rows_and_uses_valid_page_specific_sort(self):
+        visual_path = (
+            "Report/definition/pages/glossary001aabbcc06/visuals/"
+            "glossary_table_001/visual.json"
+        )
+        for file_name in (
+            "ESS Dashboard - Dynamic Topics (Dataverse) V21.pbit",
+            "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit",
+        ):
+            with self.subTest(file_name=file_name), zipfile.ZipFile(ROOT / file_name) as package:
+                schema = json.loads(package.read("DataModelSchema").decode("utf-16-le"))
+                visual = json.loads(package.read(visual_path).decode("utf-8-sig"))
+
+                glossary = next(
+                    table
+                    for table in schema["model"]["tables"]
+                    if "glossary" in table["name"].casefold()
+                )
+                metric = next(column for column in glossary["columns"] if column["name"] == "Metric")
+                self.assertNotIn("sortByColumn", metric)
+                expression = glossary["partitions"][0]["source"]["expression"]
+                lines = expression if isinstance(expression, list) else expression.splitlines()
+                row_pattern = re.compile(
+                    r'^\s*\{"(?:""|[^"])*", "(?:""|[^"])*", '
+                    r'"(?:""|[^"])*", \d+, \d+\},?\s*$'
+                )
+                self.assertEqual(sum(bool(row_pattern.match(line)) for line in lines), 143)
+                sort_fields = [
+                    item["field"]["Column"]["Property"]
+                    for item in visual["visual"]["query"]["sortDefinition"]["sort"]
+                ]
+                self.assertEqual(sort_fields, ["PageOrder", "MetricOrder"])
     def test_packages_are_valid_data_free_templates(self):
         for file_name, expected_entries in TEMPLATES.items():
             with self.subTest(file_name=file_name):
@@ -68,11 +148,15 @@ class TemplatePackageTests(unittest.TestCase):
                             "utf-16-le"
                         )
                     )
-                    json.loads(
-                        package.read("UnappliedChanges").decode(
-                            "utf-16-le"
+                    if file_name in PUBLISHABLE_TEMPLATES:
+                        self.assertNotIn("UnappliedChanges", names)
+                    else:
+                        self.assertIn("UnappliedChanges", names)
+                        json.loads(
+                            package.read("UnappliedChanges").decode(
+                                "utf-16-le"
+                            )
                         )
-                    )
                     for name in names:
                         if (
                             name.startswith("Report/definition/")

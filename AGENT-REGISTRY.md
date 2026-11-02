@@ -223,7 +223,7 @@ Replace `production-us` with the exact `EnvironmentKey` in your CSV.
 
 No registry is required to discover transcript agents in `All Agents` mode. A registry is recommended when the Copilot Studio technical name must display as a stable friendly label, when a credits export must be checked against a known `CreditId`, or when Microsoft 365 feedback uses a `T_...` title ID.
 
-Follow [Action 2 in the Dataverse Direct guide](SETUP-Dataverse.md#action-2---run-the-guided-setup-and-validate-the-report). When adding data, select the reviewed `agent-registry.csv` or `agent-registry.json` under **Agent registry**. Guided setup validates and embeds it; no separate conversion command is required.
+Follow [Option B in the Dataverse Direct guide](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements). When adding data, select the reviewed `agent-registry.csv` or `agent-registry.json` under **Agent registry**. Guided setup validates and embeds it; no separate conversion command is required.
 
 ### Fabric V2
 
