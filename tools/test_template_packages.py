@@ -11,9 +11,11 @@ TEMPLATES = {
     "ESS - Fabric V2.pbit": 247,
     "ESS Dashboard - Dynamic Topics (CSV) V18.pbit": 349,
     "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit": 349,
+    "ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit": 349,
 }
 PUBLISHABLE_TEMPLATES = {
     "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit",
+    "ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit",
 }
 VISUAL_PATHS = (
     "Report/definition/pages/bizimpact001aabbcc03/visuals/"
@@ -27,6 +29,7 @@ BOOKMARK_PATH = (
 )
 CUSTOMER_TEMPLATE_NAMES = (
     "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit",
+    "ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit",
 )
 FORBIDDEN_CUSTOMER_MARKERS = (
     "ess-synthetic",

@@ -32,7 +32,7 @@ You need:
 
 - the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip), extracted with its folder structure intact;
 - [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add Python to PATH** selected during installation;
-- a successful [Dataverse V21 baseline](SETUP-Dataverse.md);
+- a successful [Dataverse V22 baseline](SETUP-Dataverse.md);
 - permission to export `ConversationTranscript` from the same Dataverse environment; and
 - a customer-controlled folder for the transcript export and review files.
 
@@ -100,7 +100,7 @@ The tool reports one of three outcomes:
 The tuner validates the approved rules, embeds them in a new template, and opens:
 
 ```text
-Generated Templates\ESS Dashboard - Dynamic Topics (Dataverse) V21 - Desktop Validation - Topics - DO NOT PUBLISH.pbit
+Generated Templates\ESS Dashboard - Dynamic Topics (Dataverse) V22 - Desktop Validation - Topics - LOCAL ONLY.pbit
 ```
 
 Continue to [Step 5](#step-5---validate-the-improvement).
@@ -142,7 +142,7 @@ Do not change the template or import the empty JSON. The message explains why th
 
 ## Step 5 - Validate the improvement
 
-In the newly opened **Desktop Validation - Topics - DO NOT PUBLISH** template:
+In the newly opened **Desktop Validation - Topics - LOCAL ONLY** template:
 
 1. Wait until every prefilled parameter value is visible and stable.
 2. Select **Load**.
@@ -164,7 +164,7 @@ Classification follows this order:
 4. Other / Uncategorized
 
 > [!IMPORTANT]
-> This file is for Desktop validation only. Its filename includes **DO NOT PUBLISH** because it may contain local Organization or Credits file paths.
+> This is the local topic-validation output and may contain local Organization or Credits file paths. For shared Power BI Service access, continue to Step 6 and generate the separate **Power BI Service - PUBLISH THIS** output.
 
 ## Step 6 - Publish only if needed
 
@@ -200,7 +200,7 @@ The Service builder reuses the approved topic rules. You do not run the tuner ag
 | **STOP** with no rules | Keep the existing report. Collect better evidence only when a meaningful classification gap remains. |
 | A generated PBIT cannot be replaced | Close the previously opened Topics validation report, then retry. |
 | Queries are blocked or a cyclic reference appears after opening the PBIT | Close without saving, reopen it, wait for all parameter values to stabilize, and then select **Load**. |
-| Scheduled refresh is unavailable | Confirm that you published **Power BI Service - PUBLISH THIS**, not a **DO NOT PUBLISH** Desktop report. |
+| Scheduled refresh is unavailable | Confirm that you published **Power BI Service - PUBLISH THIS**. The **Desktop Validation - LOCAL ONLY** report is the separate local input-checking output. |
 
 ## Privacy and safety
 
@@ -213,7 +213,7 @@ The Service builder reuses the approved topic rules. You do not run the tuner ag
 
 ## Other ESS data paths
 
-This guided apply workflow targets **Dataverse V21**.
+This guided apply workflow targets **Dataverse V22**.
 
 - **CSV V18:** paste the active approved JSON into **Customer Topic Overrides JSON (optional)**, then refresh. Use `customer-topic-overrides.json` after an automatic **READY** result or `approved-*.json` after **REVIEW REQUIRED**. See [CSV setup](SETUP-CSV-Download.md).
 - **Fabric V2:** upload the reviewed `customer-topic-overrides.csv` to `Files/config/customer-topic-overrides.csv`. See [Fabric setup](SETUP-Fabric.md).
