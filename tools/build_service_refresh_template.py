@@ -36,7 +36,6 @@ M_TYPE_BY_TABULAR_TYPE = {
 ENVIRONMENT_PARAMETER = "Dataverse Environment URL (required)"
 REGISTRY_EXPRESSION = "Agent Registry JSON"
 ORG_DATA_PARAMETER = "Org Data File"
-ORG_DATA_URL_PARAMETER = "Organization Data URL (optional)"
 CREDITS_PARAMETER = "Agent Credits  (optional)"
 OVERRIDES_PARAMETER = "Customer Topic Overrides JSON (optional)"
 FEEDBACK_PARAMETER = "Feedback Events JSON (optional)"
@@ -91,7 +90,7 @@ DATAVERSE_HOST_PATTERNS = tuple(
 )
 ENVIRONMENT_DESCRIPTION = (
     "Required. The Dataverse environment that contains the Copilot Studio "
-    "conversation data. Use the Instance URL from Power Apps Session details. "
+    "conversation data. Use the Environment URL from Power Apps Developer resources. "
     "The connector uses this parameter directly; after changing environments in "
     "Power BI Service, update the Dataverse credentials before refreshing."
 )
@@ -107,11 +106,6 @@ PARAMETER_DESCRIPTIONS = {
     ORG_DATA_PARAMETER: (
         "Optional. Approved user roster CSV for organization analysis. The file "
         "must contain UserPrincipalName, UPN, or PersonId. Leave blank to skip."
-    ),
-    ORG_DATA_URL_PARAMETER: (
-        "Optional. Direct HTTPS URL to an approved organization CSV in SharePoint "
-        "Online or OneDrive for Business. The file must contain UserPrincipalName, "
-        "UPN, or PersonId. Leave blank to skip organization analysis."
     ),
     CREDITS_PARAMETER: (
         "Optional. User-Level Credit Consumption CSV from Power Platform admin "
@@ -678,7 +672,7 @@ def build_query_expressions(
             desktop_source_payload()["queries"]["Chat + Agent Org Data"]
         ).replace(
             f'#"{ORG_DATA_PARAMETER}"',
-            f'#"{ORG_DATA_URL_PARAMETER}"',
+            m_text(org_data_url),
         )
         org_expression = order_org_loader_before_result(org_expression)
         desktop_source = '''            IsSharePoint = Text.StartsWith(Text.Lower(FilePath), "http"),
@@ -759,7 +753,6 @@ def update_parameter_metadata(
     mode: str,
     registry_json: str | None,
     org_data_file: Path | None = None,
-    org_data_url: str | None = None,
     credits_file: Path | None = None,
     overrides_json: str | None = None,
     feedback_json: str | None = None,
@@ -772,24 +765,6 @@ def update_parameter_metadata(
         item["name"]: item
         for item in schema["model"]["expressions"]
     }
-    if (
-        mode in SERVICE_MODES
-        and org_data_url is not None
-        and ORG_DATA_URL_PARAMETER not in schema_expressions
-    ):
-        desktop_parameter = next(
-            item
-            for item in desktop_source_payload()["parameters"]
-            if item["name"] == ORG_DATA_PARAMETER
-        )
-        service_parameter = json.loads(json.dumps(desktop_parameter))
-        service_parameter["name"] = ORG_DATA_URL_PARAMETER
-        service_parameter["expression"] = (
-            'null meta [IsParameterQuery=true, Type="Text", '
-            'IsParameterQueryRequired=false]'
-        )
-        schema["model"]["expressions"].append(service_parameter)
-        schema_expressions[ORG_DATA_URL_PARAMETER] = service_parameter
     environment = schema_expressions[ENVIRONMENT_PARAMETER]
     environment["expression"] = parameter_expression
     environment["description"] = ENVIRONMENT_DESCRIPTION
@@ -813,7 +788,6 @@ def update_parameter_metadata(
         ORG_DATA_PARAMETER: (
             str(org_data_file.resolve()) if org_data_file is not None else None
         ),
-        ORG_DATA_URL_PARAMETER: org_data_url,
         CREDITS_PARAMETER: (
             str(credits_file.resolve()) if credits_file is not None else None
         ),
@@ -833,10 +807,6 @@ def update_parameter_metadata(
             item
             for item in schema["model"]["expressions"]
             if item["name"] not in DISABLED_FILE_PARAMETERS
-            and not (
-                item["name"] == ORG_DATA_URL_PARAMETER
-                and org_data_url is None
-            )
         ]
 
 
@@ -951,7 +921,6 @@ def build_package(
         mode,
         registry_json,
         org_data_file,
-        org_data_url,
         credits_file,
         overrides_json,
         feedback_json,

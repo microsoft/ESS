@@ -32,7 +32,7 @@ You need:
 
 - the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip), extracted with its folder structure intact;
 - [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add Python to PATH** selected during installation;
-- a successful [Dataverse V21 baseline](SETUP-Dataverse.md);
+- a successful [Dataverse V22 baseline](SETUP-Dataverse.md);
 - permission to export `ConversationTranscript` from the same Dataverse environment; and
 - a customer-controlled folder for the transcript export and review files.
 
@@ -100,7 +100,7 @@ The tool reports one of three outcomes:
 The tuner validates the approved rules, embeds them in a new template, and opens:
 
 ```text
-Generated Templates\ESS Dashboard - Dynamic Topics (Dataverse) V21 - Desktop Validation - Topics - DO NOT PUBLISH.pbit
+Generated Templates\ESS Dashboard - Dynamic Topics (Dataverse) V22 - Desktop Validation - Topics - DO NOT PUBLISH.pbit
 ```
 
 Continue to [Step 5](#step-5---validate-the-improvement).
@@ -213,7 +213,7 @@ The Service builder reuses the approved topic rules. You do not run the tuner ag
 
 ## Other ESS data paths
 
-This guided apply workflow targets **Dataverse V21**.
+This guided apply workflow targets **Dataverse V22**.
 
 - **CSV V18:** paste the active approved JSON into **Customer Topic Overrides JSON (optional)**, then refresh. Use `customer-topic-overrides.json` after an automatic **READY** result or `approved-*.json` after **REVIEW REQUIRED**. See [CSV setup](SETUP-CSV-Download.md).
 - **Fabric V2:** upload the reviewed `customer-topic-overrides.csv` to `Files/config/customer-topic-overrides.csv`. See [Fabric setup](SETUP-Fabric.md).

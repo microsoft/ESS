@@ -12,7 +12,7 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 > ✅ **Start here:** For hands‑off, production dashboards, **Dataverse Direct (Path A)** is the simplest — no file hosting, no gateway. If you must stay on CSV, **host it on SharePoint/OneDrive (Path B)** so the cloud can refresh it without a gateway.
 
-> **Why this matters for refresh:** Dataverse V22 passes the validated customer URL directly to the Dataverse connector through a Power Query parameter, which Power BI Service supports for refresh. The customer-neutral Service PBIT removes all Organization and Credits connectors. When organization data is selected in the guided builder, it validates the SharePoint Online or OneDrive for Business CSV path and emits a customer-specific static SharePoint source.
+> **Why this matters for refresh:** Dataverse V22 passes the validated customer URL directly to the Dataverse connector through a Power Query parameter, which Power BI Service supports for refresh. The customer-neutral Service PBIT removes all Organization and Credits connectors. When organization data is selected in the guided builder, it validates the SharePoint Online or OneDrive for Business CSV URL format and emits a customer-specific static SharePoint source.
 
 > 🆕 **Already need more than this?** Path A and Path B above already give you gateway‑free, cloud‑to‑cloud scheduled refresh — most customers don't need anything else. If you're consolidating multiple Dataverse environments into one dashboard, hitting refresh limits at very large scale, or want [Power Platform admin center](https://admin.powerplatform.microsoft.com) credit-consumption analytics alongside conversation data (with a separate file-landing step), see **[SETUP-Fabric.md ↗](SETUP-Fabric.md)**.
 
@@ -35,9 +35,11 @@ The report prepared by the Dataverse publication step connects the service direc
 
 1. Complete [Action 3 in the Dataverse guide](SETUP-Dataverse.md#action-3---publish-the-service-report). URL-only users can publish the Service-ready PBIT without Python. Guided users run the existing publication helper to reuse the validated Environment URL and approved registry, feedback, and topic data.
 
-   Local Organization and Credits files are not included in the publishable Dataverse report. Organization data requires the guided builder's validated static SharePoint source; use Fabric when the source must be Entra/Graph, credits must be automated, or several environments must be combined.
+   Local Organization and Credits files are not included in the publishable Dataverse report. Organization data requires the guided builder's format-validated static SharePoint source; use Fabric when the source must be Entra/Graph, credits must be automated, or several environments must be combined.
 
 2. Confirm the prepared filename ends with **Power BI Service - PUBLISH THIS.pbit**. Paste the required Environment URL and leave optional parameters blank for the transcript-only baseline. If organization data is required, run `BUILD-SERVICE-REFRESH.cmd` first and supply the direct SharePoint/OneDrive CSV path so the helper can generate the static source. Wait until every value is visible and stable, then select **Load**, refresh successfully in Desktop, save as PBIX, and **Publish** it to your workspace. Neither publishable PBIT exposes local Organization or Credits file parameters.
+
+   The builder validates only the organization URL format. Power BI refresh validates file existence, permissions, and schema. Rerun `BUILD-SERVICE-REFRESH.cmd` whenever the organization file location changes; editing a Power BI parameter cannot redirect this static source.
 3. In the service, open the **semantic model → Settings**.
 4. Expand **Gateway and cloud connections**:
    - Turn off **Use an On-premises or VNet data gateway**; Dataverse does not require one.
@@ -113,12 +115,12 @@ If the parameter points at a **local file** (`C:\Data\…`) or a **network share
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | **“You can't schedule refresh for this dataset because … the data sources are dynamic.”** | The report was prepared with an older package, its Dataverse query was modified, or it still contains a local-file branch. | Download the current Service-ready PBIT or repeat the guided [Action 3](SETUP-Dataverse.md#action-3---publish-the-service-report), refresh it in Desktop, and publish that result. |
-| Organization filters are blank | The customer-neutral PBIT was used, the guided URL was invalid, the file moved, or the SharePoint cloud connection is not mapped | Rebuild with a validated direct CSV path, map the SharePoint cloud connection, and run **Refresh now** |
+| Organization filters are blank | The customer-neutral PBIT was used, the guided URL format was invalid, the file moved, or the SharePoint cloud connection is not mapped | Rerun `BUILD-SERVICE-REFRESH.cmd` with the direct CSV path, map the SharePoint cloud connection, and run **Refresh now** |
 | **“We couldn't authenticate with the credentials provided.”** | A cloud connection is not mapped, or the account lacks access. | **Semantic model → Settings → Gateway and cloud connections**; map or create the OAuth2 connection using an account with Bot Transcript Viewer (Dataverse) or library read (SharePoint). |
 | **Scheduled refresh option is greyed out.** | Credentials for one or more sources not yet set. | Edit credentials on **every** listed source first, then the schedule unlocks. |
 | **Refresh succeeds but data is stale.** | New export saved under a new name/path. | Overwrite the file at the **same URL/path** the parameter points to. |
 | **Refresh very slow / times out (Dataverse).** | Lookback window too wide. | Lower **Transcript Lookback Days**. |
-| **“The remote name could not be resolved” / “Invalid URL.”** | The Environment URL used during publication preparation was wrong. | Re-copy the Instance URL and repeat the Dataverse publication step. |
+| **“The remote name could not be resolved” / “Invalid URL.”** | The Environment URL used during publication preparation was wrong. | Re-copy the Environment URL from Power Apps Developer resources and repeat the Dataverse publication step. |
 | **Queries are blocked / “A cyclic reference was encountered” immediately after Load.** | Load was selected before the prefilled parameter values finished initializing. | Close the report without saving, reopen the prepared report, wait for every value to appear and stabilize, then select **Load**. |
 
 ---

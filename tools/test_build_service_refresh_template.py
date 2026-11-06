@@ -9,6 +9,7 @@ from pathlib import Path
 
 from build_service_refresh_template import (
     build_package,
+    expression_text,
     normalize_environment_url,
     normalize_org_data_url,
     serialize_registry,
@@ -194,8 +195,23 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             else org_expression
         )
 
-        self.assertIn(org_data_url, expressions["Organization Data URL (optional)"])
+        self.assertNotIn("Organization Data URL (optional)", expressions)
         self.assertNotIn("Org Data File", expressions)
+        customer_parameters = {
+            item["name"]
+            for item in schema["model"]["expressions"]
+            if "IsParameterQuery=true" in expression_text(item["expression"])
+        }
+        self.assertEqual(
+            customer_parameters,
+            {
+                "Dataverse Environment URL (required)",
+                "Transcript Lookback Days (defaults to 90 days if left blank)",
+                "Customer Topic Overrides JSON (optional)",
+                "Feedback Events JSON (optional)",
+            },
+        )
+        self.assertIn(org_data_url, org_text)
         self.assertIn(
             'SharePoint.Files("https://contoso.sharepoint.com/sites/HR", '
             "[ApiVersion = 15])",
@@ -209,6 +225,50 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
         self.assertNotIn("Web.Contents", org_text)
         self.assertNotIn("File.Contents", org_text)
         self.assertLess(org_text.index("LoadFile ="), org_text.index("Result ="))
+
+    def test_changing_org_data_location_requires_rebuilding_template(self):
+        locations = (
+            "https://contoso.sharepoint.com/sites/HR/Shared Documents/ESS/OrgData.csv",
+            "https://contoso.sharepoint.com/sites/People/Shared Documents/ESS/Roster.csv",
+        )
+        queries = []
+        with tempfile.TemporaryDirectory() as temporary:
+            for index, location in enumerate(locations):
+                output = Path(temporary) / f"service-refresh-org-{index}.pbit"
+                build_package(
+                    SOURCE,
+                    output,
+                    "https://orgexample.crm.dynamics.com",
+                    mode="service-refresh",
+                    org_data_url=location,
+                )
+                with zipfile.ZipFile(output) as package:
+                    schema = json.loads(
+                        package.read("DataModelSchema").decode("utf-16-le")
+                    )
+                org_table = next(
+                    table
+                    for table in schema["model"]["tables"]
+                    if table["name"] == "Chat + Agent Org Data"
+                )
+                queries.append(
+                    expression_text(
+                        org_table["partitions"][0]["source"]["expression"]
+                    )
+                )
+                self.assertNotIn(
+                    "Organization Data URL (optional)",
+                    {
+                        item["name"]
+                        for item in schema["model"]["expressions"]
+                    },
+                )
+
+        self.assertNotEqual(queries[0], queries[1])
+        self.assertIn(locations[0], queries[0])
+        self.assertNotIn(locations[1], queries[0])
+        self.assertIn(locations[1], queries[1])
+        self.assertNotIn(locations[0], queries[1])
 
     def test_builds_parameterized_refresh_template(self):
         environment_url = "https://orgexample.crm.dynamics.com"
@@ -386,20 +446,22 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 cwd=ROOT,
                 check=False,
             )
-            customer_ignore = subprocess.run(
-                [
-                    "git",
-                    "check-ignore",
-                    "--no-index",
-                    "-q",
-                    "--",
-                    "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Customer Generated.pbit",
-                ],
-                cwd=ROOT,
-                check=False,
-            )
             self.assertEqual(direct_ignore.returncode, 1)
-            self.assertEqual(customer_ignore.returncode, 0)
+            for version in ("V21", "V22"):
+                customer_ignore = subprocess.run(
+                    [
+                        "git",
+                        "check-ignore",
+                        "--no-index",
+                        "-q",
+                        "--",
+                        "ESS Dashboard - Dynamic Topics (Dataverse) "
+                        f"{version} - Customer Generated.pbit",
+                    ],
+                    cwd=ROOT,
+                    check=False,
+                )
+                self.assertEqual(customer_ignore.returncode, 0, version)
         with zipfile.ZipFile(DIRECT_SERVICE) as package:
             self.assertIsNone(package.testzip())
             self.assertNotIn("UnappliedChanges", package.namelist())
@@ -632,7 +694,7 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
         desktop_description = schema_expressions[
             "Dataverse Environment URL (required)"
         ]["description"]
-        self.assertIn("Power Apps Session details", desktop_description)
+        self.assertIn("Power Apps Developer resources", desktop_description)
         descriptions = [
             str(item.get("description") or "")
             for item in schema_expressions.values()

@@ -79,7 +79,7 @@ Use this path when Dataverse conversations and the built-in topic taxonomy are s
 4. For the transcript-only baseline, leave the optional parameters blank, wait until the values stop changing, and select **Load**.
 5. After Load finishes and credentials are configured, select **Home -> Refresh** and confirm the refresh completes without errors.
 
-This customer-neutral template excludes Organization and Credits sources and is ready for publication after the baseline checks pass. No Python installation or repository script is required. If the Service report needs organization data, use Option B so the builder can validate the URL and generate a static SharePoint source.
+This customer-neutral template excludes Organization and Credits sources and is ready for publication after the baseline checks pass. No Python installation or repository script is required. If the Service report needs organization data, use Option B so the builder can validate the URL format and generate a static SharePoint source.
 
 For optional inputs, Customer Topic Overrides JSON can be pasted directly. Feedback Events JSON is limited to prepared Monitor events whose Conversation ID matches one exact loaded conversation. Use Option B for Microsoft 365 Product Feedback or any input that requires an agent registry.
 
@@ -102,7 +102,7 @@ The direct Service-ready PBIT prompts for:
 | **Customer Topic Overrides JSON (optional)** | Blank |
 | **Feedback Events JSON (optional)** | Blank |
 
-The guided Desktop-validation report prompts for the same four baseline parameters plus local **Org Data File** and **Agent Credits (optional)** inputs for Desktop/manual-refresh validation. For gateway-free organization refresh, the publication helper validates the direct SharePoint/OneDrive CSV path at build time and emits a static `SharePoint.Files` source. The customer-neutral Service PBIT does not contain an organization connector or an editable organization URL parameter.
+The guided Desktop-validation report prompts for the same four baseline parameters plus local **Org Data File** and **Agent Credits (optional)** inputs for Desktop/manual-refresh validation. For gateway-free organization refresh, the publication helper validates the direct SharePoint/OneDrive CSV URL format at build time and emits a static `SharePoint.Files` source. The customer-neutral Service PBIT does not contain an organization connector or an editable organization URL parameter.
 
 1. Wait until every parameter value is visible and has stopped changing. Power BI fills prefilled guided values asynchronously.
 2. Only then select **Load**.
@@ -156,11 +156,11 @@ Follow [Agent registry and reporting scope](./AGENT-REGISTRY.md), then select th
 5. Run `BUILD-SERVICE-REFRESH.cmd` and enter the path when it asks whether to configure organization data. The direct customer-neutral PBIT intentionally has no organization URL parameter.
 6. Refresh and confirm Department and the other organization filters populate across the report.
 
-The builder validates only the URL format during generation. Power BI confirms file access and the required CSV schema when the generated report refreshes.
+The builder validates only the URL format during generation. Power BI refresh validates file existence, permissions, and the required CSV schema. If the organization file location changes, rerun `BUILD-SERVICE-REFRESH.cmd`; there is no editable Power BI parameter for this static source.
 
 Department, Country, JobTitle, and DisplayName are optional; missing fields produce a warning and remain blank.
 
-The generated Service report uses the native SharePoint connector for organization data. In Power BI Service, map that cloud source to an OAuth2 connection using an account that can read the hosted CSV. Keep the URL stable and overwrite the file in place when the roster changes.
+The generated Service report uses the native SharePoint connector for organization data. In Power BI Service, map that cloud source to an OAuth2 connection using an account that can read the hosted CSV. Keep the location stable and overwrite the file in place when only roster contents change.
 
 ### Copilot Credits
 
@@ -199,7 +199,7 @@ Native Copilot Studio topics remain authoritative. Uncertain rules remain disabl
 If you need only Desktop/manual refresh, save the validated report as a PBIX and stop here.
 
 1. Complete the baseline checklist before publishing.
-2. Continue with the Service-ready PBIT from Option A. If you used the guided Option B, return to the extracted package and run `BUILD-SERVICE-REFRESH.cmd`. The helper keeps Dataverse parameterized, validates and embeds the cloud organization location as a static SharePoint source when selected, and embeds approved registry, feedback, and topic selections while excluding local Organization and Credits files.
+2. Continue with the Service-ready PBIT from Option A. If you used the guided Option B, return to the extracted package and run `BUILD-SERVICE-REFRESH.cmd`. The helper keeps Dataverse parameterized, validates the cloud organization URL format and embeds its location as a static SharePoint source when selected, and embeds approved registry, feedback, and topic selections while excluding local Organization and Credits files.
 3. Confirm the filename ends with **Power BI Service - PUBLISH THIS.pbit**. Do not publish a **Desktop Validation - DO NOT PUBLISH** report.
 4. Open the prepared report, wait until every prefilled value is visible and stable, then select **Load**.
 5. Sign in if prompted and select **Home -> Refresh**.
@@ -215,7 +215,7 @@ Use Fabric instead when organization data must be sourced directly from Graph/En
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Authentication fails | Account lacks transcript-table access or URL is wrong | Confirm Bot Transcript Viewer in the target environment and recopy Instance URL |
+| Authentication fails | Account lacks transcript-table access or URL is wrong | Confirm Bot Transcript Viewer in the target environment and recopy Environment URL from Power Apps Developer resources |
 | Total Conversations is zero | Unsupported environment, no retained records, transcript capture disabled, or a newly generated conversation has not persisted yet | Check the environment, settings, retention, and lookback. End the test conversation, leave it inactive for approximately 30 minutes, confirm the row appears in Dataverse, and then refresh Power BI. |
 | Refresh is slow | Lookback is wider than needed | Use a smaller retained lookback |
 | Agent label is technical | No registry is embedded | Add a reviewed registry and rerun guided setup |

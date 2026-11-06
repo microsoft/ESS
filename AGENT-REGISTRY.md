@@ -2,7 +2,9 @@
 
 The agent registry tells ESS Insights which identifiers belong to the same Copilot Studio agent across systems. It is required for the recommended CSV scope and for Fabric ingestion, but optional for a basic Dataverse Direct setup.
 
-Dataverse V21 does not require a registry for transcript or Power Platform consumption reporting. It derives agents from `BotId`/`BotName`, matches consumption by Agent GUID, and exposes a synchronized Agent filter in the report. Use a registry only when you need Microsoft 365 `T_...` feedback attribution, custom labels, or cross-environment identity mapping. Fabric continues to use the registry for governed ingestion.
+Dataverse V22 does not require a registry for transcript or Power Platform consumption reporting. It derives agents from `BotId`/`BotName`, matches consumption by Agent GUID, and exposes a synchronized Agent filter in the report. Use a registry only when you need Microsoft 365 `T_...` feedback attribution, custom labels, or cross-environment identity mapping. Fabric continues to use the registry for governed ingestion.
+
+The retained V21 rollback template uses the same Dataverse registry behavior.
 
 | Source | Alias type | Example |
 |---|---|---|
@@ -194,7 +196,7 @@ The command stops with a clear error for invalid booleans, unknown alias types, 
 
 ### Registry with several environments
 
-Fabric can use the full master CSV. CSV V18 and Dataverse V21 report one environment per refresh, so create a filtered JSON file:
+Fabric can use the full master CSV. CSV V18 and Dataverse V22 report one environment per refresh, so create a filtered JSON file:
 
 ```powershell
 python tools\agent_registry.py `
@@ -219,7 +221,7 @@ Replace `production-us` with the exact `EnvironmentKey` in your CSV.
 
 `ESS Safe` and `Selected Agents` stop with an error when the registry is blank or no transcript agent matches. `All Agents` permits unmapped transcript and credit agents but still excludes unregistered Product Feedback.
 
-### Dataverse V21
+### Dataverse V22
 
 No registry is required to discover transcript agents in `All Agents` mode. A registry is recommended when the Copilot Studio technical name must display as a stable friendly label, when a credits export must be checked against a known `CreditId`, or when Microsoft 365 feedback uses a `T_...` title ID.
 
@@ -244,7 +246,7 @@ Fabric writes the canonical agent identity to every transcript-derived table. It
 
 After the `M365Title` row is reviewed:
 
-- **Dataverse V21:** select the registry and raw Product Feedback or Monitor exports in guided setup. It filters and prepares them locally.
+- **Dataverse V22:** select the registry and raw Product Feedback or Monitor exports in guided setup. It filters and prepares them locally.
 - **CSV V18 or Fabric V2:** follow [Microsoft 365 Copilot feedback: export, prepare, and load](FEEDBACK-INGESTION.md).
 
 The preparation step changes the Product Feedback `T_...` ID to the canonical `AgentKey`. The registry remains the required safety boundary for production attribution.
