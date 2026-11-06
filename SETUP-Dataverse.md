@@ -10,13 +10,35 @@ Dataverse Direct reads the `ConversationTranscript` table through the Dataverse 
 2. **Choose a setup and validate the report.** URL-only users can download the Service-ready PBIT and skip Python. The existing guided setup remains available for optional enhancements.
 3. **Publish the Service-safe report.** Publish the direct PBIT after validation, or use the guided publication helper when optional inputs were embedded.
 
+## Start here: choose your setup
+
+### I need only Dataverse conversations
+
+No Python or repository script is required.
+
+1. [Download the Service-ready Dataverse V22 PBIT](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V22%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit).
+2. Open it in Power BI Desktop.
+3. Enter the Dataverse Environment URL.
+4. Continue with [Option A](#option-a---url-only-no-python-or-script).
+
+### I need Organization data or other optional enhancements
+
+Download the complete ESS package. The Python scripts are included in its `tools` folder; do not download or run individual `.py` files.
+
+1. [Download the complete ESS ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip).
+2. Select **Extract All**. Do not run the files from inside the ZIP.
+3. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
+4. Open the extracted `ESS-main` folder.
+5. Double-click `START-HERE-DATAVERSE.cmd`. The command file runs the required Python setup script automatically.
+6. Continue with [Option B](#option-b---guided-setup-with-optional-enhancements). When the report is ready for publication, use `BUILD-SERVICE-REFRESH.cmd` as directed in Action 3.
+
 ## Files, portals, and required roles
 
 ### Required template input
 
 | Need | Data or input | Portal and retrieval steps | Required role | Included helper | Expected file or output |
 |---|---|---|---|---|---|
-| Live conversations | Dataverse Environment URL | [Power Apps](https://make.powerapps.com) -> select environment -> **Developer resources -> Environment URL** | Bot Transcript Viewer, or custom role with organization-level Read on `conversationtranscript`; Environment Maker alone is insufficient | [Service-ready PBIT or guided setup](#action-2---choose-a-setup-and-validate-the-report) | URL without a trailing slash, such as `https://org.crm.dynamics.com` |
+| Live conversations | Dataverse Environment URL | [Power Apps](https://make.powerapps.com) -> select environment -> **Developer resources -> Environment URL** | Bot Transcript Viewer, or custom role with organization-level Read on `conversationtranscript`; Environment Maker alone is insufficient | [Download the PBIT or complete ESS ZIP](#start-here-choose-your-setup) | URL without a trailing slash, such as `https://org.crm.dynamics.com` |
 
 ### Optional data for full report functionality
 
@@ -25,9 +47,9 @@ Load only the data needed for the report areas you intend to use. The transcript
 | Need | Data or input | Portal and retrieval steps | Required role | Included helper | Why load it / report area enabled |
 |---|---|---|---|---|---|
 | Friendly names or cross-source aliases | Agent registry | Follow the [agent registry guide](./AGENT-REGISTRY.md) | Access to approved agent identifiers | [Agent registry guide](./AGENT-REGISTRY.md) | Use for stable Agent filter labels and to reconcile credits or Microsoft 365 feedback to the correct agent across report pages. Required when loading external Product Feedback. |
-| Organization | User roster CSV; direct SharePoint/OneDrive URL for Service refresh | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Users -> Active users -> Export users**, or approved HR/Viva Insights/Graph source | Global Reader, User Administrator, or Global Administrator for Microsoft 365 export; read access to the hosted CSV | Guided setup for Service; local file for Desktop validation | Adds department, country, job title, and display-name segmentation across report pages. |
-| Copilot Credits | User-Level Credit Consumption | [Power Platform admin center](https://admin.powerplatform.microsoft.com) -> **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator recommended; tenant administrator or Dynamics 365 Administrator also works | Included guided setup | Adds observed credit totals and modeled cost/value measures to **Executive Summary** and **Business Impact**. |
-| Cross-channel feedback | Raw Product Feedback or Monitor export plus agent registry | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Health -> Product feedback -> Export to CSV** | Microsoft 365 administrator or reader with Product Feedback access | Included guided setup ([feedback guide](./FEEDBACK-INGESTION.md)) | Adds Microsoft 365 Copilot and Monitor reactions to **Agent Feedback**; transcript-native reactions already work without this file. |
+| Organization | User roster CSV; direct SharePoint/OneDrive URL for Service refresh | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Users -> Active users -> Export users**, or approved HR/Viva Insights/Graph source | Global Reader, User Administrator, or Global Administrator for Microsoft 365 export; read access to the hosted CSV | [Guided setup included in the complete ESS ZIP](#i-need-organization-data-or-other-optional-enhancements) | Adds department, country, job title, and display-name segmentation across report pages. |
+| Copilot Credits | User-Level Credit Consumption | [Power Platform admin center](https://admin.powerplatform.microsoft.com) -> **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator recommended; tenant administrator or Dynamics 365 Administrator also works | [Guided setup included in the complete ESS ZIP](#i-need-organization-data-or-other-optional-enhancements) | Adds observed credit totals and modeled cost/value measures to **Executive Summary** and **Business Impact**. |
+| Cross-channel feedback | Raw Product Feedback or Monitor export plus agent registry | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Health -> Product feedback -> Export to CSV** | Microsoft 365 administrator or reader with Product Feedback access | [Guided setup included in the complete ESS ZIP](#i-need-organization-data-or-other-optional-enhancements); see the [feedback guide](./FEEDBACK-INGESTION.md) | Adds Microsoft 365 Copilot and Monitor reactions to **Agent Feedback**; transcript-native reactions already work without this file. |
 | Customer-specific topics | Representative transcript evidence, used only when built-in topics need improvement | [Review when to use or skip it](./TOPIC-TUNER.md) | Transcript read access; no extra cloud role | [Optional topic tuner](./TOPIC-TUNER.md) | Improves classification of recurring customer language in **Conversation Details**, **Improvement Opportunities**, and **Adjust Topic Assumptions**. Skip when native and built-in topics already provide adequate coverage. |
 
 ## Action 1 - Prepare access and copy the URL
@@ -85,11 +107,13 @@ For optional inputs, Customer Topic Overrides JSON can be pasted directly. Feedb
 
 ### Option B - Guided setup with optional enhancements
 
+The complete ESS ZIP contains both command launchers and the Python scripts they run. Do not download the `.py` files separately.
+
 1. [Download the complete ESS ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip).
-2. Select **Extract All** and keep the extracted folder structure intact.
+2. Select **Extract All**, keep the extracted folder structure intact, and do not run the files from inside the ZIP.
 3. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/).
 4. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
-5. Open the extracted `ESS-main` folder and double-click `START-HERE-DATAVERSE.cmd`. This creates the local **Desktop Validation - DO NOT PUBLISH** report and preserves the current guided workflow.
+5. Open the extracted `ESS-main` folder and double-click `START-HERE-DATAVERSE.cmd`. The command file automatically runs `tools\guided_dataverse_setup.py` and creates the local **Desktop Validation - DO NOT PUBLISH** report.
 6. Paste the Environment URL and skip optional data for the first run.
 7. When the guided checks complete, open the report.
 
