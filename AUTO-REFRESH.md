@@ -20,7 +20,7 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 ## Before you begin (all paths)
 
-- [ ] For Dataverse, you published either the directly downloaded or guided **Power BI Service - PUBLISH THIS** report, not a **Desktop Validation - DO NOT PUBLISH** report.
+- [ ] For Dataverse, you published either the directly downloaded or guided **Power BI Service - PUBLISH THIS** report. A **Desktop Validation - LOCAL ONLY** report is the separate local input-checking output.
 - [ ] You have **published** the report from Power BI Desktop to a **workspace** in the Power BI service (**Home → Publish**).
 - [ ] You have permission to manage that workspace's datasets (**Member/Admin/Contributor**).
 - [ ] The dataset **refreshes successfully in Desktop first** — fix any load errors locally before scheduling in the cloud.

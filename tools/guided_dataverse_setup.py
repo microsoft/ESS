@@ -31,7 +31,7 @@ PREPARED_FEEDBACK = GENERATED_DIR / "Prepared Inputs" / "feedback-events.csv"
 OUTPUT_NAMES = {
     "desktop-validation": (
         "ESS Dashboard - Dynamic Topics (Dataverse) V22 - "
-        "Desktop Validation - DO NOT PUBLISH.pbit"
+        "Desktop Validation - LOCAL ONLY.pbit"
     ),
     "service-refresh": (
         "ESS Dashboard - Dynamic Topics (Dataverse) V22 - "
@@ -40,7 +40,7 @@ OUTPUT_NAMES = {
 }
 TOPIC_OUTPUT_NAME = (
     "ESS Dashboard - Dynamic Topics (Dataverse) V22 - "
-    "Desktop Validation - Topics - DO NOT PUBLISH.pbit"
+    "Desktop Validation - Topics - LOCAL ONLY.pbit"
 )
 
 
@@ -601,8 +601,9 @@ def main() -> int:
             "Dataverse and optional local files."
         )
         print(
-            "Do not publish this file for scheduled refresh. After validation, "
-            "run BUILD-SERVICE-REFRESH.cmd to create the publishable report."
+            "This is the local input-checking output. After validation, run "
+            "BUILD-SERVICE-REFRESH.cmd to create the separate Power BI Service "
+            "publication report."
         )
     else:
         print(
@@ -695,9 +696,10 @@ def main() -> int:
             "and refresh."
         )
         print(
-            "\nDESKTOP VALIDATION ONLY - DO NOT PUBLISH THIS FILE FOR SCHEDULED "
-            "REFRESH.\nIf you need Power BI Service, run "
-            "BUILD-SERVICE-REFRESH.cmd after validation."
+            "\nLOCAL DESKTOP VALIDATION FILE.\nThis is the first of two "
+            "intentional outputs. For shared Power BI Service access, run "
+            "BUILD-SERVICE-REFRESH.cmd after validation and publish the version "
+            "named Power BI Service - PUBLISH THIS."
         )
     else:
         print(

@@ -34,9 +34,9 @@ class GuidedDataverseSetupTests(unittest.TestCase):
         desktop_name = OUTPUT_NAMES["desktop-validation"]
         service_name = OUTPUT_NAMES["service-refresh"]
 
-        self.assertIn("Desktop Validation - DO NOT PUBLISH", desktop_name)
+        self.assertIn("Desktop Validation - LOCAL ONLY", desktop_name)
         self.assertIn("Power BI Service - PUBLISH THIS", service_name)
-        self.assertIn("Desktop Validation - Topics - DO NOT PUBLISH", TOPIC_OUTPUT_NAME)
+        self.assertIn("Desktop Validation - Topics - LOCAL ONLY", TOPIC_OUTPUT_NAME)
         self.assertNotEqual(desktop_name, service_name)
 
     def test_topic_launcher_checks_every_prepared_feedback_destination(self) -> None:

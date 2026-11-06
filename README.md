@@ -22,7 +22,7 @@ Complete three actions:
 > [!IMPORTANT]
 > Download the complete ZIP when using scripts, optional enhancements, CSV Upload, or Fabric. Dataverse URL-only users may download the Service-ready Dataverse PBIT directly.
 >
-> The existing Dataverse guided setup remains available and creates two intentionally different artifacts. **Desktop Validation - DO NOT PUBLISH** can include local Organization and Credits files. Its generated **Power BI Service - PUBLISH THIS** counterpart excludes local files but can refresh a cloud-hosted organization CSV from SharePoint Online or OneDrive for Business.
+> The existing Dataverse guided setup creates two intentional outputs. **Desktop Validation - LOCAL ONLY** checks optional local Organization and Credits files. **Power BI Service - PUBLISH THIS** is the separate publication output; it excludes local files but can refresh a cloud-hosted organization CSV from SharePoint Online or OneDrive for Business.
 
 ## Choose your data path
 

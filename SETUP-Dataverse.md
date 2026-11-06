@@ -23,14 +23,19 @@ No Python or repository script is required.
 
 ### I need Organization data or other optional enhancements
 
-Download the complete ESS package. The Python scripts are included in its `tools` folder; do not download or run individual `.py` files.
+Download the complete ESS package. It includes the command launchers and their Python implementations:
+
+- [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd) runs [`tools\guided_dataverse_setup.py`](./tools/guided_dataverse_setup.py).
+- [`BUILD-SERVICE-REFRESH.cmd`](./BUILD-SERVICE-REFRESH.cmd) runs [`tools\build_service_refresh_template.py`](./tools/build_service_refresh_template.py).
+
+Use the complete ZIP so these scripts have all required templates and supporting files; no separate repository navigation or individual script download is required.
 
 1. [Download the complete ESS ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip).
 2. Select **Extract All**. Do not run the files from inside the ZIP.
 3. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
 4. Open the extracted `ESS-main` folder.
-5. Double-click `START-HERE-DATAVERSE.cmd`. The command file runs the required Python setup script automatically.
-6. Continue with [Option B](#option-b---guided-setup-with-optional-enhancements). When the report is ready for publication, use `BUILD-SERVICE-REFRESH.cmd` as directed in Action 3.
+5. Double-click [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd). The command file runs the required Python setup script automatically.
+6. Continue with [Option B](#option-b---guided-setup-with-optional-enhancements). When the report is ready for publication, use [`BUILD-SERVICE-REFRESH.cmd`](./BUILD-SERVICE-REFRESH.cmd) as directed in Action 3.
 
 ## Files, portals, and required roles
 
@@ -107,13 +112,13 @@ For optional inputs, Customer Topic Overrides JSON can be pasted directly. Feedb
 
 ### Option B - Guided setup with optional enhancements
 
-The complete ESS ZIP contains both command launchers and the Python scripts they run. Do not download the `.py` files separately.
+The complete ESS ZIP contains both command launchers and the Python scripts they run. The links below identify the exact included files, but the complete ZIP is the runnable download because the scripts require the templates and supporting modules.
 
 1. [Download the complete ESS ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip).
 2. Select **Extract All**, keep the extracted folder structure intact, and do not run the files from inside the ZIP.
 3. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/).
 4. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
-5. Open the extracted `ESS-main` folder and double-click `START-HERE-DATAVERSE.cmd`. The command file automatically runs `tools\guided_dataverse_setup.py` and creates the local **Desktop Validation - DO NOT PUBLISH** report.
+5. Open the extracted `ESS-main` folder and double-click [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd). The command file automatically runs [`tools\guided_dataverse_setup.py`](./tools/guided_dataverse_setup.py) and creates a **Desktop Validation - LOCAL ONLY** report for checking the selected inputs.
 6. Paste the Environment URL and skip optional data for the first run.
 7. When the guided checks complete, open the report.
 
@@ -142,7 +147,7 @@ Power BI may reuse a valid cached credential. To change accounts or environments
 The lookback parameter limits the server-side query. It does not change retention and cannot restore deleted records.
 
 > [!IMPORTANT]
-> The direct Service-ready PBIT from Option A can be published after validation. The report created by `START-HERE-DATAVERSE.cmd` in Option B is for Desktop validation and may contain local Organization and Credits paths, so use its separate publication report from Action 3.
+> Option B intentionally creates two reports. `START-HERE-DATAVERSE.cmd` creates the local Desktop-validation report for checking optional inputs. Action 3 creates the separate **Power BI Service - PUBLISH THIS** report for shared Service access.
 
 ### Confirm the baseline
 
@@ -214,7 +219,7 @@ Do not load the tenant-wide raw export directly. For Product Feedback, blank or 
 1. Follow [Customer-specific topic tuning](./TOPIC-TUNER.md).
 2. Double-click `TUNE-TOPICS.cmd` and select the representative transcript export.
 3. Follow the tool's **READY**, **REVIEW REQUIRED**, or **STOP** guidance.
-4. Validate the generated **Desktop Validation - Topics - DO NOT PUBLISH** report.
+4. Validate the generated **Desktop Validation - Topics - LOCAL ONLY** report.
 
 Native Copilot Studio topics remain authoritative. Uncertain rules remain disabled or unassigned.
 
@@ -224,7 +229,7 @@ If you need only Desktop/manual refresh, save the validated report as a PBIX and
 
 1. Complete the baseline checklist before publishing.
 2. Continue with the Service-ready PBIT from Option A. If you used the guided Option B, return to the extracted package and run `BUILD-SERVICE-REFRESH.cmd`. The helper keeps Dataverse parameterized, validates the cloud organization URL format and embeds its location as a static SharePoint source when selected, and embeds approved registry, feedback, and topic selections while excluding local Organization and Credits files.
-3. Confirm the filename ends with **Power BI Service - PUBLISH THIS.pbit**. Do not publish a **Desktop Validation - DO NOT PUBLISH** report.
+3. Confirm the filename ends with **Power BI Service - PUBLISH THIS.pbit**. This is the publication artifact; the earlier Desktop-validation report is the local input-checking artifact.
 4. Open the prepared report, wait until every prefilled value is visible and stable, then select **Load**.
 5. Sign in if prompted and select **Home -> Refresh**.
 6. Save it as a clearly named PBIX, select **Home -> Publish**, and choose a workspace where you have Contributor, Member, or Admin access. Do not overwrite or publish the Desktop Validation PBIX.
