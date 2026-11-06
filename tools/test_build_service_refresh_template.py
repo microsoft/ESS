@@ -844,6 +844,52 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             ):
                 validate_feedback_events(feedback_path, registry_rows)
 
+    def test_monitor_feedback_with_conversation_id_does_not_require_registry(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            feedback_path = Path(temporary) / "monitor-feedback.json"
+            feedback_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "FeedbackEventId": "monitor-1",
+                            "ConversationId": "conversation-1",
+                            "AgentId": "",
+                            "FeedbackSource": "MonitorReactions.csv",
+                            "FeedbackVerdict": "Thumbs Up",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            _, audit = validate_feedback_events(feedback_path, None)
+
+        self.assertEqual(audit["events"], 1)
+
+    def test_product_feedback_without_registry_remains_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            feedback_path = Path(temporary) / "product-feedback.json"
+            feedback_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "FeedbackEventId": "product-1",
+                            "ConversationId": "conversation-1",
+                            "AgentId": "T_agent",
+                            "FeedbackSource": "Microsoft 365 Product Feedback",
+                            "FeedbackVerdict": "Thumbs Up",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "neither an enabled registry AgentKey",
+            ):
+                validate_feedback_events(feedback_path, None)
+
     def test_rejects_local_files_in_service_refresh_mode(self):
         with self.assertRaisesRegex(ValueError, "not supported"):
             build_package(

@@ -15,6 +15,7 @@ from guided_dataverse_setup import (
     SetupOptions,
     build_command,
     build_feedback_command,
+    collect_interactive_options,
     load_settings,
     last_process_message,
     merge_cli_options,
@@ -513,14 +514,129 @@ class GuidedDataverseSetupTests(unittest.TestCase):
         self.assertIn("--agent-registry", command)
         self.assertIn("registry.csv", command)
 
-    def test_raw_feedback_requires_registry(self) -> None:
+    def test_raw_monitor_feedback_does_not_require_registry(self) -> None:
         options = SetupOptions(
             environment_url="https://orgexample.crm.dynamics.com",
-            feedback_input_files=["product.csv"],
+            feedback_input_files=["monitor.csv"],
         )
 
-        with self.assertRaisesRegex(ValueError, "requires an agent registry"):
-            build_feedback_command(options, Path("feedback-events.csv"))
+        command = build_feedback_command(options, Path("feedback-events.csv"))
+
+        self.assertIn("monitor.csv", command)
+        self.assertNotIn("--agent-registry", command)
+
+    def test_interactive_setup_allows_every_optional_input_to_be_skipped(self) -> None:
+        stored = SetupOptions(
+            environment_url="https://orgexample.crm.dynamics.com"
+        )
+        args = Namespace(mode="desktop-validation")
+        decisions = [True, True, False, False, False, False, False]
+
+        with patch("guided_dataverse_setup.ask_yes_no", side_effect=decisions), \
+             patch("builtins.input", return_value=""), \
+             patch("guided_dataverse_setup.select_file", side_effect=AssertionError("unexpected picker")), \
+             patch("builtins.print"):
+            options = collect_interactive_options(args, stored)
+
+        self.assertEqual(options.agent_registry_json, "")
+        self.assertEqual(options.org_data_file, "")
+        self.assertEqual(options.agent_credits_file, "")
+        self.assertEqual(options.topic_overrides_json, "")
+        self.assertEqual(options.feedback_input_files, [])
+
+    def test_interactive_product_feedback_can_select_registry_when_needed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            product = root / "product-feedback.csv"
+            registry = root / "agent-registry.csv"
+            product.write_text(
+                "Feedback Id,Feedback Type,Microsoft Response Status,Agent ID\n"
+                "1,Like,Open,T_agent\n",
+                encoding="utf-8",
+            )
+            stored = SetupOptions(
+                environment_url="https://orgexample.crm.dynamics.com"
+            )
+            args = Namespace(mode="desktop-validation")
+            decisions = [
+                True, True, False, False, False, False, True, False, True
+            ]
+
+            with patch("guided_dataverse_setup.ask_yes_no", side_effect=decisions), \
+                 patch("builtins.input", return_value=""), \
+                 patch("guided_dataverse_setup.select_file", side_effect=[str(product), str(registry)]), \
+                 patch("builtins.print"):
+                options = collect_interactive_options(args, stored)
+
+        self.assertEqual(options.agent_registry_json, str(registry.resolve()))
+        self.assertEqual(options.feedback_input_files, [str(product.resolve())])
+
+    def test_interactive_product_feedback_is_skipped_when_registry_is_declined(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            product = root / "product-feedback.csv"
+            monitor = root / "monitor.csv"
+            product.write_text(
+                "Feedback Id,Feedback Type,Microsoft Response Status,Agent ID\n"
+                "1,Like,Open,T_agent\n",
+                encoding="utf-8",
+            )
+            monitor.write_text(
+                "Reaction Id,Conversation ID,Reaction\n1,conversation-1,Like\n",
+                encoding="utf-8",
+            )
+            stored = SetupOptions(
+                environment_url="https://orgexample.crm.dynamics.com"
+            )
+            args = Namespace(mode="desktop-validation")
+            decisions = [
+                True, True, False, False, False, False,
+                True, True, False, False,
+            ]
+
+            with patch("guided_dataverse_setup.ask_yes_no", side_effect=decisions), \
+                 patch("builtins.input", return_value=""), \
+                 patch("guided_dataverse_setup.select_file", side_effect=[str(product), str(monitor)]), \
+                 patch("builtins.print") as printer:
+                options = collect_interactive_options(args, stored)
+
+        self.assertEqual(options.agent_registry_json, "")
+        self.assertEqual(options.feedback_input_files, [str(monitor.resolve())])
+        self.assertTrue(
+            any(
+                "Setup will continue" in str(call)
+                for call in printer.call_args_list
+            )
+        )
+
+    def test_interactive_monitor_feedback_does_not_prompt_for_registry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            monitor = Path(directory) / "monitor.csv"
+            monitor.write_text(
+                "Reaction Id,Conversation ID,Reaction\n1,conversation-1,Like\n",
+                encoding="utf-8",
+            )
+            stored = SetupOptions(
+                environment_url="https://orgexample.crm.dynamics.com"
+            )
+            args = Namespace(mode="desktop-validation")
+            decisions = [
+                True, True, False, False, False, False, True, False
+            ]
+
+            with patch("guided_dataverse_setup.ask_yes_no", side_effect=decisions) as questions, \
+                 patch("builtins.input", return_value=""), \
+                 patch("guided_dataverse_setup.select_file", return_value=str(monitor)), \
+                 patch("builtins.print"):
+                options = collect_interactive_options(args, stored)
+
+        self.assertEqual(options.feedback_input_files, [str(monitor.resolve())])
+        self.assertFalse(
+            any(
+                "Select an agent registry now?" in call.args[0]
+                for call in questions.call_args_list
+            )
+        )
 
     def test_raw_feedback_is_filtered_and_mapped_by_guided_setup(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

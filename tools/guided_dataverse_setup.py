@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import shutil
@@ -15,7 +16,11 @@ from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 from build_service_refresh_template import normalize_environment_url
-from ess_feedback_normalizer import feedback_output_paths, reject_output_collisions
+from ess_feedback_normalizer import (
+    feedback_output_paths,
+    is_product_feedback_export,
+    reject_output_collisions,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -304,6 +309,18 @@ def merge_cli_options(
     return options
 
 
+def product_feedback_inputs(paths: list[str]) -> list[str]:
+    matches = []
+    for path in paths:
+        with Path(path).open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if not reader.fieldnames:
+                raise ValueError(f"{path} has no CSV header")
+            if is_product_feedback_export(reader.fieldnames):
+                matches.append(path)
+    return matches
+
+
 def collect_interactive_options(
     args: argparse.Namespace,
     stored: SetupOptions | None,
@@ -383,26 +400,57 @@ def collect_interactive_options(
             setattr(options, field_name, "")
 
     print(
-        "\nMicrosoft 365 feedback: optional raw Product Feedback or Monitor "
-        "CSV exports. The guided setup prepares them locally."
+        "\nMicrosoft 365 feedback is optional. Product Feedback needs an "
+        "agent registry for safe attribution. Monitor exports with "
+        "Conversation IDs do not."
     )
     if ask_yes_no(
         "Select one or more raw Microsoft 365 feedback exports?",
         default=bool(options.feedback_input_files),
     ):
-        options.feedback_input_files = []
+        selected_feedback = []
         while True:
             selected = select_file(
                 "Select a Microsoft 365 feedback export",
                 (("CSV files", "*.csv"),),
             )
             if selected:
-                options.feedback_input_files.append(str(Path(selected).resolve()))
+                selected_feedback.append(str(Path(selected).resolve()))
             if not selected or not ask_yes_no(
                 "Add another feedback export?",
                 default=False,
             ):
                 break
+        product_feedback = product_feedback_inputs(selected_feedback)
+        if product_feedback and not options.agent_registry_json:
+            print(
+                "\nMicrosoft 365 Product Feedback needs an agent registry. "
+                "This does not affect Monitor files or the rest of setup."
+            )
+            if ask_yes_no("Select an agent registry now?", default=True):
+                selected_registry = select_file(
+                    "Select Agent registry",
+                    (("Registry files", "*.csv *.json"),),
+                )
+                if selected_registry:
+                    options.agent_registry_json = str(
+                        Path(selected_registry).resolve()
+                    )
+            if not options.agent_registry_json:
+                skipped = {
+                    str(Path(path).resolve())
+                    for path in product_feedback
+                }
+                selected_feedback = [
+                    path
+                    for path in selected_feedback
+                    if str(Path(path).resolve()) not in skipped
+                ]
+                print(
+                    "Product Feedback was skipped because no agent registry "
+                    "was selected. Setup will continue."
+                )
+        options.feedback_input_files = selected_feedback
         options.feedback_events_json = ""
     else:
         options.feedback_input_files = []
@@ -411,24 +459,19 @@ def collect_interactive_options(
 
 
 def build_feedback_command(options: SetupOptions, output: Path) -> list[str]:
-    if not options.agent_registry_json:
-        raise ValueError(
-            "Microsoft 365 feedback requires an agent registry so tenant-wide "
-            "rows can be attributed safely."
-        )
     command = [sys.executable, str(FEEDBACK_NORMALIZER)]
     for path in options.feedback_input_files:
         command.extend(("--input", path))
-    command.extend(
-        (
-            "--agent-registry",
-            options.agent_registry_json,
-            "--scope-mode",
-            "ESS Safe",
-            "--output",
-            str(output),
+    if options.agent_registry_json:
+        command.extend(
+            (
+                "--agent-registry",
+                options.agent_registry_json,
+                "--scope-mode",
+                "ESS Safe",
+            )
         )
-    )
+    command.extend(("--output", str(output)))
     return command
 
 

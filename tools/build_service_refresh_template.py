@@ -479,11 +479,6 @@ def validate_feedback_events(
     path: Path,
     registry_rows: list[dict] | None,
 ) -> tuple[str, dict]:
-    if not registry_rows:
-        raise ValueError(
-            "Feedback Events require --agent-registry-json so external AgentId "
-            "values can be mapped safely."
-        )
     rows = load_json_array(path, "Feedback Events")
     for row_number, row in enumerate(rows, start=1):
         missing = sorted(FEEDBACK_REQUIRED_COLUMNS - set(row))
@@ -493,7 +488,7 @@ def validate_feedback_events(
             )
     active_keys = {
         row["AgentKey"]
-        for row in registry_rows
+        for row in registry_rows or []
         if row["Enabled"]
     }
     invalid_identifiers = sorted(
