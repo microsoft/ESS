@@ -17,7 +17,7 @@ import uuid
 import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse, urlunparse
 
 from agent_registry import load_registry
 from topic_classifier import canonical_terms, rule_locale
@@ -36,6 +36,7 @@ M_TYPE_BY_TABULAR_TYPE = {
 ENVIRONMENT_PARAMETER = "Dataverse Environment URL (required)"
 REGISTRY_EXPRESSION = "Agent Registry JSON"
 ORG_DATA_PARAMETER = "Org Data File"
+ORG_DATA_URL_PARAMETER = "Organization Data URL (optional)"
 CREDITS_PARAMETER = "Agent Credits  (optional)"
 OVERRIDES_PARAMETER = "Customer Topic Overrides JSON (optional)"
 FEEDBACK_PARAMETER = "Feedback Events JSON (optional)"
@@ -107,6 +108,11 @@ PARAMETER_DESCRIPTIONS = {
         "Optional. Approved user roster CSV for organization analysis. The file "
         "must contain UserPrincipalName, UPN, or PersonId. Leave blank to skip."
     ),
+    ORG_DATA_URL_PARAMETER: (
+        "Optional. Direct HTTPS URL to an approved organization CSV in SharePoint "
+        "Online or OneDrive for Business. The file must contain UserPrincipalName, "
+        "UPN, or PersonId. Leave blank to skip organization analysis."
+    ),
     CREDITS_PARAMETER: (
         "Optional. User-Level Credit Consumption CSV from Power Platform admin "
         "center. Leave blank to skip credit-consumption analysis."
@@ -161,16 +167,57 @@ def strip_packaged_placeholder_examples(value):
     return value
 
 
-def restore_desktop_sources(schema: dict) -> None:
+def desktop_source_payload() -> dict:
     payload_bytes = gzip.decompress(base64.b64decode(DESKTOP_SOURCE_PAYLOAD))
     if hashlib.sha256(payload_bytes).hexdigest() != DESKTOP_SOURCE_PAYLOAD_SHA256:
         raise ValueError("Desktop source definitions failed their integrity check")
-    payload = json.loads(payload_bytes)
+    return json.loads(payload_bytes)
+
+
+def order_org_loader_before_result(expression: str) -> str:
+    result_marker = "\n    Result =\n"
+    loader_marker = "\n    // Loader (only invoked when a path is provided)\n"
+    final_marker = "\nin\n    Result"
+    result_start = expression.find(result_marker)
+    loader_start = expression.find(loader_marker)
+    final_start = expression.rfind(final_marker)
+    if not 0 <= result_start < loader_start < final_start:
+        raise ValueError("Organization query binding order is not recognized")
+
+    result_block = expression[result_start:loader_start].rstrip()
+    loader_block = expression[loader_start:final_start].rstrip()
+    if not result_block.endswith(",") or loader_block.endswith(","):
+        raise ValueError("Organization query binding delimiters are not recognized")
+
+    return (
+        expression[:result_start]
+        + loader_block
+        + ",\n"
+        + result_block[:-1]
+        + expression[final_start:]
+    )
+
+
+def restore_desktop_sources(schema: dict) -> None:
+    payload = desktop_source_payload()
     expressions = schema["model"]["expressions"]
     existing = {item["name"] for item in expressions}
+    lineage_tags = {
+        item["lineageTag"].casefold()
+        for item in expressions
+        if item.get("lineageTag")
+    }
     for parameter in payload["parameters"]:
         if parameter["name"] not in existing:
+            parameter = json.loads(json.dumps(parameter))
+            lineage_tag = parameter.get("lineageTag")
+            if lineage_tag and lineage_tag.casefold() in lineage_tags:
+                seed = f"ess-desktop-expression:{parameter['name']}:{lineage_tag}"
+                lineage_tag = str(uuid.uuid5(uuid.NAMESPACE_URL, seed))
+                parameter["lineageTag"] = lineage_tag
             expressions.append(parameter)
+            if lineage_tag:
+                lineage_tags.add(lineage_tag.casefold())
     tables = {
         table["name"]: table
         for table in schema["model"]["tables"]
@@ -206,6 +253,65 @@ def normalize_environment_url(value: str) -> str:
             "https://orgabc12345.crm.dynamics.com."
         )
     return f"https://{parsed.hostname.lower()}"
+
+
+def normalize_org_data_url(value: str) -> str:
+    parsed = urlparse(value.strip())
+    hostname = (parsed.hostname or "").lower()
+    sharepoint_suffixes = (
+        ".sharepoint.com",
+        ".sharepoint.us",
+        ".sharepoint-mil.us",
+        ".sharepoint.de",
+        ".sharepoint.cn",
+    )
+    if (
+        parsed.scheme.lower() != "https"
+        or not any(hostname.endswith(suffix) for suffix in sharepoint_suffixes)
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.port is not None
+        or not parsed.path.lower().endswith(".csv")
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError(
+            "Organization Data URL must be a direct HTTPS CSV path in "
+            "SharePoint Online or OneDrive for Business, without sharing-link "
+            "query parameters."
+        )
+    return urlunparse(("https", hostname, parsed.path, "", "", ""))
+
+
+def sharepoint_file_location(value: str) -> tuple[str, str, str]:
+    parsed = urlparse(normalize_org_data_url(value))
+    segments = [
+        unquote(segment)
+        for segment in parsed.path.split("/")
+        if segment
+    ]
+    if not segments:
+        raise ValueError("Organization Data URL must identify a CSV file")
+
+    site_segment_count = (
+        2
+        if len(segments) >= 2
+        and segments[0].lower() in {"sites", "teams", "personal"}
+        else 0
+    )
+    site_path = (
+        "/" + "/".join(segments[:site_segment_count])
+        if site_segment_count
+        else ""
+    )
+    site_url = f"{parsed.scheme}://{parsed.netloc}{site_path}"
+    folder_url = (
+        f"{parsed.scheme}://{parsed.netloc}/"
+        + "/".join(segments[:-1])
+        + "/"
+    )
+    return site_url, folder_url, segments[-1]
 
 
 def read_csv_rows(path: Path, label: str) -> tuple[list[str], list[dict]]:
@@ -530,6 +636,7 @@ def empty_partition_expression(table: dict) -> str:
 
 def build_query_expressions(
     schema: dict,
+    org_data_url: str | None = None,
 ) -> dict[str, str]:
     tables = {
         table["name"]: table
@@ -563,15 +670,85 @@ def build_query_expressions(
     )
     query_expressions["Agent Performance"] = agent_expression
 
-    for table_name in ("Chat + Agent Org Data", "AgentCredits"):
-        table = tables[table_name]
-        expression = empty_partition_expression(table)
-        partition = table["partitions"][0]
-        partition["source"]["expression"] = store_expression(
-            partition["source"]["expression"],
-            expression,
+    org_table = tables["Chat + Agent Org Data"]
+    if org_data_url is None:
+        org_expression = empty_partition_expression(org_table)
+    else:
+        org_expression = expression_text(
+            desktop_source_payload()["queries"]["Chat + Agent Org Data"]
+        ).replace(
+            f'#"{ORG_DATA_PARAMETER}"',
+            f'#"{ORG_DATA_URL_PARAMETER}"',
         )
-        query_expressions[table_name] = expression
+        org_expression = order_org_loader_before_result(org_expression)
+        desktop_source = '''            IsSharePoint = Text.StartsWith(Text.Lower(FilePath), "http"),
+
+            // SCHEDULED / AUTO-REFRESH REQUIREMENT (see Agent Performance for detail):
+            // call Web.Contents with a static base URL (site origin) + RelativePath so the
+            // Fabric service can identify and authenticate the source. Passing the whole
+            // URL as one string makes it a "dynamic data source" and blocks refresh.
+            _AfterScheme = Text.AfterDelimiter(FilePath, "://"),
+            _Origin      = Text.BeforeDelimiter(FilePath, "://") & "://" & Text.BeforeDelimiter(_AfterScheme, "/"),
+            _Relative    = Text.AfterDelimiter(_AfterScheme, "/"),
+
+            Source = if IsSharePoint then
+                Csv.Document(
+                    Web.Contents(_Origin, [RelativePath = _Relative]),
+                    [Delimiter = ",", Encoding = 1252, QuoteStyle = QuoteStyle.None]
+                )
+            else
+                Csv.Document(
+                    File.Contents(FilePath),
+                    [Delimiter = ",", Encoding = 1252, QuoteStyle = QuoteStyle.None]
+                ),'''
+        site_url, folder_url, file_name = sharepoint_file_location(org_data_url)
+        service_source = f'''            // Customer-specific Service builds use the native SharePoint
+            // connector so Desktop and Service expose an Organizational account
+            // credential instead of treating the source as hand-authored Web content.
+            SharePointFiles = SharePoint.Files({m_text(site_url)}, [ApiVersion = 15]),
+            MatchingFiles = Table.SelectRows(
+                SharePointFiles,
+                each [Name] = {m_text(file_name)}
+                    and Text.Lower(Text.TrimEnd([Folder Path], "/"))
+                        = Text.Lower(Text.TrimEnd({m_text(folder_url)}, "/"))
+            ),
+            SourceBinary =
+                if Table.RowCount(MatchingFiles) = 1 then
+                    MatchingFiles{{0}}[Content]
+                else if Table.IsEmpty(MatchingFiles) then
+                    error "Organization CSV was not found at the configured SharePoint path."
+                else
+                    error "More than one organization CSV matched the configured SharePoint path.",
+
+            Source = Csv.Document(
+                SourceBinary,
+                [Delimiter = ",", Encoding = 1252, QuoteStyle = QuoteStyle.None]
+            ),'''
+        org_expression = replace_once(
+            org_expression,
+            desktop_source,
+            service_source,
+            "Service organization SharePoint source",
+        )
+        if "File.Contents" in org_expression:
+            raise ValueError(
+                "Service organization query still contains a local file source"
+            )
+    org_partition = org_table["partitions"][0]
+    org_partition["source"]["expression"] = store_expression(
+        org_partition["source"]["expression"],
+        org_expression,
+    )
+    query_expressions["Chat + Agent Org Data"] = org_expression
+
+    credits_table = tables["AgentCredits"]
+    credits_expression = empty_partition_expression(credits_table)
+    credits_partition = credits_table["partitions"][0]
+    credits_partition["source"]["expression"] = store_expression(
+        credits_partition["source"]["expression"],
+        credits_expression,
+    )
+    query_expressions["AgentCredits"] = credits_expression
 
     return query_expressions
 
@@ -582,6 +759,7 @@ def update_parameter_metadata(
     mode: str,
     registry_json: str | None,
     org_data_file: Path | None = None,
+    org_data_url: str | None = None,
     credits_file: Path | None = None,
     overrides_json: str | None = None,
     feedback_json: str | None = None,
@@ -594,6 +772,24 @@ def update_parameter_metadata(
         item["name"]: item
         for item in schema["model"]["expressions"]
     }
+    if (
+        mode in SERVICE_MODES
+        and org_data_url is not None
+        and ORG_DATA_URL_PARAMETER not in schema_expressions
+    ):
+        desktop_parameter = next(
+            item
+            for item in desktop_source_payload()["parameters"]
+            if item["name"] == ORG_DATA_PARAMETER
+        )
+        service_parameter = json.loads(json.dumps(desktop_parameter))
+        service_parameter["name"] = ORG_DATA_URL_PARAMETER
+        service_parameter["expression"] = (
+            'null meta [IsParameterQuery=true, Type="Text", '
+            'IsParameterQueryRequired=false]'
+        )
+        schema["model"]["expressions"].append(service_parameter)
+        schema_expressions[ORG_DATA_URL_PARAMETER] = service_parameter
     environment = schema_expressions[ENVIRONMENT_PARAMETER]
     environment["expression"] = parameter_expression
     environment["description"] = ENVIRONMENT_DESCRIPTION
@@ -617,6 +813,7 @@ def update_parameter_metadata(
         ORG_DATA_PARAMETER: (
             str(org_data_file.resolve()) if org_data_file is not None else None
         ),
+        ORG_DATA_URL_PARAMETER: org_data_url,
         CREDITS_PARAMETER: (
             str(credits_file.resolve()) if credits_file is not None else None
         ),
@@ -636,6 +833,10 @@ def update_parameter_metadata(
             item
             for item in schema["model"]["expressions"]
             if item["name"] not in DISABLED_FILE_PARAMETERS
+            and not (
+                item["name"] == ORG_DATA_URL_PARAMETER
+                and org_data_url is None
+            )
         ]
 
 
@@ -696,6 +897,7 @@ def build_package(
     *,
     mode: str = "service-refresh",
     org_data_file: Path | None = None,
+    org_data_url: str | None = None,
     credits_file: Path | None = None,
     overrides_json: str | None = None,
     feedback_json: str | None = None,
@@ -707,8 +909,15 @@ def build_package(
             "Org Data and Agent Credits files are not supported in Service-refresh "
             "mode. Use --mode desktop-validation or Fabric."
         )
+    if mode == "desktop-validation" and org_data_url:
+        raise ValueError(
+            "Organization Data URL is supported only in Service modes. Use "
+            "--org-data-file for Desktop validation."
+        )
+    if org_data_url is not None:
+        org_data_url = normalize_org_data_url(org_data_url)
     if mode == "service-direct" and any(
-        (environment_url, registry_json, overrides_json, feedback_json)
+        (environment_url, registry_json, org_data_url, overrides_json, feedback_json)
     ):
         raise ValueError(
             "Service-direct mode must remain customer-neutral. Enter the Environment "
@@ -735,13 +944,14 @@ def build_package(
         restore_desktop_sources(schema)
     schema["name"] = str(uuid.uuid4())
     if mode in SERVICE_MODES:
-        build_query_expressions(schema)
+        build_query_expressions(schema, org_data_url)
     update_parameter_metadata(
         schema,
         environment_url,
         mode,
         registry_json,
         org_data_file,
+        org_data_url,
         credits_file,
         overrides_json,
         feedback_json,
@@ -809,6 +1019,13 @@ def main() -> None:
         help="Desktop-validation Org Data CSV.",
     )
     parser.add_argument(
+        "--org-data-url",
+        help=(
+            "Service-refresh direct HTTPS URL to an Org Data CSV in "
+            "SharePoint Online or OneDrive for Business."
+        ),
+    )
+    parser.add_argument(
         "--agent-credits-file",
         type=Path,
         help="Desktop-validation User-Level Credit Consumption CSV.",
@@ -847,6 +1064,7 @@ def main() -> None:
         )
     if args.mode == "service-direct" and (
         args.agent_registry_json
+        or args.org_data_url
         or args.topic_overrides_json
         or args.feedback_events_json
     ):
@@ -859,6 +1077,11 @@ def main() -> None:
     validation = {
         "environmentUrl": environment_url,
         "mode": args.mode,
+        "organizationDataUrl": (
+            normalize_org_data_url(args.org_data_url)
+            if args.org_data_url
+            else ""
+        ),
         "registryAliases": len(registry_rows or []),
         "sources": [],
         "warnings": [],
@@ -896,6 +1119,7 @@ def main() -> None:
         registry_json,
         mode=args.mode,
         org_data_file=args.org_data_file,
+        org_data_url=args.org_data_url,
         credits_file=args.agent_credits_file,
         overrides_json=overrides_json,
         feedback_json=feedback_json,

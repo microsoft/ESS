@@ -17,12 +17,12 @@ Complete three actions:
 
 1. **Download and choose one path.** Select [Download ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip), extract it, and choose Dataverse Direct, CSV Upload, or Fabric below.
 2. **Validate the transcript-only baseline.** Follow only that path's guide and confirm the report works before adding other data.
-3. **Enable the report areas you need.** Dataverse URL-only users can open and publish the [Service-ready Dataverse PBIT](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit) without Python. It accepts optional topic-override JSON and prepared Monitor feedback that can reconcile to an exact loaded conversation. Use the guided setup for Microsoft 365 Product Feedback or whenever registry, Organization, or Credits inputs are needed.
+3. **Enable the report areas you need.** Dataverse URL-only users can open and publish the [Service-ready Dataverse PBIT](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V22%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit) without Python. It accepts topic-override JSON and prepared Monitor feedback that can reconcile to an exact loaded conversation. Use the guided setup for organization data, Microsoft 365 Product Feedback, registry inputs, or local Desktop validation files.
 
 > [!IMPORTANT]
 > Download the complete ZIP when using scripts, optional enhancements, CSV Upload, or Fabric. Dataverse URL-only users may download the Service-ready Dataverse PBIT directly.
 >
-> The existing Dataverse guided setup remains available and creates two intentionally different artifacts. **Desktop Validation - DO NOT PUBLISH** can include local Organization and Credits files. Its generated **Power BI Service - PUBLISH THIS** counterpart excludes those local sources.
+> The existing Dataverse guided setup remains available and creates two intentionally different artifacts. **Desktop Validation - DO NOT PUBLISH** can include local Organization and Credits files. Its generated **Power BI Service - PUBLISH THIS** counterpart excludes local files but can refresh a cloud-hosted organization CSV from SharePoint Online or OneDrive for Business.
 
 ## Choose your data path
 
@@ -38,7 +38,7 @@ Choose this path when the report will use one Production, Sandbox, or Default Da
 
 **Required access:** Bot Transcript Viewer, or a custom Dataverse role with organization-level Read on `conversationtranscript`. Environment Maker alone is not enough.
 
-**Included setup:** URL-only users can open the [Service-ready Dataverse PBIT](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit), enter the required Environment URL, optionally set Transcript Lookback Days or Customer Topic Overrides JSON, then validate and publish without Python. The Feedback Events JSON parameter is for prepared Monitor events that identify one exact loaded conversation; registry-dependent Microsoft 365 Product Feedback uses the guided setup. The direct PBIT does not expose registry, Organization, or Credits file parameters. Power BI Service refreshes Dataverse directly and does not run Python.
+**Included setup:** URL-only users can open the [Service-ready Dataverse PBIT](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V22%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit), enter the required Environment URL, and optionally set Transcript Lookback Days or Customer Topic Overrides JSON. The Feedback Events JSON parameter is for prepared Monitor events that identify one exact loaded conversation; registry-dependent Microsoft 365 Product Feedback uses the guided setup. The direct PBIT is a transcript-only Service baseline and does not expose registry, Organization, or Credits file parameters. For gateway-free organization refresh, the guided builder validates the SharePoint/OneDrive CSV path and generates a customer-specific template with a static SharePoint source.
 
 When the direct report opens, paste the Environment URL and leave optional parameters blank for the baseline. Guided users should wait until prefilled values are visible and stable before selecting **Load**.
 
@@ -84,7 +84,7 @@ These inputs enable specific report areas; they are not required for the transcr
 
 | Enhancement | What it adds | Where to retrieve it | Required role | Included helper or guide |
 |---|---|---|---|---|
-| **Users / organization** | Department, country, job title, display name | Microsoft 365 admin center: **Users -> Active users -> Export users**, or an approved HR/Viva Insights/Graph source | Global Reader, User Administrator, or Global Administrator for the Microsoft 365 export; other sources use their own access model | CSV and Dataverse Desktop accept `OrgData.csv`; Fabric requires a customer-built Lakehouse ingestion |
+| **Users / organization** | Department, country, job title, display name | Microsoft 365 admin center: **Users -> Active users -> Export users**, or an approved HR/Viva Insights/Graph source | Global Reader, User Administrator, or Global Administrator for the Microsoft 365 export; other sources use their own access model | CSV and Dataverse Desktop accept `OrgData.csv`; the Dataverse guided builder can embed a validated SharePoint/OneDrive CSV path as a static Service source; Universal Lake/Fabric can automate Entra ingestion |
 | **Copilot Credits** | Observed tenant, agent, and user credit consumption | Power Platform admin center: **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator is recommended least privilege; tenant administrator or Dynamics 365 Administrator also works | CSV/Dataverse Desktop use the User-Level file; Fabric uses all three files and [`Copilot_Credit_Consumption_Ingester.ipynb`](./Fabric/notebooks/Copilot_Credit_Consumption_Ingester.ipynb) |
 | **External Product Feedback** | Microsoft 365 Copilot Chat and exported Monitor reactions beyond the reactions already found in transcripts | Microsoft 365 admin center: **Health -> Product feedback -> Export to CSV** | A Microsoft 365 administrator or reader with Product Feedback access; Compliance Administrator or Global Administrator only when identity details or deletion are required | Dataverse prepares raw exports in its guided setup; CSV/Fabric use the [feedback guide](./FEEDBACK-INGESTION.md) |
 | **Customer-specific topics** | Better coverage for recurring customer language that native and built-in topics do not classify reliably | Learn from the customer's native Copilot Studio topic evidence | Transcript read access; no additional cloud role | Use the [optional topic tuner](./TOPIC-TUNER.md) only after reviewing when to use or skip it |
@@ -97,12 +97,13 @@ The downloadable ZIP contains these current report artifacts:
 
 | File | Use |
 |---|---|
-| [`ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit) | Single customer-neutral Dataverse V21 template. Use it directly for URL-only Service publication, or use the guided setup to generate customer and Desktop-validation builds with optional inputs. |
+| [`ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V22%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit) | Current customer-neutral transcript-only Dataverse V22 template. Use it directly for the four supported Service parameters, or use the guided setup to generate a customer-specific static SharePoint organization source and Desktop-validation builds with optional inputs. |
+| [`ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit) | Previous Dataverse V21 design retained as a rollback backup. Use V22 for new deployments. |
 | [`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) | CSV Upload template |
 | [`ESS - Fabric V2.pbit`](./ESS%20-%20Fabric%20V2.pbit) | Fabric/Lakehouse template |
 | [`ESS Dashboard - DEMO PBIX.pbix`](./ESS%20Dashboard%20-%20DEMO%20PBIX.pbix) | Synthetic demonstration report; not a customer template |
 
-Older Dataverse template backups are not included in the release.
+V21 is retained so the previous Dataverse design can be restored if needed. Older Dataverse template backups are not included in the release.
 
 ## Before collecting data
 
@@ -117,19 +118,17 @@ Older Dataverse template backups are not included in the release.
 | Sandbox | Yes | Yes |
 | Default | Yes | Yes |
 | Developer | Only the maker's conversations | Demo only |
-| Microsoft Teams environment | No | No |
-| Microsoft 365 Copilot environment | No | No |
 
-Check the type in the [Power Platform admin center](https://admin.powerplatform.microsoft.com): **Environments -> select the environment**.
+Check the type in the [Power Platform admin center](https://admin.powerplatform.microsoft.com): **Manage -> Environments -> select the environment**. Microsoft 365 Copilot and Teams are publishing channels, not Dataverse environment types. Either can be a valid channel when the underlying Production, Sandbox, or Default environment supports transcript persistence.
 
 ### Enable the required transcript settings
 
-1. Open the agent in [Copilot Studio](https://copilotstudio.microsoft.com).
-2. Select **Settings -> Advanced -> Conversation transcripts**.
-3. Turn on **Save conversation transcripts to Dataverse**.
-4. Turn on **Include node-level details in transcripts**.
-5. Save and publish the agent.
-6. Run several new test conversations and allow a few minutes for the records to appear.
+1. In [Power Platform admin center](https://admin.powerplatform.microsoft.com), select **Manage -> Environments -> select the environment -> Settings -> Product -> Features -> Copilot Studio agents**, then enable saving conversation transcripts to Dataverse.
+2. Open the agent in [Copilot Studio](https://copilotstudio.microsoft.com).
+3. Select **Settings -> Advanced -> Conversation transcripts** and turn on **Include node-level details in transcripts**.
+4. Save and publish the agent.
+5. Test through an enabled published channel; generic `/webchat` is not required for Microsoft-authenticated agents.
+6. End each new test conversation and allow approximately **30 minutes of inactivity** before expecting its row in Dataverse.
 
 These settings affect future conversations only. Node-level details are required for topic, turn, duration, outcome, and parent/child-agent analysis.
 
@@ -182,7 +181,7 @@ The [`SampleData`](./SampleData/) folder contains fabricated `example.com` users
 | `feedback-events.csv` / `feedback-events.json` | Prepared cross-channel feedback |
 | Three `*MCSMessages*` CSVs | Environment, agent, and user Copilot Credits contracts |
 
-The synthetic credit files reconcile to **1,651.75 total credits**. CSV V18 and Dataverse V21 Desktop use the User-Level file; Fabric V2 uses all three.
+The synthetic credit files reconcile to **1,651.75 total credits**. CSV V18 and Dataverse V22 Desktop use the User-Level file; Fabric V2 uses all three.
 
 ## Help and reference
 

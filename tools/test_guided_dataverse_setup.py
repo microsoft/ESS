@@ -475,6 +475,10 @@ class GuidedDataverseSetupTests(unittest.TestCase):
             environment_url="https://orgexample.crm.dynamics.com",
             agent_registry_json="registry.json",
             org_data_file="users.csv",
+            org_data_url=(
+                "https://contoso.sharepoint.com/sites/HR/Shared Documents/"
+                "ESS/OrgData.csv"
+            ),
             agent_credits_file="credits.csv",
             topic_overrides_json="topics.json",
             feedback_events_json="feedback.json",
@@ -487,6 +491,8 @@ class GuidedDataverseSetupTests(unittest.TestCase):
         )
 
         self.assertIn("--agent-registry-json", command)
+        self.assertIn("--org-data-url", command)
+        self.assertIn(options.org_data_url, command)
         self.assertIn("--topic-overrides-json", command)
         self.assertIn("--feedback-events-json", command)
         self.assertNotIn("--org-data-file", command)
@@ -645,6 +651,10 @@ class GuidedDataverseSetupTests(unittest.TestCase):
         options = SetupOptions(
             environment_url="https://orgexample.crm.dynamics.com",
             org_data_file="users.csv",
+            org_data_url=(
+                "https://contoso.sharepoint.com/sites/HR/Shared Documents/"
+                "ESS/OrgData.csv"
+            ),
         )
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "settings.json"
@@ -718,6 +728,7 @@ class GuidedDataverseSetupTests(unittest.TestCase):
             environment_url="https://orga.crm.dynamics.com",
             agent_registry_json="customer-a-registry.json",
             org_data_file="customer-a-users.csv",
+            org_data_url="https://customer-a.sharepoint.com/sites/HR/OrgData.csv",
             agent_credits_file="customer-a-credits.csv",
             topic_overrides_json="customer-a-topics.json",
             feedback_events_json="customer-a-feedback.json",
@@ -744,6 +755,7 @@ class GuidedDataverseSetupTests(unittest.TestCase):
             str(Path("customer-b-registry.json").resolve()),
         )
         self.assertEqual(options.org_data_file, "")
+        self.assertEqual(options.org_data_url, "")
         self.assertEqual(options.agent_credits_file, "")
         self.assertEqual(options.topic_overrides_json, "")
         self.assertEqual(options.feedback_events_json, "")
@@ -796,6 +808,24 @@ class GuidedDataverseSetupTests(unittest.TestCase):
                 "Organization data: 303 rows",
                 "Approved topic rules: 2 rows",
                 "Prepared feedback: 6 rows",
+            ],
+        )
+
+    def test_validation_summary_reports_cloud_org_data(self) -> None:
+        summary = validation_summary(
+            {
+                "organizationDataUrl": (
+                    "https://contoso.sharepoint.com/sites/HR/OrgData.csv"
+                ),
+                "sources": [],
+            }
+        )
+
+        self.assertEqual(
+            summary,
+            [
+                "Dataverse Environment URL: valid",
+                "Organization data URL format: valid",
             ],
         )
 

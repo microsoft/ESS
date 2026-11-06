@@ -21,7 +21,7 @@ from ess_feedback_normalizer import feedback_output_paths, reject_output_collisi
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_TEMPLATE = (
     ROOT
-    / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
+    / "ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit"
 )
 BUILDER = ROOT / "tools" / "build_service_refresh_template.py"
 FEEDBACK_NORMALIZER = ROOT / "tools" / "ess_feedback_normalizer.py"
@@ -30,16 +30,16 @@ DEFAULT_SETTINGS = GENERATED_DIR / "dataverse-setup.json"
 PREPARED_FEEDBACK = GENERATED_DIR / "Prepared Inputs" / "feedback-events.csv"
 OUTPUT_NAMES = {
     "desktop-validation": (
-        "ESS Dashboard - Dynamic Topics (Dataverse) V21 - "
+        "ESS Dashboard - Dynamic Topics (Dataverse) V22 - "
         "Desktop Validation - DO NOT PUBLISH.pbit"
     ),
     "service-refresh": (
-        "ESS Dashboard - Dynamic Topics (Dataverse) V21 - "
+        "ESS Dashboard - Dynamic Topics (Dataverse) V22 - "
         "Power BI Service - PUBLISH THIS.pbit"
     ),
 }
 TOPIC_OUTPUT_NAME = (
-    "ESS Dashboard - Dynamic Topics (Dataverse) V21 - "
+    "ESS Dashboard - Dynamic Topics (Dataverse) V22 - "
     "Desktop Validation - Topics - DO NOT PUBLISH.pbit"
 )
 
@@ -49,6 +49,7 @@ class SetupOptions:
     environment_url: str
     agent_registry_json: str = ""
     org_data_file: str = ""
+    org_data_url: str = ""
     agent_credits_file: str = ""
     topic_overrides_json: str = ""
     feedback_events_json: str = ""
@@ -82,6 +83,7 @@ OPTIONAL_FILES = (
     ),
 )
 OPTIONAL_FILE_FIELDS = tuple(item[0] for item in OPTIONAL_FILES) + (
+    "org_data_url",
     "feedback_events_json",
     "feedback_input_files",
 )
@@ -99,6 +101,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--environment-url")
     parser.add_argument("--agent-registry-json", type=Path)
     parser.add_argument("--org-data-file", type=Path)
+    parser.add_argument("--org-data-url")
     parser.add_argument("--agent-credits-file", type=Path)
     parser.add_argument("--topic-overrides-json", type=Path)
     parser.add_argument("--tune-topics", action="store_true", help="Tune an exported transcript CSV using saved setup choices.")
@@ -128,6 +131,7 @@ def load_settings(path: Path) -> SetupOptions | None:
         environment_url=str(payload.get("environment_url") or ""),
         agent_registry_json=str(payload.get("agent_registry_json") or ""),
         org_data_file=str(payload.get("org_data_file") or ""),
+        org_data_url=str(payload.get("org_data_url") or ""),
         agent_credits_file=str(payload.get("agent_credits_file") or ""),
         topic_overrides_json=str(payload.get("topic_overrides_json") or ""),
         feedback_events_json=str(payload.get("feedback_events_json") or ""),
@@ -280,6 +284,10 @@ def merge_cli_options(
         argument = getattr(args, field_name)
         if argument:
             setattr(options, field_name, str(argument.resolve()))
+    org_data_url = getattr(args, "org_data_url", None)
+    if org_data_url:
+        options.org_data_url = org_data_url.strip()
+        options.org_data_file = ""
     if args.feedback_events_json:
         options.feedback_events_json = str(args.feedback_events_json.resolve())
         options.feedback_input_files = []
@@ -335,6 +343,25 @@ def collect_interactive_options(
             clear_optional_files(options)
 
     if args.mode == "service-refresh":
+        print(
+            "\nOrganization data: optionally provide a direct HTTPS CSV path "
+            "from SharePoint Online or OneDrive for Business."
+        )
+        if options.org_data_url:
+            print(f"Current URL: {options.org_data_url}")
+        if ask_yes_no(
+            "Configure organization data for scheduled refresh?",
+            default=bool(options.org_data_url),
+        ):
+            value = input(
+                "Paste the direct organization CSV URL"
+                + (f" [{options.org_data_url}]" if options.org_data_url else "")
+                + ": "
+            ).strip()
+            options.org_data_url = value or options.org_data_url
+            options.org_data_file = ""
+        else:
+            options.org_data_url = ""
         return options
 
     if not ask_yes_no(
@@ -471,6 +498,8 @@ def build_command(
             value = getattr(options, field_name)
             if value:
                 command.extend((argument, value))
+    elif options.org_data_url:
+        command.extend(("--org-data-url", options.org_data_url))
     return command
 
 
@@ -490,6 +519,8 @@ def validate_runtime() -> None:
 
 def validation_summary(validation: dict) -> list[str]:
     lines = ["Dataverse Environment URL: valid"]
+    if validation.get("organizationDataUrl"):
+        lines.append("Organization data URL format: valid")
     aliases = int(validation.get("registryAliases") or 0)
     if aliases:
         lines.append(f"Agent registry: {aliases} aliases")
@@ -579,8 +610,8 @@ def main() -> int:
             "scheduled Dataverse refresh."
         )
         print(
-            "Organization and credit files are intentionally excluded because "
-            "Power BI Service cannot refresh those local files without a gateway."
+            "Local organization and credit files are excluded. Organization data "
+            "can use a direct SharePoint or OneDrive CSV URL for scheduled refresh."
         )
         if not stored and not args.environment_url:
             raise RuntimeError(
@@ -672,9 +703,11 @@ def main() -> int:
         print(
             "\nPOWER BI SERVICE PUBLICATION FILE - PUBLISH THIS VERSION.\n"
             "Refresh it in Power BI Desktop, save it as PBIX, and publish it. "
-            "In Power BI Service, configure the Dataverse credentials as OAuth2 "
-            "/ Organizational, run Refresh now, confirm Refresh history shows "
-            "Completed, and only then enable Scheduled refresh."
+            "In Power BI Service, map the Dataverse source and, when organization "
+            "data is enabled, the SharePoint source under Gateway and cloud "
+            "connections using OAuth2 / Organizational credentials. Run Refresh "
+            "now, confirm Refresh history shows Completed, and only then enable "
+            "Scheduled refresh."
         )
 
     open_template = args.open_template
