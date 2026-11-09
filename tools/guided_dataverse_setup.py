@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import shutil
@@ -15,13 +16,18 @@ from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 from build_service_refresh_template import normalize_environment_url
-from ess_feedback_normalizer import feedback_output_paths, reject_output_collisions
+from ess_feedback_normalizer import (
+    feedback_output_paths,
+    is_product_feedback_export,
+    reject_output_collisions,
+)
 
 
+SETUP_VERSION = "V23"
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_TEMPLATE = (
     ROOT
-    / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
+    / f"ESS Dashboard - Dynamic Topics (Dataverse) {SETUP_VERSION} - Power BI Service - PUBLISH THIS.pbit"
 )
 BUILDER = ROOT / "tools" / "build_service_refresh_template.py"
 FEEDBACK_NORMALIZER = ROOT / "tools" / "ess_feedback_normalizer.py"
@@ -30,17 +36,17 @@ DEFAULT_SETTINGS = GENERATED_DIR / "dataverse-setup.json"
 PREPARED_FEEDBACK = GENERATED_DIR / "Prepared Inputs" / "feedback-events.csv"
 OUTPUT_NAMES = {
     "desktop-validation": (
-        "ESS Dashboard - Dynamic Topics (Dataverse) V21 - "
-        "Desktop Validation - DO NOT PUBLISH.pbit"
+        f"ESS Dashboard - Dynamic Topics (Dataverse) {SETUP_VERSION} - "
+        "Desktop Validation - LOCAL ONLY.pbit"
     ),
     "service-refresh": (
-        "ESS Dashboard - Dynamic Topics (Dataverse) V21 - "
+        f"ESS Dashboard - Dynamic Topics (Dataverse) {SETUP_VERSION} - "
         "Power BI Service - PUBLISH THIS.pbit"
     ),
 }
 TOPIC_OUTPUT_NAME = (
-    "ESS Dashboard - Dynamic Topics (Dataverse) V21 - "
-    "Desktop Validation - Topics - DO NOT PUBLISH.pbit"
+    f"ESS Dashboard - Dynamic Topics (Dataverse) {SETUP_VERSION} - "
+    "Desktop Validation - Topics - LOCAL ONLY.pbit"
 )
 
 
@@ -49,6 +55,7 @@ class SetupOptions:
     environment_url: str
     agent_registry_json: str = ""
     org_data_file: str = ""
+    org_data_url: str = ""
     agent_credits_file: str = ""
     topic_overrides_json: str = ""
     feedback_events_json: str = ""
@@ -82,42 +89,81 @@ OPTIONAL_FILES = (
     ),
 )
 OPTIONAL_FILE_FIELDS = tuple(item[0] for item in OPTIONAL_FILES) + (
+    "org_data_url",
     "feedback_events_json",
     "feedback_input_files",
 )
 
 
+SKIP_FIELDS = {
+    "--skip-agent-registry": ("agent_registry_json",),
+    "--skip-org-data": ("org_data_file", "org_data_url"),
+    "--skip-agent-credits": ("agent_credits_file",),
+    "--skip-topic-overrides": ("topic_overrides_json",),
+    "--skip-feedback": ("feedback_events_json", "feedback_input_files"),
+}
+
+
+def selected_skip_flags(args: argparse.Namespace) -> list[str]:
+    return [
+        flag for flag in SKIP_FIELDS
+        if getattr(args, flag[2:].replace("-", "_"), False)
+    ]
+
+
+def apply_skip_options(options: SetupOptions, args: argparse.Namespace) -> SetupOptions:
+    for flag in selected_skip_flags(args):
+        for field_name in SKIP_FIELDS[flag]:
+            setattr(options, field_name, [] if field_name == "feedback_input_files" else "")
+    return options
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build validated ESS Dataverse templates through a guided setup."
+        description=f"Build validated ESS Dataverse {SETUP_VERSION} templates through a guided setup."
     )
+    parser.add_argument("--version", action="version", version=f"ESS Dataverse setup {SETUP_VERSION} (Python 3.10+)")
     parser.add_argument(
         "--mode",
         choices=("desktop-validation", "service-refresh"),
         default="desktop-validation",
     )
     parser.add_argument("--environment-url")
-    parser.add_argument("--agent-registry-json", type=Path)
-    parser.add_argument("--org-data-file", type=Path)
-    parser.add_argument("--agent-credits-file", type=Path)
-    parser.add_argument("--topic-overrides-json", type=Path)
+    registry = parser.add_mutually_exclusive_group()
+    registry.add_argument("--agent-registry-json", type=Path)
+    registry.add_argument("--skip-agent-registry", action="store_true", help="Ignore any saved agent registry.")
+    organization = parser.add_mutually_exclusive_group()
+    organization.add_argument("--org-data-file", type=Path)
+    organization.add_argument("--org-data-url")
+    organization.add_argument("--skip-org-data", action="store_true", help="Ignore saved local and cloud organization data.")
+    credits = parser.add_mutually_exclusive_group()
+    credits.add_argument("--agent-credits-file", type=Path)
+    credits.add_argument("--skip-agent-credits", action="store_true", help="Ignore any saved credit-consumption file.")
+    topics = parser.add_mutually_exclusive_group()
+    topics.add_argument("--topic-overrides-json", type=Path)
+    topics.add_argument("--skip-topic-overrides", action="store_true", help="Use native and built-in topics only.")
     parser.add_argument("--tune-topics", action="store_true", help="Tune an exported transcript CSV using saved setup choices.")
     parser.add_argument("--topic-transcripts", type=Path, help="Optional transcript CSV for --tune-topics; otherwise a file picker opens.")
-    parser.add_argument("--feedback-events-json", type=Path)
-    parser.add_argument(
+    feedback = parser.add_mutually_exclusive_group()
+    feedback.add_argument("--feedback-events-json", type=Path)
+    feedback.add_argument(
         "--feedback-input",
         type=Path,
         action="append",
         default=[],
         help="Raw Product Feedback or Monitor CSV; repeat for multiple exports.",
     )
+    feedback.add_argument("--skip-feedback", action="store_true", help="Ignore saved raw exports and prepared feedback JSON.")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--settings-file", type=Path, default=DEFAULT_SETTINGS)
     parser.add_argument("--non-interactive", action="store_true")
     opening = parser.add_mutually_exclusive_group()
     opening.add_argument("--no-open", action="store_true")
     opening.add_argument("--open", action="store_true", dest="open_template")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.tune_topics and args.skip_topic_overrides:
+        parser.error("--skip-topic-overrides cannot be combined with --tune-topics, which builds new topic rules.")
+    return args
 
 
 def load_settings(path: Path) -> SetupOptions | None:
@@ -128,6 +174,7 @@ def load_settings(path: Path) -> SetupOptions | None:
         environment_url=str(payload.get("environment_url") or ""),
         agent_registry_json=str(payload.get("agent_registry_json") or ""),
         org_data_file=str(payload.get("org_data_file") or ""),
+        org_data_url=str(payload.get("org_data_url") or ""),
         agent_credits_file=str(payload.get("agent_credits_file") or ""),
         topic_overrides_json=str(payload.get("topic_overrides_json") or ""),
         feedback_events_json=str(payload.get("feedback_events_json") or ""),
@@ -269,7 +316,7 @@ def merge_cli_options(
     args: argparse.Namespace,
     stored: SetupOptions | None,
 ) -> SetupOptions:
-    options = stored or SetupOptions(environment_url="")
+    options = replace(stored, feedback_input_files=list(stored.feedback_input_files)) if stored else SetupOptions(environment_url="")
     if (
         stored
         and args.environment_url
@@ -280,6 +327,12 @@ def merge_cli_options(
         argument = getattr(args, field_name)
         if argument:
             setattr(options, field_name, str(argument.resolve()))
+    org_data_url = getattr(args, "org_data_url", None)
+    if org_data_url:
+        options.org_data_url = org_data_url.strip()
+        options.org_data_file = ""
+    elif args.org_data_file:
+        options.org_data_url = ""
     if args.feedback_events_json:
         options.feedback_events_json = str(args.feedback_events_json.resolve())
         options.feedback_input_files = []
@@ -293,7 +346,86 @@ def merge_cli_options(
         options.environment_url = normalize_environment_url(
             args.environment_url
         )
-    return options
+    return apply_skip_options(options, args)
+
+
+def product_feedback_inputs(paths: list[str]) -> list[str]:
+    matches = []
+    for path in paths:
+        with Path(path).open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if not reader.fieldnames:
+                raise ValueError(f"{path} has no CSV header")
+            if is_product_feedback_export(reader.fieldnames):
+                matches.append(path)
+    return matches
+
+
+def enhancement_action(label: str, current: str, *, skipped: bool = False) -> str:
+    if skipped:
+        return "skip"
+    if not current:
+        return "replace" if ask_yes_no(f"Add {label}?", default=False) else "skip"
+    print(f"Current selection: {current}")
+    choices = {"k": "keep", "keep": "keep", "r": "replace", "replace": "replace", "s": "skip", "skip": "skip", "": "skip"}
+    while True:
+        answer = input(f"{label}: keep, replace, or skip? [k/r/S]: ").strip().lower()
+        if answer in choices:
+            return choices[answer]
+        print("Enter keep, replace, or skip.")
+
+
+def collect_feedback(options: SetupOptions, *, skipped: bool = False, registry_skipped: bool = False) -> None:
+    print(
+        "\nMicrosoft 365 feedback is optional: choose raw CSV exports or prepared "
+        "feedback-events.json. Product Feedback needs an agent registry for safe "
+        "attribution. Monitor exports with Conversation IDs do not."
+    )
+    current = ", ".join([path for path in [options.feedback_events_json, *options.feedback_input_files] if path])
+    action = enhancement_action("Microsoft 365 feedback", current, skipped=skipped)
+    if action != "keep":
+        options.feedback_events_json = ""
+        options.feedback_input_files = []
+    if action == "skip":
+        return
+    if action == "replace":
+        selected = select_file(
+            "Select a Microsoft 365 feedback CSV or prepared feedback JSON",
+            (("Feedback files", "*.csv *.json"),),
+        )
+        if not selected:
+            return
+        if Path(selected).suffix.lower() == ".json":
+            options.feedback_events_json = str(Path(selected).resolve())
+            return
+        options.feedback_input_files.append(str(Path(selected).resolve()))
+        while ask_yes_no("Add another feedback export?", default=False):
+            selected = select_file("Select a Microsoft 365 feedback export", (("CSV files", "*.csv"),))
+            if not selected:
+                break
+            options.feedback_input_files.append(str(Path(selected).resolve()))
+
+    if options.agent_registry_json or not options.feedback_input_files:
+        return
+    product_feedback = product_feedback_inputs(options.feedback_input_files)
+    if not product_feedback:
+        return
+    print(
+        "\nMicrosoft 365 Product Feedback needs an agent registry. "
+        "This does not affect Monitor files or the rest of setup."
+    )
+    if not registry_skipped and ask_yes_no("Select an agent registry now?", default=False):
+        selected_registry = select_file("Select Agent registry", (("Registry files", "*.csv *.json"),))
+        if selected_registry:
+            options.agent_registry_json = str(Path(selected_registry).resolve())
+    if not options.agent_registry_json:
+        excluded = {str(Path(path).resolve()) for path in product_feedback}
+        options.feedback_input_files = [
+            path for path in options.feedback_input_files
+            if str(Path(path).resolve()) not in excluded
+        ]
+        options.feedback_events_json = ""
+        print("Product Feedback was skipped because no agent registry was selected. Setup will continue.")
 
 
 def collect_interactive_options(
@@ -301,107 +433,86 @@ def collect_interactive_options(
     stored: SetupOptions | None,
 ) -> SetupOptions:
     if stored and ask_yes_no("Reuse the previously saved setup choices?", default=True):
-        options = stored
+        options = replace(stored, feedback_input_files=list(stored.feedback_input_files))
         saved_environment = stored.environment_url
     else:
         options = SetupOptions(environment_url="")
         saved_environment = ""
 
     options.environment_url = prompt_environment(options.environment_url)
-    if saved_environment and not same_environment(
-        saved_environment,
-        options.environment_url,
-    ):
+    if saved_environment and not same_environment(saved_environment, options.environment_url):
         clear_optional_files(options)
         print(
             "\nThe Environment URL changed, so saved customer files were "
             "cleared. Select files for this environment if needed."
         )
-    elif any(getattr(options, field_name) for field_name in OPTIONAL_FILE_FIELDS):
-        print("\nSaved optional files:")
-        for field_name, label, _, _ in OPTIONAL_FILES:
-            value = getattr(options, field_name)
-            if value:
-                print(f"  {label}: {value}")
-        if options.feedback_input_files:
-            print(
-                "  Microsoft 365 feedback exports: "
-                + ", ".join(options.feedback_input_files)
-            )
-        if not ask_yes_no(
-            "Keep these saved optional files for this environment?",
-            default=True,
-        ):
-            clear_optional_files(options)
-
-    if args.mode == "service-refresh":
-        return options
-
-    if not ask_yes_no(
-        "Do you want to choose or replace optional organization, credits, registry, topic, or feedback files?",
-        default=False,
-    ):
-        return options
+    apply_skip_options(options, args)
+    skipped_fields = {field_name for flag in selected_skip_flags(args) for field_name in SKIP_FIELDS[flag]}
+    print("\nChoose each enhancement independently. New enhancements default to skip; saved selections require keep, replace, or skip.")
 
     for field_name, label, description, filetypes in OPTIONAL_FILES:
-        print(f"\n{label}: {description}")
-        current = getattr(options, field_name)
-        if current:
-            print(f"Current file: {current}")
-        if ask_yes_no(f"Select a {label} file?", default=bool(current)):
-            selected = select_file(f"Select {label}", filetypes)
-            if selected:
-                setattr(options, field_name, str(Path(selected).resolve()))
+        if args.mode == "service-refresh" and field_name == "agent_credits_file":
+            options.agent_credits_file = ""
+            print("\nCopilot credit consumption: skipped (Desktop/manual refresh only).")
+            continue
+        cloud_organization = args.mode == "service-refresh" and field_name == "org_data_file"
+        if cloud_organization:
+            options.org_data_file = ""
+            current = options.org_data_url
+            print("\nOrganization data: optional direct HTTPS CSV path from SharePoint Online or OneDrive for Business.")
         else:
-            setattr(options, field_name, "")
+            current = getattr(options, field_name)
+            print(f"\n{label}: {description}")
+        action = enhancement_action(label, current, skipped=field_name in skipped_fields)
+        if action == "keep":
+            continue
+        setattr(options, field_name, "")
+        if field_name == "org_data_file":
+            options.org_data_url = ""
+        if action == "replace":
+            if cloud_organization:
+                options.org_data_url = input("Paste the direct organization CSV URL, or press Enter to skip: ").strip().strip('"')
+            else:
+                selected = select_file(f"Select {label}", filetypes)
+                if selected:
+                    setattr(options, field_name, str(Path(selected).resolve()))
 
-    print(
-        "\nMicrosoft 365 feedback: optional raw Product Feedback or Monitor "
-        "CSV exports. The guided setup prepares them locally."
+    collect_feedback(
+        options,
+        skipped="feedback_input_files" in skipped_fields,
+        registry_skipped="agent_registry_json" in skipped_fields,
     )
-    if ask_yes_no(
-        "Select one or more raw Microsoft 365 feedback exports?",
-        default=bool(options.feedback_input_files),
-    ):
-        options.feedback_input_files = []
-        while True:
-            selected = select_file(
-                "Select a Microsoft 365 feedback export",
-                (("CSV files", "*.csv"),),
-            )
-            if selected:
-                options.feedback_input_files.append(str(Path(selected).resolve()))
-            if not selected or not ask_yes_no(
-                "Add another feedback export?",
-                default=False,
-            ):
-                break
-        options.feedback_events_json = ""
-    else:
-        options.feedback_input_files = []
-        options.feedback_events_json = ""
     return options
 
 
+def print_selection_summary(mode: str, options: SetupOptions) -> None:
+    print("\nEnhancements selected for this build:")
+    for field_name, label, _, _ in OPTIONAL_FILES:
+        if mode == "service-refresh" and field_name == "agent_credits_file":
+            value = ""
+        elif mode == "service-refresh" and field_name == "org_data_file":
+            value = options.org_data_url
+        else:
+            value = getattr(options, field_name)
+        print(f"  - {label}: {value or 'skipped'}")
+    feedback = ", ".join(options.feedback_input_files) or options.feedback_events_json
+    print(f"  - Microsoft 365 feedback: {feedback or 'skipped'}")
+
+
 def build_feedback_command(options: SetupOptions, output: Path) -> list[str]:
-    if not options.agent_registry_json:
-        raise ValueError(
-            "Microsoft 365 feedback requires an agent registry so tenant-wide "
-            "rows can be attributed safely."
-        )
     command = [sys.executable, str(FEEDBACK_NORMALIZER)]
     for path in options.feedback_input_files:
         command.extend(("--input", path))
-    command.extend(
-        (
-            "--agent-registry",
-            options.agent_registry_json,
-            "--scope-mode",
-            "ESS Safe",
-            "--output",
-            str(output),
+    if options.agent_registry_json:
+        command.extend(
+            (
+                "--agent-registry",
+                options.agent_registry_json,
+                "--scope-mode",
+                "ESS Safe",
+            )
         )
-    )
+    command.extend(("--output", str(output)))
     return command
 
 
@@ -471,6 +582,8 @@ def build_command(
             value = getattr(options, field_name)
             if value:
                 command.extend((argument, value))
+    elif options.org_data_url:
+        command.extend(("--org-data-url", options.org_data_url))
     return command
 
 
@@ -490,6 +603,8 @@ def validate_runtime() -> None:
 
 def validation_summary(validation: dict) -> list[str]:
     lines = ["Dataverse Environment URL: valid"]
+    if validation.get("organizationDataUrl"):
+        lines.append("Organization data URL format: valid")
     aliases = int(validation.get("registryAliases") or 0)
     if aliases:
         lines.append(f"Agent registry: {aliases} aliases")
@@ -537,7 +652,8 @@ def tune_topics(args: argparse.Namespace) -> int:
     output = args.output or GENERATED_DIR / TOPIC_OUTPUT_NAME
     protected_inputs = [SOURCE_TEMPLATE, settings_file, source, *setup_input_paths(stored)]
     reject_output_collisions(output, [*feedback_output_paths(PREPARED_FEEDBACK), *protected_inputs])
-    if stored.feedback_input_files:
+    selected = apply_skip_options(replace(stored, feedback_input_files=list(stored.feedback_input_files)), args)
+    if selected.feedback_input_files:
         for destination in feedback_output_paths(PREPARED_FEEDBACK):
             reject_output_collisions(destination, [output, *protected_inputs])
     command = [
@@ -546,6 +662,7 @@ def tune_topics(args: argparse.Namespace) -> int:
         "--settings-file", str(settings_file),
         "--template-output", str(output.resolve()),
     ]
+    command.extend(selected_skip_flags(args))
     if args.no_open:
         command.append("--no-open")
     if args.non_interactive:
@@ -562,16 +679,17 @@ def main() -> int:
     stored = load_settings(settings_file)
 
     protected_inputs = [SOURCE_TEMPLATE, settings_file, args.topic_transcripts, *setup_input_paths(stored)]
-    print("\nESS Insights - Guided Dataverse Setup")
-    print("=" * 39)
+    print(f"\nESS Insights - Guided Dataverse Setup {SETUP_VERSION}")
+    print("=" * 43)
     if args.mode == "desktop-validation":
         print(
             "This creates a LOCAL DESKTOP VALIDATION template used to test "
             "Dataverse and optional local files."
         )
         print(
-            "Do not publish this file for scheduled refresh. After validation, "
-            "run BUILD-SERVICE-REFRESH.cmd to create the publishable report."
+            "This is the local input-checking output. After validation, run "
+            "BUILD-SERVICE-REFRESH.cmd to create the separate Power BI Service "
+            "publication report."
         )
     else:
         print(
@@ -579,8 +697,8 @@ def main() -> int:
             "scheduled Dataverse refresh."
         )
         print(
-            "Organization and credit files are intentionally excluded because "
-            "Power BI Service cannot refresh those local files without a gateway."
+            "Local organization and credit files are excluded. Organization data "
+            "can use a direct SharePoint or OneDrive CSV URL for scheduled refresh."
         )
         if not stored and not args.environment_url:
             raise RuntimeError(
@@ -595,6 +713,7 @@ def main() -> int:
     else:
         options = collect_interactive_options(args, stored)
 
+    print_selection_summary(args.mode, options)
     output = (
         args.output.resolve()
         if args.output
@@ -664,17 +783,20 @@ def main() -> int:
             "and refresh."
         )
         print(
-            "\nDESKTOP VALIDATION ONLY - DO NOT PUBLISH THIS FILE FOR SCHEDULED "
-            "REFRESH.\nIf you need Power BI Service, run "
-            "BUILD-SERVICE-REFRESH.cmd after validation."
+            "\nLOCAL DESKTOP VALIDATION FILE.\nThis is the first of two "
+            "intentional outputs. For shared Power BI Service access, run "
+            "BUILD-SERVICE-REFRESH.cmd after validation and publish the version "
+            "named Power BI Service - PUBLISH THIS."
         )
     else:
         print(
             "\nPOWER BI SERVICE PUBLICATION FILE - PUBLISH THIS VERSION.\n"
             "Refresh it in Power BI Desktop, save it as PBIX, and publish it. "
-            "In Power BI Service, configure the Dataverse credentials as OAuth2 "
-            "/ Organizational, run Refresh now, confirm Refresh history shows "
-            "Completed, and only then enable Scheduled refresh."
+            "In Power BI Service, map the Dataverse source and, when organization "
+            "data is enabled, the SharePoint source under Gateway and cloud "
+            "connections using OAuth2 / Organizational credentials. Run Refresh "
+            "now, confirm Refresh history shows Completed, and only then enable "
+            "Scheduled refresh."
         )
 
     open_template = args.open_template

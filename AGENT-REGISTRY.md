@@ -2,7 +2,9 @@
 
 The agent registry tells ESS Insights which identifiers belong to the same Copilot Studio agent across systems. It is required for the recommended CSV scope and for Fabric ingestion, but optional for a basic Dataverse Direct setup.
 
-Dataverse V21 does not require a registry for transcript or Power Platform consumption reporting. It derives agents from `BotId`/`BotName`, matches consumption by Agent GUID, and exposes a synchronized Agent filter in the report. Use a registry only when you need Microsoft 365 `T_...` feedback attribution, custom labels, or cross-environment identity mapping. Fabric continues to use the registry for governed ingestion.
+Dataverse V23 does not require a registry for transcript or Power Platform consumption reporting. It derives agents from `BotId`/`BotName`, matches consumption by Agent GUID, and exposes a synchronized Agent filter in the report. Use a registry only when you need Microsoft 365 `T_...` feedback attribution, custom labels, or cross-environment identity mapping. Fabric continues to use the registry for governed ingestion.
+
+V23 is the corrected local setup package described in [SETUP-Dataverse.md](SETUP-Dataverse.md). The unchanged V22 and retained V21 templates use the same Dataverse registry behavior.
 
 | Source | Alias type | Example |
 |---|---|---|
@@ -32,8 +34,8 @@ Blank, disabled, unrelated, or ambiguous Product Feedback identifiers never ente
 
 ## Before you start
 
-1. [Download the complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) and select **Extract All**.
-2. Open the extracted `ESS-main` folder. Keep `tools/agent_registry.py` and `SampleData/agent-registry.csv` in their original locations.
+1. [Download the complete V23 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip) and select **Extract All**.
+2. Open the extracted `ESS-039417f-optional-fixes-V23` folder. Keep `tools\agent_registry.py` and `SampleData\agent-registry.csv` in their original locations.
 3. Create a customer-controlled folder such as `C:\AgentData`.
 4. Copy [`SampleData/agent-registry.csv`](SampleData/agent-registry.csv) into that folder.
 5. Rename the copy `agent-registry.csv`.
@@ -161,10 +163,10 @@ Column rules:
 
 Only CSV V18 requires this manual conversion to `agent-registry.json`. Dataverse guided setup accepts the reviewed CSV or JSON and validates it for you. Fabric reads and validates `agent-registry.csv` directly.
 
-1. Open the extracted package in File Explorer. If Windows created an outer folder such as `ESS-main (3)` containing another `ESS-main` folder, open the inner folder. The correct folder directly contains `tools`.
+1. Open the extracted `ESS-039417f-optional-fixes-V23` package in File Explorer. If Windows created an outer folder containing another package folder, open the inner folder. The correct folder directly contains `tools`.
 2. Press **Alt+D** to select the File Explorer address bar. The complete folder path should become highlighted.
 3. Type `powershell.exe` exactly, including `.exe`, and press **Enter**. Do not use the search box or select an address suggestion.
-4. Confirm that a PowerShell terminal window opens and its prompt ends with `\ESS-main>`.
+4. Confirm that a PowerShell terminal window opens and its prompt ends with `\ESS-039417f-optional-fixes-V23>`.
 5. Confirm Python and the script path by running these commands **one at a time**, pressing **Enter** after each command:
 
 ```powershell
@@ -194,7 +196,7 @@ The command stops with a clear error for invalid booleans, unknown alias types, 
 
 ### Registry with several environments
 
-Fabric can use the full master CSV. CSV V18 and Dataverse V21 report one environment per refresh, so create a filtered JSON file:
+Fabric can use the full master CSV. CSV V18 and Dataverse V23 report one environment per refresh, so create a filtered JSON file:
 
 ```powershell
 python tools\agent_registry.py `
@@ -219,11 +221,13 @@ Replace `production-us` with the exact `EnvironmentKey` in your CSV.
 
 `ESS Safe` and `Selected Agents` stop with an error when the registry is blank or no transcript agent matches. `All Agents` permits unmapped transcript and credit agents but still excludes unregistered Product Feedback.
 
-### Dataverse V21
+### Dataverse V23
 
 No registry is required to discover transcript agents in `All Agents` mode. A registry is recommended when the Copilot Studio technical name must display as a stable friendly label, when a credits export must be checked against a known `CreditId`, or when Microsoft 365 feedback uses a `T_...` title ID.
 
-Follow [Option B in the Dataverse Direct guide](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements). When adding data, select the reviewed `agent-registry.csv` or `agent-registry.json` under **Agent registry**. Guided setup validates and embeds it; no separate conversion command is required.
+Follow [Option B in the Dataverse Direct guide](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements). Independently select the reviewed `agent-registry.csv` or `agent-registry.json` under **Agent registry**, or skip it. Saved registries have their own keep/replace/skip choice; cancelling replacement clears the old registry. Guided setup validates and embeds a selected registry; no separate conversion command is required. CLI runs can use `--skip-agent-registry` to ignore a saved registry without affecting organization data, topics, credits, or exact-ID Monitor feedback.
+
+Product Feedback still requires an approved registry. If it is missing, guided setup can offer one; declining skips only Product Feedback. Explicit registry skip suppresses that dependency picker. Non-interactive Product Feedback without a registry fails safely instead of inferring attribution.
 
 ### Fabric V2
 
@@ -244,7 +248,7 @@ Fabric writes the canonical agent identity to every transcript-derived table. It
 
 After the `M365Title` row is reviewed:
 
-- **Dataverse V21:** select the registry and raw Product Feedback or Monitor exports in guided setup. It filters and prepares them locally.
+- **Dataverse V23:** independently select the approved registry and raw Product Feedback exports in guided setup. It filters and prepares them locally. Monitor-only events can skip the registry when exact Conversation IDs identify one loaded conversation; prepared feedback JSON is also supported.
 - **CSV V18 or Fabric V2:** follow [Microsoft 365 Copilot feedback: export, prepare, and load](FEEDBACK-INGESTION.md).
 
 The preparation step changes the Product Feedback `T_...` ID to the canonical `AgentKey`. The registry remains the required safety boundary for production attribution.

@@ -1,5 +1,7 @@
 import csv
+import io
 import json
+from dataclasses import asdict
 import os
 import subprocess
 import tempfile
@@ -15,6 +17,7 @@ from guided_dataverse_setup import (
     SetupOptions,
     build_command,
     build_feedback_command,
+    collect_interactive_options,
     load_settings,
     last_process_message,
     merge_cli_options,
@@ -34,9 +37,9 @@ class GuidedDataverseSetupTests(unittest.TestCase):
         desktop_name = OUTPUT_NAMES["desktop-validation"]
         service_name = OUTPUT_NAMES["service-refresh"]
 
-        self.assertIn("Desktop Validation - DO NOT PUBLISH", desktop_name)
+        self.assertIn("Desktop Validation - LOCAL ONLY", desktop_name)
         self.assertIn("Power BI Service - PUBLISH THIS", service_name)
-        self.assertIn("Desktop Validation - Topics - DO NOT PUBLISH", TOPIC_OUTPUT_NAME)
+        self.assertIn("Desktop Validation - Topics - LOCAL ONLY", TOPIC_OUTPUT_NAME)
         self.assertNotEqual(desktop_name, service_name)
 
     def test_topic_launcher_checks_every_prepared_feedback_destination(self) -> None:
@@ -475,6 +478,10 @@ class GuidedDataverseSetupTests(unittest.TestCase):
             environment_url="https://orgexample.crm.dynamics.com",
             agent_registry_json="registry.json",
             org_data_file="users.csv",
+            org_data_url=(
+                "https://contoso.sharepoint.com/sites/HR/Shared Documents/"
+                "ESS/OrgData.csv"
+            ),
             agent_credits_file="credits.csv",
             topic_overrides_json="topics.json",
             feedback_events_json="feedback.json",
@@ -487,6 +494,8 @@ class GuidedDataverseSetupTests(unittest.TestCase):
         )
 
         self.assertIn("--agent-registry-json", command)
+        self.assertIn("--org-data-url", command)
+        self.assertIn(options.org_data_url, command)
         self.assertIn("--topic-overrides-json", command)
         self.assertIn("--feedback-events-json", command)
         self.assertNotIn("--org-data-file", command)
@@ -507,14 +516,129 @@ class GuidedDataverseSetupTests(unittest.TestCase):
         self.assertIn("--agent-registry", command)
         self.assertIn("registry.csv", command)
 
-    def test_raw_feedback_requires_registry(self) -> None:
+    def test_raw_monitor_feedback_does_not_require_registry(self) -> None:
         options = SetupOptions(
             environment_url="https://orgexample.crm.dynamics.com",
-            feedback_input_files=["product.csv"],
+            feedback_input_files=["monitor.csv"],
         )
 
-        with self.assertRaisesRegex(ValueError, "requires an agent registry"):
-            build_feedback_command(options, Path("feedback-events.csv"))
+        command = build_feedback_command(options, Path("feedback-events.csv"))
+
+        self.assertIn("monitor.csv", command)
+        self.assertNotIn("--agent-registry", command)
+
+    def test_interactive_setup_allows_every_optional_input_to_be_skipped(self) -> None:
+        stored = SetupOptions(
+            environment_url="https://orgexample.crm.dynamics.com"
+        )
+        args = Namespace(mode="desktop-validation")
+        decisions = [True, False, False, False, False, False]
+
+        with patch("guided_dataverse_setup.ask_yes_no", side_effect=decisions), \
+             patch("builtins.input", return_value=""), \
+             patch("guided_dataverse_setup.select_file", side_effect=AssertionError("unexpected picker")), \
+             patch("builtins.print"):
+            options = collect_interactive_options(args, stored)
+
+        self.assertEqual(options.agent_registry_json, "")
+        self.assertEqual(options.org_data_file, "")
+        self.assertEqual(options.agent_credits_file, "")
+        self.assertEqual(options.topic_overrides_json, "")
+        self.assertEqual(options.feedback_input_files, [])
+
+    def test_interactive_product_feedback_can_select_registry_when_needed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            product = root / "product-feedback.csv"
+            registry = root / "agent-registry.csv"
+            product.write_text(
+                "Feedback Id,Feedback Type,Microsoft Response Status,Agent ID\n"
+                "1,Like,Open,T_agent\n",
+                encoding="utf-8",
+            )
+            stored = SetupOptions(
+                environment_url="https://orgexample.crm.dynamics.com"
+            )
+            args = Namespace(mode="desktop-validation")
+            decisions = [
+                True, False, False, False, False, True, False, True
+            ]
+
+            with patch("guided_dataverse_setup.ask_yes_no", side_effect=decisions), \
+                 patch("builtins.input", return_value=""), \
+                 patch("guided_dataverse_setup.select_file", side_effect=[str(product), str(registry)]), \
+                 patch("builtins.print"):
+                options = collect_interactive_options(args, stored)
+
+        self.assertEqual(options.agent_registry_json, str(registry.resolve()))
+        self.assertEqual(options.feedback_input_files, [str(product.resolve())])
+
+    def test_interactive_product_feedback_is_skipped_when_registry_is_declined(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            product = root / "product-feedback.csv"
+            monitor = root / "monitor.csv"
+            product.write_text(
+                "Feedback Id,Feedback Type,Microsoft Response Status,Agent ID\n"
+                "1,Like,Open,T_agent\n",
+                encoding="utf-8",
+            )
+            monitor.write_text(
+                "Reaction Id,Conversation ID,Reaction\n1,conversation-1,Like\n",
+                encoding="utf-8",
+            )
+            stored = SetupOptions(
+                environment_url="https://orgexample.crm.dynamics.com"
+            )
+            args = Namespace(mode="desktop-validation")
+            decisions = [
+                True, False, False, False, False,
+                True, True, False, False,
+            ]
+
+            with patch("guided_dataverse_setup.ask_yes_no", side_effect=decisions), \
+                 patch("builtins.input", return_value=""), \
+                 patch("guided_dataverse_setup.select_file", side_effect=[str(product), str(monitor)]), \
+                 patch("builtins.print") as printer:
+                options = collect_interactive_options(args, stored)
+
+        self.assertEqual(options.agent_registry_json, "")
+        self.assertEqual(options.feedback_input_files, [str(monitor.resolve())])
+        self.assertTrue(
+            any(
+                "Setup will continue" in str(call)
+                for call in printer.call_args_list
+            )
+        )
+
+    def test_interactive_monitor_feedback_does_not_prompt_for_registry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            monitor = Path(directory) / "monitor.csv"
+            monitor.write_text(
+                "Reaction Id,Conversation ID,Reaction\n1,conversation-1,Like\n",
+                encoding="utf-8",
+            )
+            stored = SetupOptions(
+                environment_url="https://orgexample.crm.dynamics.com"
+            )
+            args = Namespace(mode="desktop-validation")
+            decisions = [
+                True, False, False, False, False, True, False
+            ]
+
+            with patch("guided_dataverse_setup.ask_yes_no", side_effect=decisions) as questions, \
+                 patch("builtins.input", return_value=""), \
+                 patch("guided_dataverse_setup.select_file", return_value=str(monitor)), \
+                 patch("builtins.print"):
+                options = collect_interactive_options(args, stored)
+
+        self.assertEqual(options.feedback_input_files, [str(monitor.resolve())])
+        self.assertFalse(
+            any(
+                "Select an agent registry now?" in call.args[0]
+                for call in questions.call_args_list
+            )
+        )
 
     def test_raw_feedback_is_filtered_and_mapped_by_guided_setup(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -641,10 +765,360 @@ class GuidedDataverseSetupTests(unittest.TestCase):
         self.assertEqual(events[1]["ConversationId"], "conversation-1")
         self.assertEqual(audit["events"], 2)
 
+    def saved_enhancements(self) -> SetupOptions:
+        return SetupOptions(
+            environment_url="https://orgexample.crm.dynamics.com",
+            agent_registry_json="missing-registry.json",
+            org_data_file="missing-users.csv",
+            org_data_url="https://contoso.sharepoint.com/sites/HR/OrgData.csv",
+            agent_credits_file="missing-credits.csv",
+            topic_overrides_json="missing-topics.json",
+            feedback_events_json="missing-feedback.json",
+            feedback_input_files=["missing-monitor.csv"],
+        )
+
+    def setup_arguments(self, *arguments: str) -> Namespace:
+        from guided_dataverse_setup import parse_args
+
+        with patch("sys.argv", ["setup", *arguments]):
+            return parse_args()
+
+    def test_fresh_setup_defaults_to_skipping_every_enhancement_in_both_modes(self) -> None:
+        for mode in ("desktop-validation", "service-refresh"):
+            with self.subTest(mode=mode), \
+                 patch("guided_dataverse_setup.prompt_environment", return_value="https://orgexample.crm.dynamics.com"), \
+                 patch("guided_dataverse_setup.ask_yes_no", return_value=False) as questions, \
+                 patch("guided_dataverse_setup.select_file", side_effect=AssertionError("unexpected picker")), \
+                 patch("builtins.print"):
+                options = collect_interactive_options(Namespace(mode=mode), None)
+            self.assertEqual(options, SetupOptions(environment_url="https://orgexample.crm.dynamics.com"))
+            self.assertTrue(all(call.kwargs["default"] is False for call in questions.call_args_list))
+
+    def test_cancelled_replacement_clears_each_saved_enhancement(self) -> None:
+        cases = (
+            ("desktop-validation", "agent_registry_json"),
+            ("desktop-validation", "org_data_file"),
+            ("desktop-validation", "agent_credits_file"),
+            ("desktop-validation", "topic_overrides_json"),
+            ("desktop-validation", "feedback_events_json"),
+            ("service-refresh", "agent_registry_json"),
+            ("service-refresh", "org_data_url"),
+            ("service-refresh", "topic_overrides_json"),
+            ("service-refresh", "feedback_events_json"),
+        )
+        for mode, field_name in cases:
+            stored = SetupOptions(environment_url="https://orgexample.crm.dynamics.com")
+            setattr(stored, field_name, getattr(self.saved_enhancements(), field_name))
+            before = asdict(stored)
+            with self.subTest(mode=mode, field=field_name), \
+                 patch("guided_dataverse_setup.prompt_environment", return_value=stored.environment_url), \
+                 patch("guided_dataverse_setup.ask_yes_no", return_value=True), \
+                 patch("guided_dataverse_setup.select_file", return_value=""), \
+                 patch("builtins.input", side_effect=lambda prompt: "" if prompt.startswith("Paste ") else "replace"), \
+                 patch("builtins.print"):
+                options = collect_interactive_options(Namespace(mode=mode), stored)
+            self.assertEqual(getattr(options, field_name), "")
+            self.assertEqual(asdict(stored), before)
+            if field_name.startswith("feedback"):
+                self.assertEqual(options.feedback_input_files, [])
+
+    def test_saved_enhancements_can_be_skipped_independently_in_both_modes(self) -> None:
+        for mode in ("desktop-validation", "service-refresh"):
+            cases = [
+                ("agent_registry_json", "Agent registry"),
+                ("org_data_file" if mode == "desktop-validation" else "org_data_url", "Organization data"),
+                ("topic_overrides_json", "Approved topic rules"),
+                ("feedback_events_json", "Microsoft 365 feedback"),
+            ]
+            if mode == "desktop-validation":
+                cases.append(("agent_credits_file", "Copilot credit consumption"))
+            for field_name, label in cases:
+                stored = self.saved_enhancements()
+                before = asdict(stored)
+                with self.subTest(mode=mode, field=field_name), \
+                     patch("guided_dataverse_setup.prompt_environment", return_value=stored.environment_url), \
+                     patch("guided_dataverse_setup.ask_yes_no", side_effect=lambda prompt, **kwargs: "Reuse" in prompt), \
+                     patch("guided_dataverse_setup.product_feedback_inputs", return_value=[]), \
+                     patch("guided_dataverse_setup.select_file", side_effect=AssertionError("unexpected picker")), \
+                     patch("builtins.input", side_effect=lambda prompt: "skip" if label in prompt else "keep"), \
+                     patch("builtins.print"):
+                    options = collect_interactive_options(Namespace(mode=mode), stored)
+                    self.assertEqual(getattr(options, field_name), "")
+                    for unrelated, _ in cases:
+                        if unrelated != field_name:
+                            self.assertEqual(getattr(options, unrelated), before[unrelated])
+                    if mode == "service-refresh":
+                        self.assertEqual(options.org_data_file, "")
+                        self.assertEqual(options.agent_credits_file, "")
+                    if field_name.startswith("org_data"):
+                        self.assertEqual((options.org_data_file, options.org_data_url), ("", ""))
+                    if field_name == "feedback_events_json":
+                        self.assertEqual(options.feedback_input_files, [])
+                    self.assertEqual(asdict(stored), before)
+
+    def test_desktop_organization_can_be_selected_without_other_enhancements(self) -> None:
+        roster = Path("users.csv").resolve()
+        with patch("guided_dataverse_setup.prompt_environment", return_value="https://orgexample.crm.dynamics.com"), \
+             patch("guided_dataverse_setup.ask_yes_no", side_effect=lambda prompt, **kwargs: "Organization data" in prompt), \
+             patch("guided_dataverse_setup.select_file", return_value=str(roster)) as picker, \
+             patch("builtins.print"):
+            options = collect_interactive_options(Namespace(mode="desktop-validation"), None)
+        self.assertEqual(options, SetupOptions(environment_url="https://orgexample.crm.dynamics.com", org_data_file=str(roster)))
+        picker.assert_called_once()
+
+    def test_service_organization_can_be_selected_without_other_enhancements(self) -> None:
+        url = "https://contoso.sharepoint.com/sites/HR/OrgData.csv"
+        with patch("guided_dataverse_setup.prompt_environment", return_value="https://orgexample.crm.dynamics.com"), \
+             patch("guided_dataverse_setup.ask_yes_no", side_effect=lambda prompt, **kwargs: "Organization data" in prompt), \
+             patch("builtins.input", return_value=url), \
+             patch("guided_dataverse_setup.select_file", side_effect=AssertionError("unexpected local picker")), \
+             patch("builtins.print"):
+            options = collect_interactive_options(Namespace(mode="service-refresh"), None)
+        self.assertEqual(options, SetupOptions(environment_url="https://orgexample.crm.dynamics.com", org_data_url=url))
+
+    def test_saved_enhancements_default_to_skip_without_deliberate_keep(self) -> None:
+        for mode in ("desktop-validation", "service-refresh"):
+            with self.subTest(mode=mode):
+                stored = self.saved_enhancements()
+                before = asdict(stored)
+                with patch("guided_dataverse_setup.prompt_environment", return_value=stored.environment_url), \
+                     patch("guided_dataverse_setup.ask_yes_no", return_value=True), \
+                     patch("builtins.input", return_value=""), \
+                     patch("guided_dataverse_setup.select_file", side_effect=AssertionError("unexpected picker")), \
+                     patch("builtins.print"):
+                    options = collect_interactive_options(Namespace(mode=mode), stored)
+                self.assertEqual(options, SetupOptions(environment_url=stored.environment_url))
+                self.assertEqual(asdict(stored), before)
+
+    def test_explicit_registry_skip_keeps_monitor_feedback_and_other_selections(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            product = root / "product.csv"
+            monitor = root / "monitor.csv"
+            product.write_text("Feedback Id,Feedback Type,Microsoft Response Status,Agent ID\n1,Like,Open,T_agent\n", encoding="utf-8")
+            monitor.write_text("Reaction Id,Conversation ID,Reaction\n1,conversation-1,Like\n", encoding="utf-8")
+            for mode in ("desktop-validation", "service-refresh"):
+                with self.subTest(mode=mode):
+                    stored = SetupOptions(
+                        environment_url="https://orgexample.crm.dynamics.com", agent_registry_json="previous-registry.json",
+                        org_data_file="users.csv", org_data_url="https://contoso.sharepoint.com/sites/HR/OrgData.csv",
+                        feedback_events_json="previous-prepared-feedback.json", feedback_input_files=[str(product), str(monitor)],
+                    )
+                    before = asdict(stored)
+                    args = self.setup_arguments("--mode", mode, "--skip-agent-registry")
+                    with patch("guided_dataverse_setup.prompt_environment", return_value=stored.environment_url), \
+                         patch("guided_dataverse_setup.ask_yes_no", side_effect=lambda prompt, **kwargs: "Reuse" in prompt) as questions, \
+                         patch("builtins.input", return_value="keep"), \
+                         patch("guided_dataverse_setup.select_file", side_effect=AssertionError("skipped registry must not be reopened")), \
+                         patch("builtins.print"):
+                        options = collect_interactive_options(args, stored)
+                    self.assertEqual(options.agent_registry_json, "")
+                    self.assertEqual(options.feedback_input_files, [str(monitor)])
+                    self.assertEqual(options.feedback_events_json, "")
+                    self.assertEqual(options.org_data_file if mode == "desktop-validation" else options.org_data_url,
+                                     stored.org_data_file if mode == "desktop-validation" else stored.org_data_url)
+                    self.assertFalse(any("registry" in call.args[0].lower() for call in questions.call_args_list))
+                    self.assertEqual(asdict(stored), before)
+
+    def test_prepared_feedback_can_be_selected_without_raw_exports(self) -> None:
+        prepared = Path("monitor-events.json").resolve()
+        with patch("guided_dataverse_setup.prompt_environment", return_value="https://orgexample.crm.dynamics.com"), \
+             patch("guided_dataverse_setup.ask_yes_no", side_effect=lambda prompt, **kwargs: "Microsoft 365 feedback" in prompt), \
+             patch("guided_dataverse_setup.select_file", return_value=str(prepared)), \
+             patch("builtins.print"):
+            options = collect_interactive_options(Namespace(mode="service-refresh"), None)
+        self.assertEqual(options.feedback_events_json, str(prepared))
+        self.assertEqual(options.feedback_input_files, [])
+        self.assertEqual(options.agent_registry_json, "")
+
+    def test_cli_skip_flags_clear_only_the_selected_enhancement(self) -> None:
+        cases = (
+            ("--skip-agent-registry", ("agent_registry_json",)),
+            ("--skip-org-data", ("org_data_file", "org_data_url")),
+            ("--skip-agent-credits", ("agent_credits_file",)),
+            ("--skip-topic-overrides", ("topic_overrides_json",)),
+            ("--skip-feedback", ("feedback_events_json", "feedback_input_files")),
+        )
+        for flag, fields in cases:
+            with self.subTest(flag=flag), patch("sys.stderr"):
+                args = self.setup_arguments("--non-interactive", flag)
+                stored = self.saved_enhancements()
+                previous = asdict(stored)
+                options = merge_cli_options(args, stored)
+                expected = dict(previous)
+                for name in fields:
+                    expected[name] = [] if name == "feedback_input_files" else ""
+                self.assertEqual(asdict(options), expected)
+                self.assertEqual(asdict(stored), previous)
+
+    def test_skipping_all_saved_missing_files_never_prepares_or_passes_them(self) -> None:
+        flags = ("--skip-agent-registry", "--skip-org-data", "--skip-agent-credits", "--skip-topic-overrides", "--skip-feedback")
+        for mode in ("desktop-validation", "service-refresh"):
+            with self.subTest(mode=mode), patch("sys.stderr"):
+                args = self.setup_arguments("--mode", mode, "--non-interactive", *flags)
+                options = merge_cli_options(args, self.saved_enhancements())
+                with patch("guided_dataverse_setup.subprocess.run", side_effect=AssertionError("unexpected normalization")):
+                    self.assertIs(prepare_feedback(options), options)
+                command = build_command(mode, options, Path("output.pbit"))
+                for argument in ("--agent-registry-json", "--org-data-file", "--org-data-url", "--agent-credits-file", "--topic-overrides-json", "--feedback-events-json"):
+                    self.assertNotIn(argument, command)
+                self.assertEqual(options, SetupOptions(environment_url="https://orgexample.crm.dynamics.com"))
+
+    def test_supply_and_skip_arguments_are_rejected_as_conflicting(self) -> None:
+        cases = (
+            ("--skip-agent-registry", "--agent-registry-json", "registry.json"),
+            ("--skip-org-data", "--org-data-file", "users.csv"),
+            ("--skip-org-data", "--org-data-url", "https://contoso.sharepoint.com/sites/HR/OrgData.csv"),
+            ("--skip-agent-credits", "--agent-credits-file", "credits.csv"),
+            ("--skip-topic-overrides", "--topic-overrides-json", "rules.json"),
+            ("--skip-feedback", "--feedback-events-json", "feedback.json"),
+            ("--skip-feedback", "--feedback-input", "monitor.csv"),
+        )
+        for skip, supplied, value in cases:
+            error = io.StringIO()
+            with self.subTest(skip=skip, supplied=supplied), patch("sys.stderr", error):
+                with self.assertRaises(SystemExit) as failure:
+                    self.setup_arguments(skip, supplied, value)
+            self.assertEqual(failure.exception.code, 2)
+            self.assertIn("not allowed with argument", error.getvalue())
+
+    def test_replacing_local_organization_clears_a_saved_cloud_selection(self) -> None:
+        stored = self.saved_enhancements()
+        options = merge_cli_options(self.setup_arguments("--org-data-file", "new-users.csv"), stored)
+        self.assertEqual(options.org_data_file, str(Path("new-users.csv").resolve()))
+        self.assertEqual(options.org_data_url, "")
+        self.assertNotEqual(stored.org_data_file, options.org_data_file)
+
+    def test_guided_skip_flags_do_not_prompt_or_open_inherited_files(self) -> None:
+        flags = ("--skip-agent-registry", "--skip-org-data", "--skip-agent-credits", "--skip-topic-overrides", "--skip-feedback")
+        for mode in ("desktop-validation", "service-refresh"):
+            with self.subTest(mode=mode), patch("sys.stderr"):
+                args = self.setup_arguments("--mode", mode, *flags)
+                with patch("guided_dataverse_setup.prompt_environment", return_value="https://orgexample.crm.dynamics.com"), \
+                     patch("guided_dataverse_setup.ask_yes_no", return_value=True) as questions, \
+                     patch("guided_dataverse_setup.select_file", side_effect=AssertionError("unexpected picker")), \
+                     patch("builtins.input", side_effect=AssertionError("unexpected enhancement prompt")), \
+                     patch("builtins.print"):
+                    options = collect_interactive_options(args, self.saved_enhancements())
+                self.assertEqual(options, SetupOptions(environment_url="https://orgexample.crm.dynamics.com"))
+                self.assertEqual(questions.call_count, 1)
+
+    def test_topic_launcher_forwards_skip_controls(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            settings = root / "settings.json"
+            save_settings(settings, self.saved_enhancements())
+            flags = ("--skip-agent-registry", "--skip-org-data", "--skip-agent-credits", "--skip-feedback")
+            with patch("sys.stderr"):
+                args = self.setup_arguments("--tune-topics", "--non-interactive", "--no-open", "--settings-file", str(settings), "--topic-transcripts", str(root / "transcripts.csv"), *flags)
+            with patch("guided_dataverse_setup.subprocess.run") as runner:
+                runner.return_value.returncode = 0
+                self.assertEqual(tune_topics(args), 0)
+            for flag in flags:
+                self.assertIn(flag, runner.call_args.args[0])
+
+    def test_topic_tuning_cannot_also_skip_the_topic_rules_it_builds(self) -> None:
+        error = io.StringIO()
+        with patch("sys.stderr", error), self.assertRaises(SystemExit) as failure:
+            self.setup_arguments("--tune-topics", "--skip-topic-overrides")
+        self.assertEqual(failure.exception.code, 2)
+        self.assertIn("cannot be combined with --tune-topics", error.getvalue())
+
+    def test_v23_version_and_template_names_are_explicit(self) -> None:
+        from guided_dataverse_setup import SOURCE_TEMPLATE, parse_args
+
+        output = io.StringIO()
+        with patch("sys.argv", ["setup", "--version"]), patch("sys.stdout", output), patch("sys.stderr"), self.assertRaises(SystemExit) as result:
+            parse_args()
+        self.assertEqual(result.exception.code, 0)
+        self.assertIn("V23", output.getvalue())
+        self.assertIn("V23", SOURCE_TEMPLATE.name)
+        self.assertTrue(SOURCE_TEMPLATE.is_file())
+        for name in (*OUTPUT_NAMES.values(), TOPIC_OUTPUT_NAME):
+            self.assertIn("V23", name)
+
+    def test_independent_optional_build_matrix_ignores_all_skipped_saved_files(self) -> None:
+        from build_service_refresh_template import expression_text
+        from guided_dataverse_setup import ROOT, main
+
+        flags = ("--skip-agent-registry", "--skip-org-data", "--skip-agent-credits", "--skip-topic-overrides", "--skip-feedback")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            topics = root / "topics.json"
+            topics.write_text(json.dumps([{"Locale": "en", "Vertical": "Customer", "CanonicalTopic": "Enrollment Matrix",
+                                          "Keywords": "device enrollment", "Exclusions": "", "Priority": 120}]), encoding="utf-8")
+            prepared = root / "feedback.json"
+            prepared.write_text(json.dumps([{"FeedbackEventId": "monitor-matrix", "ConversationId": "conversation-matrix",
+                                            "AgentId": "", "FeedbackSource": "MonitorReactions.csv", "FeedbackVerdict": "Thumbs Up"}]), encoding="utf-8")
+            raw = root / "monitor.csv"
+            raw.write_text("Reaction Id,Conversation ID,Reaction\nmonitor-matrix,conversation-matrix,Like\n", encoding="utf-8")
+            sample = ROOT / "SampleData"
+            for mode in ("desktop-validation", "service-refresh"):
+                organization = ["--org-data-file", str(sample / "OrgData.csv")] if mode == "desktop-validation" else [
+                    "--org-data-url", "https://qademo.sharepoint.com/sites/HR/OrgData.csv",
+                ]
+                cases = [
+                    ("baseline", [], None),
+                    ("registry", ["--agent-registry-json", str(sample / "agent-registry.json")], "--skip-agent-registry"),
+                    ("organization", organization, "--skip-org-data"),
+                    ("topics", ["--topic-overrides-json", str(topics)], "--skip-topic-overrides"),
+                    ("prepared-feedback", ["--feedback-events-json", str(prepared)], "--skip-feedback"),
+                    ("raw-feedback", ["--feedback-input", str(raw)], "--skip-feedback"),
+                ]
+                if mode == "desktop-validation":
+                    cases.append(("credits", ["--agent-credits-file", str(sample / "EntitlementConsumptionTenantPerUserDetailsReport_MCSMessages_30_SYNTHETIC.csv")], "--skip-agent-credits"))
+                for name, selection, selected_flag in cases:
+                    with self.subTest(mode=mode, enhancement=name):
+                        destination = root / mode / name
+                        settings = destination / "settings.json"
+                        save_settings(settings, self.saved_enhancements())
+                        previous = settings.read_bytes()
+                        output = destination / "result.pbit"
+                        arguments = ["setup", "--mode", mode, "--non-interactive", "--no-open", "--settings-file", str(settings),
+                                     "--output", str(output), *[flag for flag in flags if flag != selected_flag], *selection]
+                        with patch("sys.argv", arguments), patch("builtins.print"), \
+                             patch("builtins.input", side_effect=AssertionError("unexpected non-interactive prompt")), \
+                             patch("guided_dataverse_setup.PREPARED_FEEDBACK", destination / "prepared" / "feedback-events.csv"):
+                            self.assertEqual(main(), 0)
+                        if mode == "service-refresh":
+                            self.assertEqual(settings.read_bytes(), previous)
+                        else:
+                            saved = load_settings(settings)
+                            active = {
+                                "registry": bool(saved.agent_registry_json),
+                                "organization": bool(saved.org_data_file or saved.org_data_url),
+                                "credits": bool(saved.agent_credits_file),
+                                "topics": bool(saved.topic_overrides_json),
+                                "feedback": bool(saved.feedback_events_json or saved.feedback_input_files),
+                            }
+                            expected = "feedback" if "feedback" in name else name
+                            self.assertEqual({key for key, enabled in active.items() if enabled}, set() if name == "baseline" else {expected})
+                        with zipfile.ZipFile(output) as package:
+                            self.assertIsNone(package.testzip())
+                            schema = json.loads(package.read("DataModelSchema").decode("utf-16-le"))
+                        expressions = {item["name"]: expression_text(item["expression"]) for item in schema["model"]["expressions"]}
+                        serialized = json.dumps(schema)
+                        for stale in ("missing-registry.json", "missing-users.csv", "missing-credits.csv", "missing-topics.json", "missing-feedback.json", "missing-monitor.csv"):
+                            self.assertNotIn(stale, serialized)
+                        self.assertEqual("ess-synthetic" in expressions["Agent Registry JSON"], name == "registry")
+                        self.assertEqual("Enrollment Matrix" in expressions["Customer Topic Overrides JSON (optional)"], name == "topics")
+                        self.assertEqual("conversation-matrix" in expressions["Feedback Events JSON (optional)"], "feedback" in name)
+                        if mode == "service-refresh":
+                            self.assertNotIn("File.Contents", serialized)
+                            self.assertNotIn("Org Data File", expressions)
+                            self.assertEqual("SharePoint.Files" in serialized, name == "organization")
+                        else:
+                            self.assertEqual(str((sample / "OrgData.csv").resolve()) in expressions["Org Data File"], name == "organization")
+                            self.assertEqual("MCSMessages_30_SYNTHETIC.csv" in expressions["Agent Credits  (optional)"], name == "credits")
+
     def test_settings_round_trip(self) -> None:
         options = SetupOptions(
             environment_url="https://orgexample.crm.dynamics.com",
             org_data_file="users.csv",
+            org_data_url=(
+                "https://contoso.sharepoint.com/sites/HR/Shared Documents/"
+                "ESS/OrgData.csv"
+            ),
         )
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "settings.json"
@@ -718,6 +1192,7 @@ class GuidedDataverseSetupTests(unittest.TestCase):
             environment_url="https://orga.crm.dynamics.com",
             agent_registry_json="customer-a-registry.json",
             org_data_file="customer-a-users.csv",
+            org_data_url="https://customer-a.sharepoint.com/sites/HR/OrgData.csv",
             agent_credits_file="customer-a-credits.csv",
             topic_overrides_json="customer-a-topics.json",
             feedback_events_json="customer-a-feedback.json",
@@ -744,6 +1219,7 @@ class GuidedDataverseSetupTests(unittest.TestCase):
             str(Path("customer-b-registry.json").resolve()),
         )
         self.assertEqual(options.org_data_file, "")
+        self.assertEqual(options.org_data_url, "")
         self.assertEqual(options.agent_credits_file, "")
         self.assertEqual(options.topic_overrides_json, "")
         self.assertEqual(options.feedback_events_json, "")
@@ -796,6 +1272,24 @@ class GuidedDataverseSetupTests(unittest.TestCase):
                 "Organization data: 303 rows",
                 "Approved topic rules: 2 rows",
                 "Prepared feedback: 6 rows",
+            ],
+        )
+
+    def test_validation_summary_reports_cloud_org_data(self) -> None:
+        summary = validation_summary(
+            {
+                "organizationDataUrl": (
+                    "https://contoso.sharepoint.com/sites/HR/OrgData.csv"
+                ),
+                "sources": [],
+            }
+        )
+
+        self.assertEqual(
+            summary,
+            [
+                "Dataverse Environment URL: valid",
+                "Organization data URL format: valid",
             ],
         )
 

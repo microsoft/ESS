@@ -20,17 +20,19 @@ Microsoft documentation:
 
 ## Before you start
 
-All paths need:
+For **Microsoft 365 Product Feedback**, all paths need:
 
 - an administrator or reader account that can open **Product feedback** in the Microsoft 365 admin center;
 - a reviewed agent registry CSV or JSON containing the agent's `M365Title` alias; and
 - an approved customer-controlled folder such as `C:\AgentData`.
 
+Feedback itself is optional. **Monitor-only** events with exact Conversation IDs do not require Product Feedback access or an agent registry; the report must reconcile each ID to one exact loaded conversation. Select only the source you need.
+
 All Microsoft 365 administrators and readers can view and export Product feedback. Only Compliance Administrators and Global Administrators can see user identity details and delete feedback. Use the least-privileged role that meets your needs.
 
-**Dataverse with cross-channel feedback:** use [Option B in the guided Dataverse setup](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements). Select the reviewed registry and raw feedback exports; do not prepare a JSON file first. The URL-only direct PBIT has no registry input and therefore cannot safely attribute Microsoft 365 Product Feedback.
+**Dataverse with cross-channel feedback:** use [Option B in the guided Dataverse setup](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements) from the complete corrected V23 package. Select raw exports, or choose an already prepared `feedback-events.json`; there is no need to prepare JSON first. Product Feedback needs the reviewed registry; Monitor-only exact-ID feedback does not. The URL-only direct PBIT has no registry input and therefore cannot safely attribute Microsoft 365 Product Feedback.
 
-**CSV or Fabric:** download and extract the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip). These paths use the included local preparation tool after export.
+**CSV or Fabric:** [download and extract the complete V23 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip). These paths use the included local preparation tool after export.
 
 ## Step 1 - Identify the Microsoft 365 Agent ID
 
@@ -69,14 +71,16 @@ If Copilot Studio Monitor also provides a reaction export, save that CSV in the 
 
 ### Dataverse Direct
 
-1. Open the extracted ESS package and run the guided Dataverse setup again.
-2. Reuse the saved Environment URL.
-3. Choose to add or replace data.
-4. Select the reviewed registry CSV or JSON under **Agent registry**.
-5. Select the raw Product Feedback export when asked for Microsoft 365 feedback.
-6. Add the Monitor export when available.
-7. Open and refresh the prepared report.
+1. Open the extracted corrected V23 package and run the guided Dataverse setup again.
+2. Reuse the saved Environment URL if appropriate.
+3. Independently keep, replace, or skip each enhancement; unrelated organization, credits, and topic files are not required for feedback.
+4. For Product Feedback, select or keep the reviewed registry CSV or JSON under **Agent registry**. A Monitor-only exact-ID selection can skip the registry.
+5. Select raw feedback CSV under the feedback choice, or select an already prepared `feedback-events.json` instead.
+6. When using raw CSV, add another Product Feedback or Monitor export only if needed; cancelling the additional picker finishes the current selection.
+7. Review the selected/skipped summary, then open and refresh the prepared report.
 8. On **Agent Feedback**, confirm the cross-channel totals and verdicts are plausible.
+
+New feedback defaults to skip. Saved feedback has its own keep/replace/skip choice; Enter skips, and cancelling the first replacement picker clears the old selection. CLI users can specify prepared `--feedback-events-json`, repeated raw `--feedback-input`, or `--skip-feedback`, but not combine those alternatives. Skipping clears both saved raw exports and prepared JSON and does not run preparation. Guided setup without a registry can offer one for Product Feedback; declining skips only Product Feedback, retaining Monitor and other enhancements. Explicit `--skip-agent-registry` suppresses that dependency picker.
 
 The guided setup filters, deduplicates, validates, and embeds matching rows locally. Product Feedback requires an approved registry match. A Monitor reaction uses a registry Bot/Agent ID when present; otherwise the report includes it only after its exported Conversation ID matches one exact loaded conversation. Rows with neither form of identity are excluded.
 
@@ -84,7 +88,7 @@ If the report will be published, follow [Publish the Service report](SETUP-Datav
 
 ### CSV V18 or Fabric V2
 
-Confirm Python 3.10 or later from the extracted `ESS-main` folder:
+Confirm Python 3.10 or later from the extracted `ESS-039417f-optional-fixes-V23` folder:
 
 ```powershell
 python --version

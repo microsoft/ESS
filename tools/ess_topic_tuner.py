@@ -13,8 +13,8 @@ from pathlib import Path
 
 from build_service_refresh_template import validate_topic_overrides
 from guided_dataverse_setup import (
-    DEFAULT_SETTINGS, GENERATED_DIR, PREPARED_FEEDBACK, SOURCE_TEMPLATE, TOPIC_OUTPUT_NAME,
-    feedback_output_paths, load_settings, reject_output_collisions, setup_input_paths,
+    DEFAULT_SETTINGS, GENERATED_DIR, PREPARED_FEEDBACK, SKIP_FIELDS, SOURCE_TEMPLATE, TOPIC_OUTPUT_NAME,
+    feedback_output_paths, load_settings, reject_output_collisions, selected_skip_flags, setup_input_paths,
 )
 from topic_classifier import (
     CLASSIFIER_VERSION,
@@ -131,6 +131,9 @@ def parse_args() -> argparse.Namespace:
     action.add_argument("--apply", type=Path, help="Apply non-empty approved JSON using saved Dataverse setup choices.")
     action.add_argument("--review", type=Path, help="Validate the reviewed CSV, export enabled rules, and apply them.")
     parser.add_argument("--settings-file", type=Path, default=DEFAULT_SETTINGS)
+    for flag in SKIP_FIELDS:
+        if flag != "--skip-topic-overrides":
+            parser.add_argument(flag, action="store_true", help="Skip this saved enhancement when applying approved rules.")
     parser.add_argument("--template-output", type=Path, help="Optional destination for the new Desktop Validation PBIT.")
     parser.add_argument("--no-open", action="store_true", help="Build without opening Power BI Desktop.")
     parser.add_argument("--non-interactive", action="store_true", help="Never prompt for customer review; print a recovery command instead.")
@@ -1099,6 +1102,7 @@ def next_command(args: argparse.Namespace, action: str, path: Path) -> str:
         command.extend(("--template-output", str(args.template_output.resolve())))
     if args.no_open:
         command.append("--no-open")
+    command.extend(selected_skip_flags(args))
     return "& " + " ".join("'" + value.replace("'", "''") + "'" for value in command)
 
 
@@ -1200,7 +1204,7 @@ def validate_tuner_output(args: argparse.Namespace, *additional_inputs: Path) ->
         protected.extend(tuner_output_paths(artifact_directory).values())
     prepared_outputs = feedback_output_paths(PREPARED_FEEDBACK)
     reject_output_collisions(output, [*prepared_outputs, *protected])
-    if stored is not None and stored.feedback_input_files:
+    if stored is not None and stored.feedback_input_files and not getattr(args, "skip_feedback", False):
         for destination in prepared_outputs:
             reject_output_collisions(destination, [output, *protected])
     return output
@@ -1226,6 +1230,7 @@ def apply_dataverse_rules(
         "--settings-file", str(settings), "--topic-overrides-json", str(path.resolve()),
         "--output", str(output.resolve()), "--no-open" if args.no_open else "--open",
     ]
+    command.extend(selected_skip_flags(args))
     print(f"Applying {validation['enabledRules']} approved rule(s) using saved Dataverse choices.", flush=True)
     return subprocess.run(command, check=False).returncode
 

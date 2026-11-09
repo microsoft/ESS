@@ -9,7 +9,9 @@ from pathlib import Path
 
 from build_service_refresh_template import (
     build_package,
+    expression_text,
     normalize_environment_url,
+    normalize_org_data_url,
     serialize_registry,
     strip_packaged_placeholder_examples,
     validate_credits,
@@ -22,7 +24,7 @@ from build_service_refresh_template import (
 ROOT = Path(__file__).resolve().parents[1]
 DIRECT_SERVICE = (
     ROOT
-    / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
+    / "ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit"
 )
 SOURCE = DIRECT_SERVICE
 
@@ -133,6 +135,141 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 normalize_environment_url(value)
 
+    def test_accepts_direct_sharepoint_org_data_url(self):
+        value = (
+            "https://Contoso.sharepoint.com/sites/HR/Shared Documents/"
+            "ESS/OrgData.csv"
+        )
+
+        self.assertEqual(
+            normalize_org_data_url(value),
+            "https://contoso.sharepoint.com/sites/HR/Shared Documents/ESS/OrgData.csv",
+        )
+
+    def test_rejects_non_direct_org_data_url(self):
+        invalid_urls = (
+            "http://contoso.sharepoint.com/sites/HR/OrgData.csv",
+            "https://contoso.example.com/OrgData.csv",
+            "https://contoso.sharepoint.com/sites/HR/OrgData.xlsx",
+            "https://contoso.sharepoint.com/sites/HR/OrgData.csv?web=1",
+        )
+        for value in invalid_urls:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                normalize_org_data_url(value)
+
+    def test_builds_service_refresh_with_org_data_url(self):
+        org_data_url = (
+            "https://contoso.sharepoint.com/sites/HR/Shared Documents/"
+            "ESS/OrgData.csv"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "service-refresh-org.pbit"
+            build_package(
+                SOURCE,
+                output,
+                "https://orgexample.crm.dynamics.com",
+                mode="service-refresh",
+                org_data_url=org_data_url,
+            )
+
+            with zipfile.ZipFile(output) as package:
+                schema = json.loads(
+                    package.read("DataModelSchema").decode("utf-16-le")
+                )
+
+        expressions = {
+            item["name"]: (
+                "\n".join(item["expression"])
+                if isinstance(item["expression"], list)
+                else item["expression"]
+            )
+            for item in schema["model"]["expressions"]
+        }
+        tables = {table["name"]: table for table in schema["model"]["tables"]}
+        org_expression = tables["Chat + Agent Org Data"]["partitions"][0][
+            "source"
+        ]["expression"]
+        org_text = (
+            "\n".join(org_expression)
+            if isinstance(org_expression, list)
+            else org_expression
+        )
+
+        self.assertNotIn("Organization Data URL (optional)", expressions)
+        self.assertNotIn("Org Data File", expressions)
+        customer_parameters = {
+            item["name"]
+            for item in schema["model"]["expressions"]
+            if "IsParameterQuery=true" in expression_text(item["expression"])
+        }
+        self.assertEqual(
+            customer_parameters,
+            {
+                "Dataverse Environment URL (required)",
+                "Transcript Lookback Days (defaults to 90 days if left blank)",
+                "Customer Topic Overrides JSON (optional)",
+                "Feedback Events JSON (optional)",
+            },
+        )
+        self.assertIn(org_data_url, org_text)
+        self.assertIn(
+            'SharePoint.Files("https://contoso.sharepoint.com/sites/HR", '
+            "[ApiVersion = 15])",
+            org_text,
+        )
+        self.assertIn(
+            '"https://contoso.sharepoint.com/sites/HR/Shared Documents/ESS/"',
+            org_text,
+        )
+        self.assertIn('"OrgData.csv"', org_text)
+        self.assertNotIn("Web.Contents", org_text)
+        self.assertNotIn("File.Contents", org_text)
+        self.assertLess(org_text.index("LoadFile ="), org_text.index("Result ="))
+
+    def test_changing_org_data_location_requires_rebuilding_template(self):
+        locations = (
+            "https://contoso.sharepoint.com/sites/HR/Shared Documents/ESS/OrgData.csv",
+            "https://contoso.sharepoint.com/sites/People/Shared Documents/ESS/Roster.csv",
+        )
+        queries = []
+        with tempfile.TemporaryDirectory() as temporary:
+            for index, location in enumerate(locations):
+                output = Path(temporary) / f"service-refresh-org-{index}.pbit"
+                build_package(
+                    SOURCE,
+                    output,
+                    "https://orgexample.crm.dynamics.com",
+                    mode="service-refresh",
+                    org_data_url=location,
+                )
+                with zipfile.ZipFile(output) as package:
+                    schema = json.loads(
+                        package.read("DataModelSchema").decode("utf-16-le")
+                    )
+                org_table = next(
+                    table
+                    for table in schema["model"]["tables"]
+                    if table["name"] == "Chat + Agent Org Data"
+                )
+                queries.append(
+                    expression_text(
+                        org_table["partitions"][0]["source"]["expression"]
+                    )
+                )
+                self.assertNotIn(
+                    "Organization Data URL (optional)",
+                    {
+                        item["name"]
+                        for item in schema["model"]["expressions"]
+                    },
+                )
+
+        self.assertNotEqual(queries[0], queries[1])
+        self.assertIn(locations[0], queries[0])
+        self.assertNotIn(locations[1], queries[0])
+        self.assertIn(locations[1], queries[1])
+        self.assertNotIn(locations[0], queries[1])
+
     def test_builds_parameterized_refresh_template(self):
         environment_url = "https://orgexample.crm.dynamics.com"
         with tempfile.TemporaryDirectory() as temporary:
@@ -189,10 +326,12 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             self.assertNotIn("Cds.Entities(_EnvUrl", agent_text)
             self.assertNotIn(environment_url, agent_text)
 
-            for name in ("Chat + Agent Org Data", "AgentCredits"):
-                text = model_expressions[name]
-                self.assertNotIn("Web.Contents", text)
-                self.assertNotIn("File.Contents", text)
+            self.assertIn(
+                "Empty = #table(",
+                model_expressions["Chat + Agent Org Data"],
+            )
+            self.assertNotIn("Web.Contents", model_expressions["AgentCredits"])
+            self.assertNotIn("File.Contents", model_expressions["AgentCredits"])
 
             model_parameters = {
                 item["name"]: item
@@ -205,6 +344,7 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 ]["expression"],
             )
             self.assertNotIn("Org Data File", model_parameters)
+            self.assertNotIn("Organization Data URL (optional)", model_parameters)
             self.assertNotIn(
                 "Agent Credits  (optional)",
                 model_parameters,
@@ -306,20 +446,22 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 cwd=ROOT,
                 check=False,
             )
-            customer_ignore = subprocess.run(
-                [
-                    "git",
-                    "check-ignore",
-                    "--no-index",
-                    "-q",
-                    "--",
-                    "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Customer Generated.pbit",
-                ],
-                cwd=ROOT,
-                check=False,
-            )
             self.assertEqual(direct_ignore.returncode, 1)
-            self.assertEqual(customer_ignore.returncode, 0)
+            for version in ("V21", "V22", "V23"):
+                customer_ignore = subprocess.run(
+                    [
+                        "git",
+                        "check-ignore",
+                        "--no-index",
+                        "-q",
+                        "--",
+                        "ESS Dashboard - Dynamic Topics (Dataverse) "
+                        f"{version} - Customer Generated.pbit",
+                    ],
+                    cwd=ROOT,
+                    check=False,
+                )
+                self.assertEqual(customer_ignore.returncode, 0, version)
         with zipfile.ZipFile(DIRECT_SERVICE) as package:
             self.assertIsNone(package.testzip())
             self.assertNotIn("UnappliedChanges", package.namelist())
@@ -357,6 +499,59 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
         self.assertNotIn("Cds.Entities(_EnvUrl", all_query_text)
         self.assertNotIn("File.Contents", all_query_text)
         self.assertNotIn("Web.Contents", all_query_text)
+
+    def test_checked_in_template_maps_department_to_all_analytic_pages(self):
+        with zipfile.ZipFile(DIRECT_SERVICE) as package:
+            names = package.namelist()
+            schema = json.loads(
+                package.read("DataModelSchema").decode("utf-16-le")
+            )
+
+            page_ids = {
+                name.split("/")[3]
+                for name in names
+                if name.startswith("Report/definition/pages/")
+                and name.endswith("/page.json")
+            }
+            support_pages = {
+                "apadjusttopics01aabb",
+                "glossary001aabbcc06",
+            }
+            organization_pages = {
+                name.split("/")[3]
+                for name in names
+                if name.startswith("Report/definition/pages/")
+                and "/visuals/" in name
+                and name.endswith("/visual.json")
+                and b"Chat + Agent Org Data" in package.read(name)
+            }
+
+        org_table = next(
+            table
+            for table in schema["model"]["tables"]
+            if table["name"] == "Chat + Agent Org Data"
+        )
+        expression = org_table["partitions"][0]["source"]["expression"]
+        org_query = "\n".join(expression) if isinstance(expression, list) else expression
+        relationships = {
+            relationship["name"]
+            for relationship in schema["model"].get("relationships", [])
+            if "Chat + Agent Org Data" in json.dumps(relationship)
+        }
+
+        self.assertEqual(organization_pages, page_ids - support_pages)
+        self.assertIn("Empty = #table(", org_query)
+        self.assertIn('#"Organization" = nullable text', org_query)
+        self.assertNotIn("Web.Contents", org_query)
+        self.assertNotIn("File.Contents", org_query)
+        self.assertEqual(
+            relationships,
+            {
+                "AgentCredits_OrgData",
+                "AgentPerformance_OrgData",
+                "ConversationFeedback_OrgData",
+            },
+        )
 
     def test_service_direct_rejects_customer_specific_inputs(self):
         with self.assertRaisesRegex(ValueError, "customer-neutral"):
@@ -490,10 +685,16 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             item["name"]: item
             for item in schema["model"]["expressions"]
         }
+        lineage_tags = [
+            item["lineageTag"].casefold()
+            for item in schema["model"]["expressions"]
+            if item.get("lineageTag")
+        ]
+        self.assertEqual(len(lineage_tags), len(set(lineage_tags)))
         desktop_description = schema_expressions[
             "Dataverse Environment URL (required)"
         ]["description"]
-        self.assertIn("Power Apps Session details", desktop_description)
+        self.assertIn("Power Apps Developer resources", desktop_description)
         descriptions = [
             str(item.get("description") or "")
             for item in schema_expressions.values()
@@ -642,6 +843,52 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 "neither an enabled registry AgentKey",
             ):
                 validate_feedback_events(feedback_path, registry_rows)
+
+    def test_monitor_feedback_with_conversation_id_does_not_require_registry(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            feedback_path = Path(temporary) / "monitor-feedback.json"
+            feedback_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "FeedbackEventId": "monitor-1",
+                            "ConversationId": "conversation-1",
+                            "AgentId": "",
+                            "FeedbackSource": "MonitorReactions.csv",
+                            "FeedbackVerdict": "Thumbs Up",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            _, audit = validate_feedback_events(feedback_path, None)
+
+        self.assertEqual(audit["events"], 1)
+
+    def test_product_feedback_without_registry_remains_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            feedback_path = Path(temporary) / "product-feedback.json"
+            feedback_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "FeedbackEventId": "product-1",
+                            "ConversationId": "conversation-1",
+                            "AgentId": "T_agent",
+                            "FeedbackSource": "Microsoft 365 Product Feedback",
+                            "FeedbackVerdict": "Thumbs Up",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "neither an enabled registry AgentKey",
+            ):
+                validate_feedback_events(feedback_path, None)
 
     def test_rejects_local_files_in_service_refresh_mode(self):
         with self.assertRaisesRegex(ValueError, "not supported"):
