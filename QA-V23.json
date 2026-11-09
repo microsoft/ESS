@@ -1,0 +1,207 @@
+{
+  "packageVersion": "V23",
+  "releaseStatus": "Validated GitHub Dataverse V23 release",
+  "baseline": {
+    "repository": "microsoft/ESS",
+    "commit": "039417fd7d5f5ccdd703f3501745fd9944e50296",
+    "archiveSha256": "F2B003D82A0D73319F6A507568417554BFB04FEAB2B853C26273B3FD2D2CCC03",
+    "originalFilesVerifiedUnchanged": 68,
+    "originalArchiveVerifiedUnchanged": true
+  },
+  "python": {
+    "minimum": "3.10",
+    "testedRuntime": "3.14.5",
+    "minimumRuntimeExecuted": false
+  },
+  "template": {
+    "default": "ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit",
+    "baseSource": "ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit",
+    "baseByteIdentical": true,
+    "archiveEntries": 349,
+    "retainedVersions": [
+      "V22",
+      "V21"
+    ]
+  },
+  "modifiedFiles": [
+    {
+      "path": ".gitignore",
+      "sha256": "297CB15FFC7B3917ACCB86FE4A0B3B721E604838C0CC153EE9C1F46B505FB0FE"
+    },
+    {
+      "path": "AGENT-REGISTRY.md",
+      "sha256": "234B8F2E1756A2829FABB700EB3ECC645FA456E6F40A6F240F39F50709057DDB"
+    },
+    {
+      "path": "AUTO-REFRESH.md",
+      "sha256": "6A43F73BA39B7E8BCED8EEB7822CD7121052E9F9FEE9A0870403DCF0FB46807F"
+    },
+    {
+      "path": "CHILD-AGENT-ATTRIBUTION.md",
+      "sha256": "1859F0265FCA3E018E6A77FE897ACF01D94EC541CC19D1D9696C367FDA7349EE"
+    },
+    {
+      "path": "FEEDBACK-INGESTION.md",
+      "sha256": "F1C7ED172C7BF3918386AB43802490098DC50797F15C6DCCC91E70C67F973DAC"
+    },
+    {
+      "path": "README.md",
+      "sha256": "3391D8E8A10101646FD1AA63A57EEED8DB90622CD6EEEC7CA48DD015E987C60F"
+    },
+    {
+      "path": "SETUP-CSV-Download.md",
+      "sha256": "B713CD985E940AD5427A6F3E8554514FE142E7473BA3FC517DEA7ECDE6EBCF26"
+    },
+    {
+      "path": "SETUP-Dataverse.md",
+      "sha256": "4613D6BF35AD3C7B0FF242945FBC0C3F98FE298C8FC58DA13BA419BF76E71559"
+    },
+    {
+      "path": "SETUP-Fabric.md",
+      "sha256": "F11FD2ED267B410255916029D0A4C22530E36C927BA0F42738BA3EBC1224EBCE"
+    },
+    {
+      "path": "tools\\ess_topic_tuner.py",
+      "sha256": "738017A101CCAEC7048949330733A03F6F8F3B58329C917DB143FFA848429063"
+    },
+    {
+      "path": "tools\\guided_dataverse_setup.py",
+      "sha256": "39F733E67845320674A90C33406D1403D5C9FCD7C6D7B5B5B15E05ECED7F732B"
+    },
+    {
+      "path": "tools\\test_build_service_refresh_template.py",
+      "sha256": "6A32B8360615C4F626E406021D43409C3516D1A8BEE71B178F92CF33DD67289C"
+    },
+    {
+      "path": "tools\\test_ess_agent_registry.py",
+      "sha256": "21FB2FFDDAD6EA1B1344EA632B8030BB689DBFE87115D362CDFA11B2F3F1A592"
+    },
+    {
+      "path": "tools\\test_ess_topic_tuner.py",
+      "sha256": "79EDCE21E3F332DA10B41F14CCD6111C51EC36AE583C5BCB87E90AC1F3DFBE34"
+    },
+    {
+      "path": "tools\\test_guided_dataverse_setup.py",
+      "sha256": "14910B7A29D914AFF35A22606A0471EB8D95491CB3F96B35C918740178A9E774"
+    },
+    {
+      "path": "tools\\test_template_packages.py",
+      "sha256": "274C597602F382F40CBE90123F654EBBF8F1BF78B59A3870C6C69C0DA39496C7"
+    },
+    {
+      "path": "TOPIC-TUNER.md",
+      "sha256": "2F4C6A86C5EB699145C9CF85BD36DCF79E5C0A8E5BBB8871FA2F072C36FC1CFA"
+    }
+  ],
+  "addedFiles": [
+    "ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit",
+    "QA-V23.json"
+  ],
+  "validation": {
+    "unitTests": {
+      "baselineCommit": "039417fd7d5f5ccdd703f3501745fd9944e50296",
+      "packageVersion": "V23",
+      "phase": "full-regression-after-runtime-validation",
+      "testsRun": 189,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "successful": true,
+      "failedTests": []
+    },
+    "testModules": [
+      "test_guided_dataverse_setup",
+      "test_build_service_refresh_template",
+      "test_ess_agent_registry",
+      "test_template_packages",
+      "test_ess_topic_tuner"
+    ],
+    "pythonFilesUnchangedSinceTests": 23,
+    "python310GrammarChecked": 23,
+    "offlineBuildScenarios": {
+      "count": 13,
+      "desktopValidation": [
+        "all-skipped",
+        "registry-only",
+        "organization-only",
+        "topics-only",
+        "prepared-monitor-only",
+        "raw-monitor-only",
+        "credits-only"
+      ],
+      "serviceRefresh": [
+        "all-skipped",
+        "registry-only",
+        "cloud-organization-only",
+        "topics-only",
+        "prepared-monitor-only",
+        "raw-monitor-only"
+      ],
+      "checks": [
+        "PBIT integrity",
+        "selected-source isolation",
+        "skipped missing paths absent",
+        "Service has no File.Contents",
+        "Service does not overwrite Desktop settings"
+      ]
+    },
+    "documentation": {
+      "relativeLinksChecked": 89,
+      "newCliExamplesParsed": 4,
+      "versionCommandVerified": true
+    }
+  },
+  "runtimeValidation": {
+    "executed": true,
+    "executedAt": "2026-11-09",
+    "environment": "Authorized How2Demo validation tenant",
+    "leastPrivilege": {
+      "successful": true,
+      "effectiveRoles": [
+        "Bot Transcript Viewer",
+        "ESS Power BI Transcript Reader"
+      ],
+      "administrativeOperationsForbidden": true
+    },
+    "desktopValidation": {
+      "successful": true,
+      "agentPerformanceRows": 17,
+      "conversationFeedbackRows": 3,
+      "users": 1,
+      "conversations": 16,
+      "dataLoadWarning": "--",
+      "organizationRowsSupplied": 303,
+      "creditRowsSupplied": 25
+    },
+    "serviceValidation": {
+      "successful": true,
+      "refreshRequestId": "696c4a50-10c7-4aab-ab7d-4683f327aac2",
+      "status": "Completed",
+      "startTimeUtc": "2026-11-09T17:37:03.64Z",
+      "endTimeUtc": "2026-11-09T17:37:15.42Z",
+      "cloudSources": [
+        {
+          "type": "Cds",
+          "path": "https://orgfdba31c9.crm.dynamics.com/"
+        }
+      ],
+      "localFileSources": 0,
+      "webSources": 0
+    },
+    "customerTaxonomy": {
+      "successful": true,
+      "desktopTemplateEmbedded": true,
+      "serviceTemplateEmbedded": true,
+      "verifiedCanonicalTopic": "Equipment Enrollment",
+      "verifiedKeywords": [
+        "zorbex ticket",
+        "zorbex tickets"
+      ],
+      "verifiedExclusion": "lost device"
+    },
+    "notExecuted": [
+      "SharePoint or OneDrive organization CSV existence, permissions, and runtime schema; the Service runtime test intentionally used only the Dataverse Cds cloud source."
+    ],
+    "checklist": "SETUP-Dataverse.md#v23-manual-qa-with-authorized-how2demo-access"
+  }
+}

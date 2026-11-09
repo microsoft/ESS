@@ -12,7 +12,7 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 > ✅ **Start here:** For hands‑off, production dashboards, **Dataverse Direct (Path A)** is the simplest — no file hosting, no gateway. If you must stay on CSV, **host it on SharePoint/OneDrive (Path B)** so the cloud can refresh it without a gateway.
 
-> **Why this matters for refresh:** Dataverse V22 passes the validated customer URL directly to the Dataverse connector through a Power Query parameter, which Power BI Service supports for refresh. The customer-neutral Service PBIT removes all Organization and Credits connectors. When organization data is selected in the guided builder, it validates the SharePoint Online or OneDrive for Business CSV URL format and emits a customer-specific static SharePoint source.
+> **Why this matters for refresh:** Dataverse V23 passes the validated customer URL directly to the Dataverse connector through a Power Query parameter, which Power BI Service supports for refresh. The customer-neutral Service PBIT removes all Organization and Credits connectors. Organization remains an independent optional enhancement: the guided builder validates the SharePoint Online or OneDrive for Business CSV URL format and emits a customer-specific static SharePoint source when selected. Use the complete V23 release package described in [SETUP-Dataverse.md](SETUP-Dataverse.md), not individually downloaded files from different versions.
 
 > 🆕 **Already need more than this?** Path A and Path B above already give you gateway‑free, cloud‑to‑cloud scheduled refresh — most customers don't need anything else. If you're consolidating multiple Dataverse environments into one dashboard, hitting refresh limits at very large scale, or want [Power Platform admin center](https://admin.powerplatform.microsoft.com) credit-consumption analytics alongside conversation data (with a separate file-landing step), see **[SETUP-Fabric.md ↗](SETUP-Fabric.md)**.
 
@@ -33,7 +33,7 @@ This guide covers the three supported hosting paths and the exact steps for each
 
 The report prepared by the Dataverse publication step connects the service directly to the Dataverse environment selected in its parameter - no transcript export and no gateway.
 
-1. Complete [Action 3 in the Dataverse guide](SETUP-Dataverse.md#action-3---publish-the-service-report). URL-only users can publish the Service-ready PBIT without Python. Guided users run the existing publication helper to reuse the validated Environment URL and approved registry, feedback, and topic data.
+1. Complete [Action 3 in the Dataverse guide](SETUP-Dataverse.md#action-3---publish-the-service-report). URL-only users can publish the included Service-ready PBIT without Python. Guided users run the publication helper, reuse the validated Environment URL if appropriate, and independently keep, replace, or skip registry, cloud organization data, feedback, and topics. Reusing the URL does not require keeping saved enhancements.
 
    Local Organization and Credits files are not included in the publishable Dataverse report. Organization data requires the guided builder's format-validated static SharePoint source; use Fabric when the source must be Entra/Graph, credits must be automated, or several environments must be combined.
 
@@ -92,7 +92,7 @@ You can get **gateway‑free cloud refresh** with the CSV Upload template *if th
 
 > 🔁 **Keep the URL stable.** Refresh follows the *path*, not the file. Overwrite the existing file (same name, same folder) rather than uploading a date‑stamped copy, or the schedule will keep reading the old file.
 
-> ⚠️ **Source-file automation isn't included.** This repository doesn't include or validate a Power Automate package or scheduled Dataverse CSV export. For supported hands-off transcript refresh, use **Dataverse V22**. If you build a custom file-landing process, validate its permissions, schema preservation, overwrite behavior, and failure monitoring before production use.
+> ⚠️ **Source-file automation isn't included.** This repository doesn't include or validate a Power Automate package or scheduled Dataverse CSV export. For supported hands-off transcript refresh, use the **Dataverse Direct V23 path**. If you build a custom file-landing process, validate its permissions, schema preservation, overwrite behavior, and failure monitoring before production use.
 
 ---
 

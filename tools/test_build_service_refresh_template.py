@@ -24,7 +24,7 @@ from build_service_refresh_template import (
 ROOT = Path(__file__).resolve().parents[1]
 DIRECT_SERVICE = (
     ROOT
-    / "ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit"
+    / "ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit"
 )
 SOURCE = DIRECT_SERVICE
 
@@ -447,7 +447,7 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(direct_ignore.returncode, 1)
-            for version in ("V21", "V22"):
+            for version in ("V21", "V22", "V23"):
                 customer_ignore = subprocess.run(
                     [
                         "git",

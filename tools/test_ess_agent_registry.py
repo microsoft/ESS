@@ -31,6 +31,7 @@ class AgentRegistryTests(unittest.TestCase):
             "ESS Dashboard - Dynamic Topics (CSV) V18.pbit",
             "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit",
             "ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit",
+            "ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit",
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)

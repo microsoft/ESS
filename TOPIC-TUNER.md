@@ -30,9 +30,9 @@ The tuner runs locally, proposes reusable topic rules, and creates a new validat
 
 You need:
 
-- the [complete ESS package](https://github.com/microsoft/ESS/archive/refs/heads/main.zip), extracted with its folder structure intact;
+- the [complete validated V23 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip), extracted with its folder structure intact;
 - [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add Python to PATH** selected during installation;
-- a successful [Dataverse V22 baseline](SETUP-Dataverse.md);
+- a successful [Dataverse V23 baseline](SETUP-Dataverse.md);
 - permission to export `ConversationTranscript` from the same Dataverse environment; and
 - a customer-controlled folder for the transcript export and review files.
 
@@ -65,8 +65,8 @@ The CSV is used only as local evidence for the tuner. Dataverse remains the repo
 
 ## Step 3 - Run the topic tuner
 
-1. Open the extracted `ESS-main` folder in File Explorer.
-2. If that folder contains another `ESS-main` folder, open the inner folder.
+1. Open the extracted `ESS-039417f-optional-fixes-V23` folder in File Explorer.
+2. If Windows created a nested package folder, open the inner `ESS-039417f-optional-fixes-V23` folder.
 3. Confirm that the folder directly contains:
    - `START-HERE-DATAVERSE.cmd`
    - `TUNE-TOPICS.cmd`
@@ -75,7 +75,18 @@ The CSV is used only as local evidence for the tuner. Dataverse remains the repo
 5. Select the exported `ConversationTranscript` CSV.
 6. Leave the window open while the tuner analyzes the file.
 
-The tuner reuses the Dataverse URL and optional inputs saved by the baseline setup. It does not ask you to select those files again.
+By default, the tuner deliberately reuses the Dataverse URL and optional inputs saved by setup. It does not ask you to select those files again, and does not silently discard a missing saved file. To change them interactively, rerun `START-HERE-DATAVERSE.cmd` first and independently keep, replace, or skip each enhancement.
+
+For explicit opt-outs, the tuner accepts `--skip-agent-registry`, `--skip-org-data`, `--skip-agent-credits`, and `--skip-feedback`. It forwards those choices to guided apply and retains them in printed review/recovery commands. A successful apply saves the resulting Desktop selections. For example, from the V23 package folder:
+
+```powershell
+python tools\ess_topic_tuner.py `
+  --input "C:\AgentData\ConversationTranscript.csv" `
+  --output-dir "C:\AgentData\TopicReview" `
+  --skip-agent-registry --skip-org-data --skip-agent-credits --skip-feedback
+```
+
+The guided `--tune-topics` entry point forwards the same four flags. Do not use `--skip-topic-overrides` with tuning: tuning applies new approved rules rather than skipping them. Other saved enhancements remain deliberately reusable unless explicitly skipped.
 
 Review files are written under:
 
@@ -100,7 +111,7 @@ The tool reports one of three outcomes:
 The tuner validates the approved rules, embeds them in a new template, and opens:
 
 ```text
-Generated Templates\ESS Dashboard - Dynamic Topics (Dataverse) V22 - Desktop Validation - Topics - LOCAL ONLY.pbit
+Generated Templates\ESS Dashboard - Dynamic Topics (Dataverse) V23 - Desktop Validation - Topics - LOCAL ONLY.pbit
 ```
 
 Continue to [Step 5](#step-5---validate-the-improvement).
@@ -173,9 +184,9 @@ If the report is only for Desktop use, save the validated PBIX and stop here.
 For shared Power BI Service access:
 
 1. Close the Desktop validation report.
-2. Return to the extracted `ESS-main` folder.
+2. Return to the extracted `ESS-039417f-optional-fixes-V23` folder.
 3. Double-click **`BUILD-SERVICE-REFRESH.cmd`**.
-4. When asked whether to reuse the saved setup, choose **Yes**. Choosing No starts without the approved topic-rule selection.
+4. When asked whether to reuse the saved setup, choose **Yes**, then explicitly **keep** the approved topic rules. Independently keep, replace, or skip the other enhancements. Choosing No starts without the approved topic-rule selection.
 5. Confirm the validation summary lists **Approved topic rules** with the expected non-zero rule count.
 6. Open the generated file whose name ends with:
 
@@ -187,7 +198,7 @@ For shared Power BI Service access:
 8. Save it as PBIX and publish it.
 9. Follow the [automatic refresh guide](AUTO-REFRESH.md#path-a--dataverse-direct-recommended) to configure OAuth2 credentials, run **Refresh now**, verify **Refresh history**, and enable the schedule.
 
-The Service builder reuses the approved topic rules. You do not run the tuner again. Local Organization and Credits files are intentionally excluded from this Service-safe report; use [Fabric](SETUP-Fabric.md) when those sources must also refresh automatically.
+In the Service builder, explicitly **keep** the saved approved topic rules; Enter now skips a saved enhancement. You do not run the tuner again. Registry, cloud organization data, and feedback remain independent keep/replace/skip choices. Local Organization and Credits files are intentionally excluded from this Service-safe report. Organization can still refresh from a direct SharePoint Online/OneDrive for Business CSV URL; use [Fabric](SETUP-Fabric.md) for automated credits or organization ingestion directly from Entra/Graph.
 
 ## Troubleshooting
 
@@ -195,8 +206,8 @@ The Service builder reuses the approved topic rules. You do not run the tuner ag
 |---|---|
 | **No saved Dataverse setup** | Complete the [guided Dataverse baseline](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements) once from this extracted package. |
 | **Python is not recognized** | Install [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add Python to PATH**, then reopen the launcher. |
-| `TUNE-TOPICS.cmd` is missing | Download and extract the [complete ESS ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip). Open the inner `ESS-main` folder if Windows created nested folders. |
-| A saved optional file is missing | Restore the saved registry, organization, credits, topic, or feedback input and retry. The tuner does not silently discard saved choices. |
+| `TUNE-TOPICS.cmd` is missing | Extract the complete corrected `ESS-039417f-optional-fixes-V23.zip`. Open the inner package folder if Windows created nested folders; do not download individual scripts. |
+| A saved optional file is missing | Restore it, rerun guided setup to replace/skip it, or use the applicable tuner skip flag for registry, organization, credits, or feedback. Printed recovery commands retain skip flags. New approved topic rules replace the saved topic-rule selection. Other saved choices are not silently discarded. |
 | **STOP** with no rules | Keep the existing report. Collect better evidence only when a meaningful classification gap remains. |
 | A generated PBIT cannot be replaced | Close the previously opened Topics validation report, then retry. |
 | Queries are blocked or a cyclic reference appears after opening the PBIT | Close without saving, reopen it, wait for all parameter values to stabilize, and then select **Load**. |
@@ -213,7 +224,7 @@ The Service builder reuses the approved topic rules. You do not run the tuner ag
 
 ## Other ESS data paths
 
-This guided apply workflow targets **Dataverse V22**.
+This guided apply workflow targets **Dataverse V23**. The unchanged V22 and V21 templates remain available for comparison and rollback.
 
 - **CSV V18:** paste the active approved JSON into **Customer Topic Overrides JSON (optional)**, then refresh. Use `customer-topic-overrides.json` after an automatic **READY** result or `approved-*.json` after **REVIEW REQUIRED**. See [CSV setup](SETUP-CSV-Download.md).
 - **Fabric V2:** upload the reviewed `customer-topic-overrides.csv` to `Files/config/customer-topic-overrides.csv`. See [Fabric setup](SETUP-Fabric.md).

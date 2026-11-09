@@ -1,8 +1,32 @@
 # Dataverse Direct setup
 
+> [!IMPORTANT]
+> These instructions require the complete validated V23 package. [Download `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip), select **Extract All**, and keep the folder structure intact. Do not download or run an individual `.cmd`, `.py`, or `.pbit` file from GitHub. Python remains **3.10 or later**.
+
 This is the recommended path for ongoing production reporting from one supported Dataverse environment. Allow about **15-25 minutes** for the first setup when transcripts already exist. Newly generated conversations may require approximately **30 minutes of inactivity** before they appear in Dataverse.
 
 Dataverse Direct reads the `ConversationTranscript` table through the Dataverse connector. **Do not export a ConversationTranscript CSV for this template.** Transcript CSV exports are supported only by the [CSV Upload path](./SETUP-CSV-Download.md).
+
+## Before you run anything
+
+Complete these prerequisites in order:
+
+1. **Download and extract the complete package.** Use the [V23 release ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip), select **Extract All**, and open the extracted `ESS-039417f-optional-fixes-V23` folder. Do not run files from the compressed ZIP.
+2. **Prepare the report account.** In [Power Platform admin center](https://admin.powerplatform.microsoft.com), open **Manage -> Environments -> select the agent environment -> Settings -> Users + permissions -> Users -> select the account -> Manage security roles**. Assign:
+   - **Bot Transcript Viewer**
+   - **ESS Power BI Transcript Reader**
+
+   If the ESS role is not present, use a customer-approved custom role with organization-level Read on `conversationtranscript` and `systemuser`. **Environment Maker is not sufficient. System Administrator is not required.**
+3. **Copy the required URL.** In [Power Apps](https://make.powerapps.com), select the same environment, open **Developer resources**, and copy **Environment URL**.
+4. **Install the desktop prerequisites.** Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/). For the guided path, install [Python 3.10 or later](https://www.python.org/downloads/windows/) and select **Add python.exe to PATH**.
+5. **Retrieve only the optional files you plan to use.** The [files, portals, and roles table](#files-portals-and-required-roles) links directly to the organization, credits, feedback, registry, and topic instructions. None is required for the transcript-only baseline.
+6. **Run setup from the extracted folder.** Double-click `START-HERE-DATAVERSE.cmd`, or open PowerShell in that folder and run:
+
+   ```powershell
+   .\START-HERE-DATAVERSE.cmd
+   ```
+
+The launcher calls the required Python modules. Do not run a copied standalone Python script.
 
 ## Three customer actions
 
@@ -16,7 +40,7 @@ Dataverse Direct reads the `ConversationTranscript` table through the Dataverse 
 
 No Python or repository script is required.
 
-1. [Download the Service-ready Dataverse V22 PBIT](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V22%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit).
+1. Open the included [Service-ready Dataverse V23 PBIT](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V23%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit).
 2. Open it in Power BI Desktop.
 3. Enter the Dataverse Environment URL.
 4. Continue with [Option A](#option-a---url-only-no-python-or-script).
@@ -30,10 +54,10 @@ Download the complete ESS package. It includes the command launchers and their P
 
 Use the complete ZIP so these scripts have all required templates and supporting files; no separate repository navigation or individual script download is required.
 
-1. [Download the complete ESS ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip).
+1. [Download the complete `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip).
 2. Select **Extract All**. Do not run the files from inside the ZIP.
 3. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
-4. Open the extracted `ESS-main` folder.
+4. Open the extracted `ESS-039417f-optional-fixes-V23` folder.
 5. Double-click [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd). The command file runs the required Python setup script automatically.
 6. Continue with [Option B](#option-b---guided-setup-with-optional-enhancements). When the report is ready for publication, use [`BUILD-SERVICE-REFRESH.cmd`](./BUILD-SERVICE-REFRESH.cmd) as directed in Action 3.
 
@@ -43,7 +67,7 @@ Use the complete ZIP so these scripts have all required templates and supporting
 
 | Need | Data or input | Portal and retrieval steps | Required role | Included helper | Expected file or output |
 |---|---|---|---|---|---|
-| Live conversations | Dataverse Environment URL | [Power Apps](https://make.powerapps.com) -> select environment -> **Developer resources -> Environment URL** | Bot Transcript Viewer, or custom role with organization-level Read on `conversationtranscript`; Environment Maker alone is insufficient | [Download the PBIT or complete ESS ZIP](#start-here-choose-your-setup) | URL without a trailing slash, such as `https://org.crm.dynamics.com` |
+| Live conversations | Dataverse Environment URL | [Power Apps](https://make.powerapps.com) -> select environment -> **Developer resources -> Environment URL** | Bot Transcript Viewer plus ESS Power BI Transcript Reader; equivalent custom access requires organization-level Read on `conversationtranscript` and `systemuser` | [Download the complete V23 ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip) | URL without a trailing slash, such as `https://org.crm.dynamics.com` |
 
 ### Optional data for full report functionality
 
@@ -59,12 +83,14 @@ Load only the data needed for the report areas you intend to use. The transcript
 
 ## Action 1 - Prepare access and copy the URL
 
-Ask a Power Platform administrator to grant the report account one of:
+Ask a Power Platform administrator to grant the report account the validated least-privilege combination in the environment that hosts the agent:
 
-- **Bot Transcript Viewer** in the environment that hosts the agent; or
-- a customer-approved custom role with organization-level **Read** on `conversationtranscript`.
+- **Bot Transcript Viewer**
+- **ESS Power BI Transcript Reader**
 
-Tenant administrator, Power Platform Administrator, and Environment Maker do not automatically grant transcript-table access.
+If the ESS role is not present, use an equivalent customer-approved custom role with organization-level **Read** on `conversationtranscript` and `systemuser`.
+
+Tenant administrator, Power Platform Administrator, and Environment Maker do not automatically grant the required table access. System Administrator is not required.
 
 If temporary **System Administrator** access was used for setup, an appropriately authorized Dataverse administrator should remove that role after validation and retain only the approved least-privilege reporting role. Do not renew elevation or grant broader privileges solely to bypass cleanup.
 
@@ -100,7 +126,7 @@ This solution targets one environment per report. Use Fabric if one report must 
 
 Use this path when Dataverse conversations and the built-in topic taxonomy are sufficient.
 
-1. [Download the Service-ready Dataverse PBIT](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V22%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit).
+1. Open the included [Service-ready Dataverse V23 PBIT](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V23%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit).
 2. Open it in Power BI Desktop.
 3. Paste the Dataverse Environment URL into **Dataverse Environment URL (required)**.
 4. For the transcript-only baseline, leave the optional parameters blank, wait until the values stop changing, and select **Load**.
@@ -112,16 +138,24 @@ For optional inputs, Customer Topic Overrides JSON can be pasted directly. Feedb
 
 ### Option B - Guided setup with optional enhancements
 
-Every enhancement in this path is optional. Answer **No** or cancel a file picker to skip it and continue. Microsoft 365 Product Feedback is the only selection that needs an agent registry; if no registry is selected, the helper skips Product Feedback and continues with any Monitor file and all other setup choices.
+Every enhancement is an independent choice. **Organization data remains supported**; it does not require registry, credits, topic, or feedback files.
 
-The complete ESS ZIP contains both command launchers and the Python scripts they run. The links below identify the exact included files, but the complete ZIP is the runnable download because the scripts require the templates and supporting modules.
+- **New selection:** answer **Yes** to add it; **No** or Enter skips it.
+- **Saved selection:** enter **k / keep**, **r / replace**, or **s / skip** for that enhancement. Enter defaults to **skip**, not keep. Reusing the saved Environment URL does not require reusing any saved files.
+- **Replacement:** the old selection is cleared first. Cancelling the first replacement picker, or leaving a replacement organization URL blank, skips that enhancement instead of silently retaining the old input. Cancelling an additional feedback picker simply finishes the exports already selected.
+- **Service output:** registry, cloud organization CSV, approved topics, and feedback are independent choices. Local organization and Credits files remain Desktop/manual-refresh only.
+- Review the **Selected / skipped** summary before the build. Only selected enhancements are validated or embedded.
 
-1. [Download the complete ESS ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip).
+Microsoft 365 Product Feedback needs an approved agent registry. If it is missing, guided setup can offer a registry picker; declining or cancelling skips only Product Feedback and preserves Monitor and all other choices. An explicit `--skip-agent-registry` suppresses that dependency picker. Monitor events with exact Conversation IDs do not require a registry.
+
+The complete V23 ZIP contains both command launchers and the Python scripts they run. Keep the templates and supporting modules together.
+
+1. [Download the complete `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip).
 2. Select **Extract All**, keep the extracted folder structure intact, and do not run the files from inside the ZIP.
 3. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/).
 4. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
-5. Open the extracted `ESS-main` folder and double-click [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd). The command file automatically runs [`tools\guided_dataverse_setup.py`](./tools/guided_dataverse_setup.py) and creates a **Desktop Validation - LOCAL ONLY** report for checking the selected inputs.
-6. Paste the Environment URL and skip optional data for the first run.
+5. Open the extracted `ESS-039417f-optional-fixes-V23` folder and double-click [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd). The command file automatically runs [`tools\guided_dataverse_setup.py`](./tools/guided_dataverse_setup.py) and creates a **Desktop Validation - LOCAL ONLY** report for checking the selected inputs.
+6. Paste the Environment URL. For a baseline, skip every enhancement; alternatively, select only what you need, such as organization data alone. A baseline-first check is recommended, not a requirement to provide more files.
 7. When the guided checks complete, open the report.
 
 The direct Service-ready PBIT prompts for:
@@ -151,6 +185,56 @@ The lookback parameter limits the server-side query. It does not change retentio
 > [!IMPORTANT]
 > Option B intentionally creates two reports. `START-HERE-DATAVERSE.cmd` creates the local Desktop-validation report for checking optional inputs. Action 3 creates the separate **Power BI Service - PUBLISH THIS** report for shared Service access.
 
+### Command-line selection and saved settings
+
+From the extracted V23 package folder, run `python tools\guided_dataverse_setup.py --version` to confirm **ESS Dataverse setup V23 (Python 3.10+)**.
+
+Non-interactive runs reuse saved settings unless an input is replaced or explicitly skipped. Use these controls to ignore inherited selections without deleting source files:
+
+| Flag | What is skipped |
+|---|---|
+| `--skip-agent-registry` | Saved agent registry |
+| `--skip-org-data` | Both saved local organization CSV and cloud organization URL |
+| `--skip-agent-credits` | Saved local credit-consumption CSV |
+| `--skip-topic-overrides` | Saved customer topic rules; native and built-in topics still work |
+| `--skip-feedback` | Both raw feedback exports and prepared feedback JSON |
+
+Do not supply an input and its skip flag together. Organization file, URL, and skip are mutually exclusive. Prepared `--feedback-events-json`, raw `--feedback-input`, and feedback skip are mutually exclusive; repeat `--feedback-input` to load multiple raw exports. `--skip-topic-overrides` cannot be combined with `--tune-topics`, which applies new topic rules.
+
+**Transcript-only Desktop build, ignoring all saved enhancements:**
+
+```powershell
+python tools\guided_dataverse_setup.py `
+  --mode desktop-validation `
+  --environment-url "https://org.crm.dynamics.com" `
+  --skip-agent-registry --skip-org-data --skip-agent-credits `
+  --skip-topic-overrides --skip-feedback --non-interactive --no-open
+```
+
+**Organization-only Desktop build:**
+
+```powershell
+python tools\guided_dataverse_setup.py `
+  --mode desktop-validation `
+  --environment-url "https://org.crm.dynamics.com" `
+  --org-data-file "C:\AgentData\OrgData.csv" `
+  --skip-agent-registry --skip-agent-credits `
+  --skip-topic-overrides --skip-feedback --non-interactive --no-open
+```
+
+**Organization-only Service build:**
+
+```powershell
+python tools\guided_dataverse_setup.py `
+  --mode service-refresh `
+  --environment-url "https://org.crm.dynamics.com" `
+  --org-data-url "https://contoso.sharepoint.com/sites/HR/Shared%20Documents/OrgData.csv" `
+  --skip-agent-registry --skip-agent-credits `
+  --skip-topic-overrides --skip-feedback --non-interactive --no-open
+```
+
+Replace the example environment and organization locations with approved customer values. `--no-open` builds the PBIT without launching Power BI; it does not refresh data. A successful Desktop build saves the resulting choices; Service builds do not overwrite Desktop settings. A selected invalid file still fails validation. In particular, non-interactive Product Feedback without an approved registry fails safely rather than guessing attribution; select a registry or explicitly skip feedback.
+
 ### Confirm the baseline
 
 On the **Adoption** page, whose report title is **Organization Adoption**, confirm:
@@ -166,7 +250,7 @@ Stop here if the baseline fails. Optional files will not repair transcript permi
 
 ### Add data for the report areas you need
 
-Run the guided setup again, reuse the saved Environment URL, and select only the enhancement you are ready to validate. The setup checks each selected file before opening a new report.
+Run the guided setup again, reuse the saved Environment URL if appropriate, and independently keep, replace, or skip each enhancement. For organization-only validation, skip registry, credits, customer topics, and feedback. Skipped saved paths are not required to exist. The setup checks only selected inputs before opening a new report.
 
 ### Agent registry
 
@@ -216,6 +300,8 @@ The export has no conversation ID. Total and billable credits are observed; cost
 
 Do not load the tenant-wide raw export directly. For Product Feedback, blank or unmatched Agent IDs are excluded and are not inferred to be ESS. Monitor reactions use a registry Bot/Agent ID when present; otherwise they are included only when the report can reconcile the exported Conversation ID to one exact loaded conversation.
 
+The same feedback picker also accepts an already prepared `feedback-events.json` instead of raw CSV exports. CLI users can use `--feedback-events-json`; it is not combined with raw `--feedback-input` arguments. Prepared Product Feedback still needs the approved registry for safe attribution; prepared Monitor-only events can use exact Conversation IDs without one. Skipping feedback ignores both saved forms and does not run feedback preparation.
+
 ### Customer-specific topics
 
 1. Follow [Customer-specific topic tuning](./TOPIC-TUNER.md).
@@ -230,7 +316,7 @@ Native Copilot Studio topics remain authoritative. Uncertain rules remain disabl
 If you need only Desktop/manual refresh, save the validated report as a PBIX and stop here.
 
 1. Complete the baseline checklist before publishing.
-2. Continue with the Service-ready PBIT from Option A. If you used the guided Option B, return to the extracted package and run `BUILD-SERVICE-REFRESH.cmd`. The helper keeps Dataverse parameterized, validates the cloud organization URL format and embeds its location as a static SharePoint source when selected, and embeds approved registry, feedback, and topic selections while excluding local Organization and Credits files.
+2. Continue with the Service-ready PBIT from Option A. If you used the guided Option B, return to the extracted V23 package and run `BUILD-SERVICE-REFRESH.cmd`. Independently keep, replace, or skip registry, cloud organization data, topics, and feedback; saved Desktop enhancements are not mandatory. The helper keeps Dataverse parameterized, validates the cloud organization URL format and embeds its location as a static SharePoint source when selected, and embeds only the approved registry, feedback, and topic selections you retain while excluding local Organization and Credits files.
 3. Confirm the filename ends with **Power BI Service - PUBLISH THIS.pbit**. This is the publication artifact; the earlier Desktop-validation report is the local input-checking artifact.
 4. Open the prepared report, wait until every prefilled value is visible and stable, then select **Load**.
 5. Sign in if prompted and select **Home -> Refresh**.
@@ -241,6 +327,17 @@ If you need only Desktop/manual refresh, save the validated report as a PBIX and
 10. Only after that successful manual Service refresh, enable **Scheduled refresh**, choose the cadence, and select **Apply**. See [AUTO-REFRESH.md](./AUTO-REFRESH.md) for the complete scheduling guide.
 
 Use Fabric instead when organization data must be sourced directly from Graph/Entra, credits must refresh automatically, several environments must be combined, or Lakehouse history is required.
+
+## V23 manual QA with authorized how2demo access
+
+Local Python tests and offline PBIT inspection do **not** execute Power Query or prove Dataverse/SharePoint permissions or Service refresh. Use the complete corrected V23 package in a separate folder and separate report/workspace artifacts; do not overwrite an existing production report.
+
+- [ ] Build with every enhancement skipped. Open and refresh in Desktop; confirm plausible transcript totals without optional file requests.
+- [ ] Build with **only local organization data**. Skip registry, credits, topics, and feedback. Refresh in Desktop and confirm department/country segmentation for known users.
+- [ ] Build with **only the direct cloud organization CSV URL**. Refresh in Desktop, publish the separate Service output, map Dataverse and SharePoint OAuth2 cloud connections, run **Refresh now**, and verify **Completed** in Service Refresh history.
+- [ ] Select each other enhancement independently when relevant. Product Feedback needs its approved registry; Monitor with exact Conversation IDs does not.
+- [ ] Rerun with saved selections. Keep one, skip the others, and confirm the summary and report contain only retained data. Replace a saved selection and cancel its first picker; confirm it is skipped, not silently reused. Repeat for a blank replacement organization URL.
+- [ ] After a successful manual Service refresh, overwrite the roster at the same hosted path with approved test changes, refresh again, and confirm organization changes appear before enabling a schedule.
 
 ## Troubleshooting
 

@@ -1577,11 +1577,58 @@ class TopicTunerTests(unittest.TestCase):
             self.assertIn("No usable native topic evidence and insufficient repeated", report["outcome"]["message"])
 
     def test_action_command_quotes_paths_and_preserves_custom_settings(self) -> None:
-        args = Namespace(settings_file=Path("customer's settings.json"), template_output=None, no_open=False)
+        args = Namespace(settings_file=Path("customer's settings.json"), template_output=None, no_open=False,
+                         skip_agent_registry=True, skip_org_data=True, skip_agent_credits=True, skip_feedback=True)
         command = next_command(args, "--apply", Path("customer's rules.json"))
         self.assertTrue(command.startswith("& '"))
         self.assertIn("customer''s rules.json", command)
         self.assertIn("customer''s settings.json", command)
+        for flag in ("--skip-agent-registry", "--skip-org-data", "--skip-agent-credits", "--skip-feedback"):
+            self.assertIn("'" + flag + "'", command)
+
+    def test_apply_can_skip_missing_saved_enhancements_without_losing_new_topics(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            settings = root / "settings.json"
+            save_settings(settings, SetupOptions(
+                environment_url="https://savedqa.crm.dynamics.com",
+                agent_registry_json=str(root / "missing-registry.json"),
+                org_data_file=str(root / "missing-users.csv"),
+                org_data_url="https://contoso.sharepoint.com/sites/HR/OrgData.csv",
+                agent_credits_file=str(root / "missing-credits.csv"),
+                topic_overrides_json=str(root / "missing-old-rules.json"),
+                feedback_events_json=str(root / "missing-feedback.json"),
+                feedback_input_files=[str(root / "missing-monitor.csv")],
+            ))
+            rules = root / "rules.json"
+            rules.write_text(json.dumps([{"Locale": "en", "Vertical": "Customer", "CanonicalTopic": "Equipment Enrollment",
+                                         "Keywords": "device enrollment", "Exclusions": "", "Priority": 120}]), encoding="utf-8")
+            output = root / "topics.pbit"
+            flags = ("--skip-agent-registry", "--skip-org-data", "--skip-agent-credits", "--skip-feedback")
+            completed = subprocess.run([
+                sys.executable, str(repo / "tools" / "ess_topic_tuner.py"), "--apply", str(rules),
+                "--settings-file", str(settings), "--template-output", str(output), "--no-open", *flags,
+            ], capture_output=True, text=True)
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            self.assertEqual(load_settings(settings), SetupOptions(
+                environment_url="https://savedqa.crm.dynamics.com", topic_overrides_json=str(rules.resolve()),
+            ))
+            with zipfile.ZipFile(output) as package:
+                self.assertIsNone(package.testzip())
+                schema = json.loads(package.read("DataModelSchema").decode("utf-16-le"))
+            self.assertIn("Equipment Enrollment", json.dumps(schema))
+            self.assertNotIn("missing-", json.dumps(schema))
+
+    def test_skipped_feedback_does_not_block_tuning_on_unused_preparation_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            settings = root / "settings.json"
+            raw = root / "raw.csv"
+            save_settings(settings, SetupOptions(environment_url="https://savedqa.crm.dynamics.com", feedback_input_files=[str(raw)]))
+            args = Namespace(settings_file=settings, template_output=root / "topics.pbit", skip_feedback=True)
+            with patch("ess_topic_tuner.PREPARED_FEEDBACK", raw):
+                self.assertEqual(validate_tuner_output(args), args.template_output)
 
     def test_failed_apply_keeps_saved_choices_and_existing_template(self) -> None:
         repo = Path(__file__).resolve().parents[1]

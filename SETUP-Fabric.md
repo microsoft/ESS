@@ -47,7 +47,7 @@ Load only the data needed for the report areas you intend to use. The transcript
 
 ## Step 1 - Download the package and create Fabric resources
 
-1. [Download the complete ESS ZIP](https://github.com/microsoft/ESS/archive/refs/heads/main.zip) and extract it.
+1. [Download the complete validated V23 ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip) and extract it.
 2. Keep the package folder structure intact.
 3. In [Microsoft Fabric](https://app.fabric.microsoft.com), create or select a capacity-backed workspace.
 4. Create a Lakehouse.
