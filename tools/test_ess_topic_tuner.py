@@ -12,13 +12,47 @@ from unittest.mock import patch
 
 from ess_topic_tuner import (
     OVERRIDE_COLUMNS, apply_dataverse_rules, expand_customer_terms, finish_analysis, next_command, print_outcome,
-    review_and_apply, rules_from_override_rows, validate_tuner_output, workflow_outcome,
+    read_csv, review_and_apply, rules_from_override_rows, validate_tuner_output, workflow_outcome,
 )
 from guided_dataverse_setup import SetupOptions, TOPIC_OUTPUT_NAME, load_settings, save_settings
 from topic_classifier import classify, load_rules, normalize
 
 
 class TopicTunerTests(unittest.TestCase):
+    def test_read_csv_accepts_large_dataverse_transcript_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "ConversationTranscript.csv"
+            content = json.dumps({"activities": [{"text": "x" * 150_000}]})
+            with source.open("w", encoding="utf-8-sig", newline="") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=("conversationtranscriptid", "content"),
+                )
+                writer.writeheader()
+                writer.writerow(
+                    {
+                        "conversationtranscriptid": "large-transcript",
+                        "content": content,
+                    }
+                )
+
+            previous_limit = csv.field_size_limit()
+            csv.field_size_limit(131_072)
+            try:
+                fieldnames, rows = read_csv(source)
+                self.assertEqual(
+                    csv.field_size_limit(),
+                    131_072,
+                )
+            finally:
+                csv.field_size_limit(previous_limit)
+
+            self.assertEqual(
+                fieldnames,
+                ["conversationtranscriptid", "content"],
+            )
+            self.assertEqual(rows[0]["content"], content)
+
     def test_default_tuner_output_uses_guarded_filename(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

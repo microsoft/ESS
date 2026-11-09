@@ -186,10 +186,15 @@ def parse_args() -> argparse.Namespace:
 
 
 def read_csv(path: Path) -> tuple[list[str], list[dict]]:
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle)
-        rows = list(reader)
-        return list(reader.fieldnames or []), rows
+    previous_limit = csv.field_size_limit()
+    try:
+        csv.field_size_limit(sys.maxsize)
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            rows = list(reader)
+            return list(reader.fieldnames or []), rows
+    finally:
+        csv.field_size_limit(previous_limit)
 
 
 def resolve_column(
