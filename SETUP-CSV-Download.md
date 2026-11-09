@@ -40,7 +40,7 @@ Load only the data needed for the report areas you intend to use. The transcript
 
 ## Prepare the package and tools
 
-1. [Download the complete validated V23 ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip).
+1. [Download the complete validated V23 ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23.1/ESS-039417f-optional-fixes-V23.zip).
 2. Select **Extract All** and keep the extracted folder structure intact.
 3. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/).
 4. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and select **Add Python to PATH**. The included tools use only the standard library.

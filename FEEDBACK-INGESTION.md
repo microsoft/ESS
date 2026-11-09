@@ -32,7 +32,7 @@ All Microsoft 365 administrators and readers can view and export Product feedbac
 
 **Dataverse with cross-channel feedback:** use [Option B in the guided Dataverse setup](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements) from the complete corrected V23 package. Select raw exports, or choose an already prepared `feedback-events.json`; there is no need to prepare JSON first. Product Feedback needs the reviewed registry; Monitor-only exact-ID feedback does not. The URL-only direct PBIT has no registry input and therefore cannot safely attribute Microsoft 365 Product Feedback.
 
-**CSV or Fabric:** [download and extract the complete V23 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip). These paths use the included local preparation tool after export.
+**CSV or Fabric:** [download and extract the complete V23 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23.1/ESS-039417f-optional-fixes-V23.zip). These paths use the included local preparation tool after export.
 
 ## Step 1 - Identify the Microsoft 365 Agent ID
 

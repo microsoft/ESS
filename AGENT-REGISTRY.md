@@ -34,7 +34,7 @@ Blank, disabled, unrelated, or ambiguous Product Feedback identifiers never ente
 
 ## Before you start
 
-1. [Download the complete V23 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip) and select **Extract All**.
+1. [Download the complete V23 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23.1/ESS-039417f-optional-fixes-V23.zip) and select **Extract All**.
 2. Open the extracted `ESS-039417f-optional-fixes-V23` folder. Keep `tools\agent_registry.py` and `SampleData\agent-registry.csv` in their original locations.
 3. Create a customer-controlled folder such as `C:\AgentData`.
 4. Copy [`SampleData/agent-registry.csv`](SampleData/agent-registry.csv) into that folder.

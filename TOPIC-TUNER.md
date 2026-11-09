@@ -30,7 +30,7 @@ The tuner runs locally, proposes reusable topic rules, and creates a new validat
 
 You need:
 
-- the [complete validated V23 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23/ESS-039417f-optional-fixes-V23.zip), extracted with its folder structure intact;
+- the [complete validated V23 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23.1/ESS-039417f-optional-fixes-V23.zip), extracted with its folder structure intact;
 - [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add Python to PATH** selected during installation;
 - a successful [Dataverse V23 baseline](SETUP-Dataverse.md);
 - permission to export `ConversationTranscript` from the same Dataverse environment; and
