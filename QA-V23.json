@@ -62,7 +62,7 @@
     },
     {
       "path": "tools\\ess_topic_tuner.py",
-      "sha256": "738017A101CCAEC7048949330733A03F6F8F3B58329C917DB143FFA848429063"
+      "sha256": "58E947F90096F29AE90599B1181D2851EFF8CFEA5FC8027495DD7273C51DA2C0"
     },
     {
       "path": "tools\\guided_dataverse_setup.py",
@@ -78,7 +78,7 @@
     },
     {
       "path": "tools\\test_ess_topic_tuner.py",
-      "sha256": "79EDCE21E3F332DA10B41F14CCD6111C51EC36AE583C5BCB87E90AC1F3DFBE34"
+      "sha256": "4F3DEE282B5CEDFB96F9673512C63343E0F75ED2FE6D381CF56D94262364BD12"
     },
     {
       "path": "tools\\test_guided_dataverse_setup.py",
@@ -101,8 +101,8 @@
     "unitTests": {
       "baselineCommit": "039417fd7d5f5ccdd703f3501745fd9944e50296",
       "packageVersion": "V23",
-      "phase": "full-regression-after-runtime-validation",
-      "testsRun": 189,
+      "phase": "full-regression-after-large-transcript-hotfix",
+      "testsRun": 190,
       "failures": 0,
       "errors": 0,
       "skipped": 1,
@@ -144,6 +144,11 @@
         "Service has no File.Contents",
         "Service does not overwrite Desktop settings"
       ]
+    },
+    "largeTranscriptCsv": {
+      "successful": true,
+      "validatedFieldBytes": 150000,
+      "defaultCsvLimitRestored": true
     },
     "documentation": {
       "relativeLinksChecked": 89,
