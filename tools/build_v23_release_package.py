@@ -12,7 +12,7 @@ import zipfile
 from pathlib import Path
 
 
-PACKAGE_NAME = "ESS-039417f-optional-fixes-V23"
+PACKAGE_NAME = "ESS-039417f-optional-fixes-V23.2"
 MODEL_RELATIVE_DIR = Path("models") / "multilingual-e5-small"
 MODEL_FILES = ("model_quint8_avx2.onnx", "tokenizer.json")
 EXCLUDED_PARTS = {

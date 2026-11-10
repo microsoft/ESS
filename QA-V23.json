@@ -1,5 +1,5 @@
 {
-  "packageVersion": "V23",
+  "packageVersion": "V23.2",
   "releaseStatus": "V23 local grouped semantic review candidate; third validation defects fixed; GitHub publication pending user approval",
   "baseline": {
     "repository": "microsoft/ESS",
@@ -47,7 +47,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "75DED6CDA1B13FCEA1B70FAB3C9F5CCEC5C867BC9457E5E4C79D16E1471B5CFE"
+      "sha256": "797AB1C40D92418732F0832A196DC5A60A6E0D9281E33826174279CDF91FD7ED"
     },
     {
       "path": "SETUP-CSV-Download.md",
@@ -55,7 +55,7 @@
     },
     {
       "path": "SETUP-Dataverse.md",
-      "sha256": "24355AB263F42B5B6C6F14C813D65F8CCB183FF24A802D54DFDC70788CA360DB"
+      "sha256": "55ECDE782019AEF0E8736D51269036F6B4BD4D04F919AB4B0D6DC8C3ED91CC56"
     },
     {
       "path": "SETUP-Fabric.md",
@@ -107,7 +107,7 @@
     },
     {
       "path": "TOPIC-TUNER.md",
-      "sha256": "3AC80430BE22477EB4253F768406C3B400B66544B81ED27D16F0386725D9C1E6"
+      "sha256": "417A8B3B77AAFBDC96AC843A2F1BEE25687BD5D6E782903D911BCC9AE07A7B36"
     }
   ],
   "addedFiles": [
@@ -134,7 +134,7 @@
     },
     {
       "path": "tools\\build_v23_release_package.py",
-      "sha256": "3E8DF0CA921295F95B2B345441C7E37D76081062611830788A909F4A7CC53535"
+      "sha256": "6F7505AFFF9568827C7437F2D2B3074F4C7FDECDF561B76FD682E38BF05774AF"
     },
     {
       "path": "tools\\local_semantic_topic_classifier.py",
@@ -164,7 +164,7 @@
   "validation": {
     "unitTests": {
       "baselineCommit": "79ca039a66afdfc3c9ed8428aaaad26341bf8a05",
-      "packageVersion": "V23",
+      "packageVersion": "V23.2",
       "phase": "local-grouped-semantic-review-and-release-package-validation",
       "testsRun": 233,
       "failures": 0,

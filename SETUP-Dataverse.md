@@ -1,7 +1,7 @@
 # Dataverse Direct setup
 
 > [!IMPORTANT]
-> These instructions require the complete validated V23 package. [Download `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip), select **Extract All**, and keep the folder structure intact. Do not download or run an individual `.cmd`, `.py`, or `.pbit` file from GitHub. Python remains **3.10 or later**.
+> These instructions require the complete validated V23.2 package. [Download `ESS-039417f-optional-fixes-V23.2.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip), select **Extract All**, and keep the folder structure intact. Do not download or run an individual `.cmd`, `.py`, or `.pbit` file from GitHub. Python remains **3.10 or later**.
 
 This is the recommended path for ongoing production reporting from one supported Dataverse environment. Allow about **15-25 minutes** for the first setup when transcripts already exist. Newly generated conversations may require approximately **30 minutes of inactivity** before they appear in Dataverse.
 
@@ -11,7 +11,7 @@ Dataverse Direct reads the `ConversationTranscript` table through the Dataverse 
 
 Complete these prerequisites in order:
 
-1. **Download and extract the complete package.** Use the [V23 release ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip), select **Extract All**, and open the extracted `ESS-039417f-optional-fixes-V23` folder. Do not run files from the compressed ZIP.
+1. **Download and extract the complete package.** Use the [V23.2 release ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip), select **Extract All**, and open the extracted `ESS-039417f-optional-fixes-V23.2` folder. Do not run files from the compressed ZIP.
 2. **Prepare the report account.** In [Power Platform admin center](https://admin.powerplatform.microsoft.com), open **Manage -> Environments -> select the agent environment -> Settings -> Users + permissions -> Users -> select the account -> Manage security roles**. Assign:
    - **Bot Transcript Viewer**
    - **ESS Power BI Transcript Reader**
@@ -54,10 +54,10 @@ Download the complete ESS package. It includes the command launchers and their P
 
 Use the complete ZIP so these scripts have all required templates and supporting files; no separate repository navigation or individual script download is required.
 
-1. [Download the complete `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip).
+1. [Download the complete `ESS-039417f-optional-fixes-V23.2.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip).
 2. Select **Extract All**. Do not run the files from inside the ZIP.
 3. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
-4. Open the extracted `ESS-039417f-optional-fixes-V23` folder.
+4. Open the extracted `ESS-039417f-optional-fixes-V23.2` folder.
 5. Double-click [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd). The command file runs the required Python setup script automatically.
 6. Continue with [Option B](#option-b---guided-setup-with-optional-enhancements). When the report is ready for publication, use [`BUILD-SERVICE-REFRESH.cmd`](./BUILD-SERVICE-REFRESH.cmd) as directed in Action 3.
 
@@ -67,7 +67,7 @@ Use the complete ZIP so these scripts have all required templates and supporting
 
 | Need | Data or input | Portal and retrieval steps | Required role | Included helper | Expected file or output |
 |---|---|---|---|---|---|
-| Live conversations | Dataverse Environment URL | [Power Apps](https://make.powerapps.com) -> select environment -> **Developer resources -> Environment URL** | Bot Transcript Viewer plus ESS Power BI Transcript Reader; equivalent custom access requires organization-level Read on `conversationtranscript` and `systemuser` | [Download the complete V23 ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip) | URL without a trailing slash, such as `https://org.crm.dynamics.com` |
+| Live conversations | Dataverse Environment URL | [Power Apps](https://make.powerapps.com) -> select environment -> **Developer resources -> Environment URL** | Bot Transcript Viewer plus ESS Power BI Transcript Reader; equivalent custom access requires organization-level Read on `conversationtranscript` and `systemuser` | [Download the complete V23.2 ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip) | URL without a trailing slash, such as `https://org.crm.dynamics.com` |
 
 ### Optional data for full report functionality
 
@@ -150,11 +150,11 @@ Microsoft 365 Product Feedback needs an approved agent registry. If it is missin
 
 The complete V23 ZIP contains both command launchers and the Python scripts they run. Keep the templates and supporting modules together.
 
-1. [Download the complete `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip).
+1. [Download the complete `ESS-039417f-optional-fixes-V23.2.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip).
 2. Select **Extract All**, keep the extracted folder structure intact, and do not run the files from inside the ZIP.
 3. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/).
 4. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
-5. Open the extracted `ESS-039417f-optional-fixes-V23` folder and double-click [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd). The command file automatically runs [`tools\guided_dataverse_setup.py`](./tools/guided_dataverse_setup.py) and creates a **Desktop Validation - LOCAL ONLY** report for checking the selected inputs.
+5. Open the extracted `ESS-039417f-optional-fixes-V23.2` folder and double-click [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd). The command file automatically runs [`tools\guided_dataverse_setup.py`](./tools/guided_dataverse_setup.py) and creates a **Desktop Validation - LOCAL ONLY** report for checking the selected inputs.
 6. Paste the Environment URL. For a baseline, skip every enhancement; alternatively, select only what you need, such as organization data alone. A baseline-first check is recommended, not a requirement to provide more files.
 7. When the guided checks complete, open the report.
 

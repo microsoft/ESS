@@ -32,7 +32,7 @@ The tuner does not change Copilot Studio topics, send credentials to Power BI, o
 
 You need:
 
-- the [complete validated V23 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip), extracted with its folder structure intact;
+- the [complete validated V23.2 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip), extracted with its folder structure intact;
 - [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add Python to PATH** selected during installation;
 - a successful [Dataverse V23 baseline](SETUP-Dataverse.md);
 - permission to export `ConversationTranscript` from the same Dataverse environment; and
@@ -78,8 +78,8 @@ The CSV is used only as local evidence for the tuner. Dataverse remains the repo
 
 ## Step 3 - Run the topic tuner
 
-1. Open the extracted `ESS-039417f-optional-fixes-V23` folder in File Explorer.
-2. If Windows created a nested package folder, open the inner `ESS-039417f-optional-fixes-V23` folder.
+1. Open the extracted `ESS-039417f-optional-fixes-V23.2` folder in File Explorer.
+2. If Windows created a nested package folder, open the inner `ESS-039417f-optional-fixes-V23.2` folder.
 3. Confirm that the folder directly contains:
    - `START-HERE-DATAVERSE.cmd`
    - `TUNE-TOPICS.cmd`
@@ -212,7 +212,7 @@ If the report is only for Desktop use, save the validated PBIX and stop here.
 For shared Power BI Service access:
 
 1. Close the Desktop validation report.
-2. Return to the extracted `ESS-039417f-optional-fixes-V23` folder.
+2. Return to the extracted `ESS-039417f-optional-fixes-V23.2` folder.
 3. Double-click **`BUILD-SERVICE-REFRESH.cmd`**.
 4. When asked whether to reuse the saved setup, choose **Yes**, then explicitly **keep** the approved topic rules. Human-approved exact conversation mappings are retained with that saved setup. Independently keep, replace, or skip the other enhancements.
 5. Confirm the validation summary lists the expected approved rule count and exact semantic conversation-topic file.
@@ -234,7 +234,7 @@ In the Service builder, explicitly **keep** the saved approved topic rules; Ente
 |---|---|
 | **No saved Dataverse setup** | Complete the [guided Dataverse baseline](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements) once from this extracted package. |
 | **Python is not recognized** | Install [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add Python to PATH**, then reopen the launcher. |
-| `TUNE-TOPICS.cmd` is missing | Extract the complete corrected `ESS-039417f-optional-fixes-V23.zip`. Open the inner package folder if Windows created nested folders; do not download individual scripts. |
+| `TUNE-TOPICS.cmd` is missing | Extract the complete corrected `ESS-039417f-optional-fixes-V23.2.zip`. Open the inner package folder if Windows created nested folders; do not download individual scripts. |
 | A saved optional file is missing | Restore it, rerun guided setup to replace/skip it, or use the applicable tuner skip flag for registry, organization, credits, or feedback. Printed recovery commands retain skip flags. New approved topic rules replace the saved topic-rule selection. Other saved choices are not silently discarded. |
 | **STOP** with no rules | Keep the existing report. Collect better evidence only when a meaningful classification gap remains. |
 | Local model file is missing or fails its hash check | Extract the complete release ZIP again. Do not download individual scripts or model files. |
