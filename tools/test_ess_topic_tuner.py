@@ -291,7 +291,14 @@ class TopicTunerTests(unittest.TestCase):
         self.assertNotIn(tail.strip(), learned_rows[0]["Keywords"])
 
     def test_local_review_displays_complete_redacted_text_beyond_model_limit(self) -> None:
-        from ess_topic_tuner import build_semantic_review
+        from build_service_refresh_template import validate_conversation_topics
+        from ess_topic_tuner import (
+            SEMANTIC_REVIEW_COLUMNS,
+            build_semantic_review,
+            reviewed_semantic_topics,
+            write_csv,
+            write_semantic_review_files,
+        )
 
         rules = load_rules(
             Path(__file__).resolve().parents[1]
@@ -299,7 +306,11 @@ class TopicTunerTests(unittest.TestCase):
             / "topics-taxonomy.csv"
         )
         tail = " END_OF_REDACTED_EXAMPLE unrelated billing dispute"
-        prompt = "zorbex allowance " + ("ordinary background " * 260) + tail
+        prompt = (
+            "zorbex allowance "
+            + ("ordinary background " * 8000)
+            + tail
+        )
         args = Namespace(
             hash_salt="",
             semantic_provider="local",
@@ -346,10 +357,45 @@ class TopicTunerTests(unittest.TestCase):
                 rules,
                 args,
             )
-        review, _ = build_semantic_review(suggestions)
+        review, evidence = build_semantic_review(suggestions)
         self.assertEqual(len(sent[0]["text"]), 4000)
-        self.assertGreater(len(review[0]["Example1"]), 4000)
+        self.assertGreater(len(review[0]["Example1"]), 131_072)
         self.assertIn("END_OF_REDACTED_EXAMPLE", review[0]["Example1"])
+        review[0]["Enabled"] = "true"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            review_path = root / "semantic-topic-review.csv"
+            evidence_path = root / "semantic-review-evidence.json"
+            key_path = root / "semantic-review-integrity.key"
+            write_semantic_review_files(
+                review_path,
+                evidence_path,
+                key_path,
+                review,
+                evidence,
+            )
+            write_csv(review_path, review, SEMANTIC_REVIEW_COLUMNS)
+            previous_limit = csv.field_size_limit()
+            csv.field_size_limit(131_072)
+            try:
+                mappings = reviewed_semantic_topics(
+                    review_path,
+                    evidence_path,
+                    key_path,
+                    Path(__file__).resolve().parents[1]
+                    / "taxonomy"
+                    / "topics-taxonomy.csv",
+                )
+                self.assertEqual(csv.field_size_limit(), 131_072)
+                mapping_path = root / "semantic-conversation-topics.json"
+                mapping_path.write_text(
+                    json.dumps(mappings),
+                    encoding="utf-8",
+                )
+                validate_conversation_topics(mapping_path)
+                self.assertEqual(csv.field_size_limit(), 131_072)
+            finally:
+                csv.field_size_limit(previous_limit)
 
     def test_semantic_evidence_does_not_request_credentials_when_redaction_removes_every_message(self) -> None:
         args = Namespace(

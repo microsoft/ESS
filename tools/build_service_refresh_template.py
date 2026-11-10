@@ -13,6 +13,7 @@ import io
 import json
 import os
 import re
+import sys
 import tempfile
 import uuid
 import zipfile
@@ -569,21 +570,26 @@ def _validate_semantic_review_bundle(
     evidence_path = mapping_path.with_name("semantic-review-evidence.json")
     key_path = mapping_path.with_name("semantic-review-integrity.key")
     try:
-        with review_path.open(
-            "r",
-            encoding="utf-8-sig",
-            newline="",
-        ) as handle:
-            reader = csv.DictReader(handle)
-            if tuple(reader.fieldnames or ()) != SEMANTIC_REVIEW_COLUMNS:
-                raise ValueError("Semantic review columns are invalid.")
-            review_rows = [
-                {
-                    key: _spreadsheet_unescape(value)
-                    for key, value in row.items()
-                }
-                for row in reader
-            ]
+        previous_limit = csv.field_size_limit()
+        try:
+            csv.field_size_limit(sys.maxsize)
+            with review_path.open(
+                "r",
+                encoding="utf-8-sig",
+                newline="",
+            ) as handle:
+                reader = csv.DictReader(handle)
+                if tuple(reader.fieldnames or ()) != SEMANTIC_REVIEW_COLUMNS:
+                    raise ValueError("Semantic review columns are invalid.")
+                review_rows = [
+                    {
+                        key: _spreadsheet_unescape(value)
+                        for key, value in row.items()
+                    }
+                    for row in reader
+                ]
+        finally:
+            csv.field_size_limit(previous_limit)
         evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
         key = bytes.fromhex(key_path.read_text(encoding="ascii").strip())
     except (OSError, ValueError, json.JSONDecodeError) as error:

@@ -496,6 +496,16 @@ in
         self.assertIn("not List.AnyTrue(List.Transform(internalPrefixes", partition)
         self.assertIn('RuleSource = "Native"', partition)
         self.assertIn('then "Native"', partition)
+        native_noise = partition.split(
+            "NoiseExactTitles = {",
+            1,
+        )[1].split("},", 1)[0]
+        self.assertIn('"conversation start"', native_noise)
+        self.assertIn('"unknown intent"', native_noise)
+        self.assertNotIn(
+            "Conversation Start\" is intentionally NOT treated as noise",
+            partition,
+        )
         self.assertIn('rule[RuleOrigin] = "CustomerExplicit"', expressions["ClassifyTopic"])
         self.assertIn("RuleOrigin", expressions["CustomerTopicRules"])
 

@@ -585,6 +585,34 @@ def build_derived_block() -> str:
 """
 
 
+def replace_native_topic_selector(expression: str) -> str:
+    start_marker = "                NoiseExactTitles = {"
+    end_marker = "                },"
+    start = expression.find(start_marker)
+    end = expression.find(end_marker, start)
+    if start < 0 or end < 0:
+        raise ValueError("Could not locate the native topic noise selector")
+    end += len(end_marker)
+    replacement = """                NoiseExactTitles = {
+                    "conversation start", "logging", "greeting", "goodbye",
+                    "end of conversation", "start over", "escalate", "sign in",
+                    "signin", "reset conversation", "on error",
+                    "multiple topics matched", "fallback",
+                    "conversational boosting", "thumbs up", "thumbs down",
+                    "unknown intent", "unknownintent"
+                },"""
+    updated = expression[:start] + replacement + expression[end:]
+    outdated_note = (
+        '                // NOTE: "Conversation Start" is intentionally NOT treated as noise — per\n'
+        "                // product decision it should remain a real topic, not fall to No Topic Detected.\n"
+    )
+    updated = updated.replace(
+        outdated_note,
+        "                // Generic system states are excluded so a later authored business topic can remain authoritative.\n",
+    )
+    return updated
+
+
 def replace_derived_block(expression: str) -> str:
     start_markers = (
         "    // Derived-topic fallback:",
@@ -596,6 +624,12 @@ def replace_derived_block(expression: str) -> str:
     if start < 0 or end < 0:
         raise ValueError("Could not locate the derived-topic block")
     return expression[:start] + build_derived_block() + expression[end:]
+
+
+def patch_agent_expression(expression: str) -> str:
+    return replace_derived_block(
+        replace_native_topic_selector(expression)
+    )
 
 
 def set_expression(model: dict, name: str, value: str) -> None:
@@ -630,7 +664,7 @@ def patch_partition(model: dict) -> None:
     source = table["partitions"][0]["source"]
     original = source["expression"]
     text = "\n".join(original) if isinstance(original, list) else original
-    updated = replace_derived_block(text)
+    updated = patch_agent_expression(text)
     source["expression"] = updated.splitlines() if isinstance(original, list) else updated
 
     existing = {column["name"] for column in table.get("columns", [])}
@@ -826,7 +860,11 @@ def patch_pbit(source: Path, destination: Path, topic_rules: str, classifier: st
         )
         unapplied_raw = replace_query_text_raw(unapplied_raw, "TopicRules", lambda _: topic_rules)
         unapplied_raw = replace_query_text_raw(unapplied_raw, "ClassifyTopic", lambda _: classifier)
-        unapplied_raw = replace_query_text_raw(unapplied_raw, "Agent Performance", replace_derived_block)
+        unapplied_raw = replace_query_text_raw(
+            unapplied_raw,
+            "Agent Performance",
+            patch_agent_expression,
+        )
         json.loads(unapplied_raw)
         parts["UnappliedChanges"] = unapplied_raw.encode("utf-16-le")
 
