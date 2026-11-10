@@ -1,5 +1,6 @@
 import hashlib
 import json
+import subprocess
 import tempfile
 import unittest
 import zipfile
@@ -44,6 +45,38 @@ class BuildV23ReleasePackageTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        subprocess.run(["git", "init", "-q", str(source)], check=True)
+        subprocess.run(
+            ["git", "-C", str(source), "config", "user.name", "ESS QA"],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(source),
+                "config",
+                "user.email",
+                "ess-qa@example.com",
+            ],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(source), "add", "-A"],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(source),
+                "commit",
+                "-q",
+                "-m",
+                "fixture",
+            ],
+            check=True,
+        )
         return source, model
 
     def test_builds_model_complete_deterministic_zip(self):
@@ -76,11 +109,20 @@ class BuildV23ReleasePackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source, model = self.create_fixture(root)
-            (source / "semantic-conversation-topics.json").write_text(
-                "[]",
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(ValueError, "cannot enter"):
+            for relative in (
+                "semantic-conversation-topics.json",
+                "customer-topic-overrides.json",
+                "privacy-report.json",
+                "tenant-settings.json",
+                ".env",
+                ".pbi/cache.bin",
+                ".pbitemp/data.bin",
+                "diagnostics/refresh.log",
+            ):
+                path = source / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("synthetic-only", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "clean Git worktree"):
                 build_release(source, model, root / "release.zip")
 
 

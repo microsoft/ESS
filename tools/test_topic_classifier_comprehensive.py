@@ -454,6 +454,18 @@ in
             expressions["CustomerConversationTopics"].rstrip(),
             build_customer_conversation_topics().rstrip(),
         )
+        self.assertIn(
+            '[ProviderVersion] <> "ESS-SEMANTIC-HUMAN-REVIEW-V1"',
+            expressions["CustomerConversationTopics"],
+        )
+        self.assertIn(
+            "ReviewDigests{0} <> ApprovedDigest",
+            expressions["CustomerConversationTopics"],
+        )
+        self.assertEqual(
+            expressions["Approved Conversation Review Digest"],
+            "null",
+        )
         table = next(
             item
             for item in model["tables"]
@@ -475,6 +487,11 @@ in
         self.assertIn("IsBusinessNativeTopic", partition)
         self.assertIn("NormalizeNativeTopic", partition)
         self.assertIn("topicNormalized = NormalizeNativeTopic(topic)", partition)
+        self.assertIn(
+            'placeholders = {"no topic detected", "no user intent", "other uncategorized"}',
+            partition,
+        )
+        self.assertNotIn('"other / uncategorized"', partition)
         self.assertIn('internalPrefixes = {"[system]", "[internal]", "[admin]", "[debug]", "[test]"}', partition)
         self.assertIn("not List.AnyTrue(List.Transform(internalPrefixes", partition)
         self.assertIn('RuleSource = "Native"', partition)

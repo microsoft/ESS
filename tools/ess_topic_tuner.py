@@ -544,7 +544,21 @@ def parse_transcript_details(content: str) -> tuple[str, str, str, list[dict]]:
                         and is_learnable_native_topic(topic)
                     ):
                         training_examples[pending_example_index] = example
-    native_topic = next((topic for topic in native_topics if is_usable_native_topic(topic)), "")
+    native_topic = next(
+        (
+            topic
+            for topic in native_topics
+            if is_learnable_native_topic(topic)
+        ),
+        next(
+            (
+                topic
+                for topic in native_topics
+                if is_usable_native_topic(topic)
+            ),
+            "",
+        ),
+    )
     return prompt, locale, native_topic, training_examples
 
 
@@ -734,6 +748,7 @@ def classify_semantic_evidence(
                 "id": f"S{index:06d}",
                 "language": language if language != "*" else "unknown",
                 "text": redacted[:4000],
+                "review_text": redacted,
                 "record": record,
                 "conversation_hash": conversation_hash,
             }
@@ -818,7 +833,7 @@ def classify_semantic_evidence(
             suggestion_records.append(
                 {
                     "id": record.get("id"),
-                    "prompt": item["text"],
+                    "prompt": item["review_text"],
                     "locale": record.get("locale"),
                     "confidence": confidence,
                     "margin": float(result.get("margin") or 0),

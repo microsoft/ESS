@@ -68,6 +68,29 @@ def _git_files(source_root: Path) -> list[Path]:
         for key, value in os.environ.items()
         if not key.startswith("GIT_CONFIG_")
     }
+    status = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(source_root),
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    if status.returncode:
+        raise ValueError(
+            "Cannot inspect release source state: " + status.stderr.strip()
+        )
+    if status.stdout.strip():
+        raise ValueError(
+            "Release packaging requires a clean Git worktree. Commit or remove "
+            "all modified, staged, and untracked files first."
+        )
     completed = subprocess.run(
         [
             "git",
@@ -75,8 +98,6 @@ def _git_files(source_root: Path) -> list[Path]:
             str(source_root),
             "ls-files",
             "--cached",
-            "--others",
-            "--exclude-standard",
             "-z",
         ],
         check=False,
@@ -96,11 +117,9 @@ def _git_files(source_root: Path) -> list[Path]:
 
 
 def release_files(source_root: Path) -> list[Path]:
-    candidates = (
-        _git_files(source_root)
-        if (source_root / ".git").exists()
-        else list(source_root.rglob("*"))
-    )
+    if not (source_root / ".git").exists():
+        raise ValueError("Release packaging requires a Git working tree.")
+    candidates = _git_files(source_root)
     files = []
     for path in candidates:
         if not path.is_file():

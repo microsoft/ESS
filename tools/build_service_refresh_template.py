@@ -41,6 +41,7 @@ ORG_DATA_PARAMETER = "Org Data File"
 CREDITS_PARAMETER = "Agent Credits  (optional)"
 OVERRIDES_PARAMETER = "Customer Topic Overrides JSON (optional)"
 CONVERSATION_TOPICS_PARAMETER = "Customer Conversation Topics JSON (optional)"
+CONVERSATION_REVIEW_DIGEST = "Approved Conversation Review Digest"
 FEEDBACK_PARAMETER = "Feedback Events JSON (optional)"
 DISABLED_FILE_PARAMETERS = (
     ORG_DATA_PARAMETER,
@@ -1061,6 +1062,17 @@ def update_parameter_metadata(
         schema_expressions[name]["expression"] = (
             f"{m_text(value)} meta "
             '[IsParameterQuery=true, Type="Text", IsParameterQueryRequired=false]'
+        )
+    reviewed_digest = None
+    if conversation_topics_json is not None:
+        reviewed_rows = json.loads(conversation_topics_json)
+        if reviewed_rows:
+            reviewed_digest = reviewed_rows[0]["ReviewDigest"]
+    if CONVERSATION_REVIEW_DIGEST in schema_expressions:
+        schema_expressions[CONVERSATION_REVIEW_DIGEST]["expression"] = (
+            m_text(reviewed_digest)
+            if reviewed_digest is not None
+            else "null"
         )
 
     if mode in SERVICE_MODES:

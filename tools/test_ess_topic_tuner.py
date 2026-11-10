@@ -32,6 +32,48 @@ class TopicTunerTests(unittest.TestCase):
         self.assertFalse(is_learnable_native_topic("Conversational Boosting"))
         self.assertTrue(is_learnable_native_topic("Benefits Enrollment"))
 
+    def test_later_business_trace_outranks_earlier_generic_trace(self) -> None:
+        from ess_topic_tuner import parse_transcript_details
+
+        content = json.dumps(
+            {
+                "activities": [
+                    {
+                        "type": "trace",
+                        "valueType": "IntentRecognition",
+                        "value": {"intentTitle": "Conversation Start"},
+                    },
+                    {
+                        "type": "message",
+                        "from": {"role": "user"},
+                        "text": "medical plan benefits",
+                        "locale": "en-US",
+                    },
+                    {
+                        "type": "trace",
+                        "valueType": "IntentRecognition",
+                        "value": {"intentTitle": "Custom Payroll Topic"},
+                    },
+                ]
+            }
+        )
+        prompt, locale, native_topic, _ = parse_transcript_details(content)
+        self.assertEqual(native_topic, "Custom Payroll Topic")
+        result = classify_records(
+            [
+                {
+                    "id": "native-priority",
+                    "prompt": prompt,
+                    "locale": locale,
+                    "native_topic": native_topic,
+                }
+            ],
+            [],
+            "",
+        )[0][0]
+        self.assertEqual(result["Topic"], "Custom Payroll Topic")
+        self.assertEqual(result["Source"], "native")
+
     def test_unknown_locale_filters_common_multilingual_stopwords(self) -> None:
         terms = extract_terms(
             "What can you help me with for the fleet card para employee",
@@ -247,6 +289,67 @@ class TopicTunerTests(unittest.TestCase):
         )
         self.assertEqual(len(learned_rules), 1)
         self.assertNotIn(tail.strip(), learned_rows[0]["Keywords"])
+
+    def test_local_review_displays_complete_redacted_text_beyond_model_limit(self) -> None:
+        from ess_topic_tuner import build_semantic_review
+
+        rules = load_rules(
+            Path(__file__).resolve().parents[1]
+            / "taxonomy"
+            / "topics-taxonomy.csv"
+        )
+        tail = " END_OF_REDACTED_EXAMPLE unrelated billing dispute"
+        prompt = "zorbex allowance " + ("ordinary background " * 260) + tail
+        args = Namespace(
+            hash_salt="",
+            semantic_provider="local",
+            semantic_batch_size=20,
+            semantic_deployment="",
+            local_model_dir=Path("model"),
+            local_min_similarity=0.82,
+            local_min_margin=0.01,
+        )
+        sent = []
+
+        def classify(items, _catalog, _config):
+            sent.extend(items)
+            return [
+                {
+                    "id": item["id"],
+                    "topic": None,
+                    "vertical": "",
+                    "confidence": 0.9,
+                    "margin": 0.1,
+                    "candidates": [
+                        {
+                            "topic": "Benefits & Retirement",
+                            "vertical": "HR",
+                            "similarity": 0.9,
+                        }
+                    ],
+                }
+                for item in items
+            ]
+
+        with patch(
+            "ess_topic_tuner.classify_local_batch",
+            side_effect=classify,
+        ):
+            _, suggestions, _, _, _ = classify_semantic_evidence(
+                [
+                    {
+                        "id": "conversation-long",
+                        "prompt": prompt,
+                        "locale": "en-US",
+                    }
+                ],
+                rules,
+                args,
+            )
+        review, _ = build_semantic_review(suggestions)
+        self.assertEqual(len(sent[0]["text"]), 4000)
+        self.assertGreater(len(review[0]["Example1"]), 4000)
+        self.assertIn("END_OF_REDACTED_EXAMPLE", review[0]["Example1"])
 
     def test_semantic_evidence_does_not_request_credentials_when_redaction_removes_every_message(self) -> None:
         args = Namespace(

@@ -119,7 +119,7 @@ The complete corrected V23 ZIP contains these report artifacts:
 
 V22 and V21 are retained unchanged for comparison and rollback.
 
-**Validation:** 231 Python regression tests pass, with one expected skip when the optional standalone Power Query runtime is unavailable. The real bundled local ONNX model passed multilingual inference and hash validation, all 29 Python files pass a Python 3.10 grammar check, and offline builds cover the baseline, grouped semantic review, human-approved mappings, and eligible Desktop and Service enhancements. Authorized runtime QA previously completed clean Power BI Desktop and Service refreshes using the validated least-privilege roles. The optional Azure provider is not required for the local workflow and is not included in its release-readiness claim. See [`QA-V23.json`](./QA-V23.json) for provenance and validation evidence.
+**Validation:** 233 Python regression tests pass, with one expected skip when the optional standalone Power Query runtime is unavailable. The real bundled local ONNX model passed multilingual inference and hash validation, all 29 Python files pass a Python 3.10 grammar check, and offline builds cover the baseline, grouped semantic review, human-approved mappings, and eligible Desktop and Service enhancements. Authorized runtime QA previously completed clean Power BI Desktop and Service refreshes using the validated least-privilege roles. The optional Azure provider is not required for the local workflow and is not included in its release-readiness claim. See [`QA-V23.json`](./QA-V23.json) for provenance and validation evidence.
 
 ## Before collecting data
 

@@ -27,6 +27,7 @@ OVERRIDES_QUERY_LINEAGE = str(
 )
 CONVERSATION_OVERRIDES_PARAMETER = "Customer Conversation Topics JSON (optional)"
 CONVERSATION_OVERRIDES_QUERY = "CustomerConversationTopics"
+CONVERSATION_REVIEW_DIGEST = "Approved Conversation Review Digest"
 CONVERSATION_OVERRIDES_PARAMETER_LINEAGE = str(
     uuid.uuid5(
         uuid.NAMESPACE_URL,
@@ -37,6 +38,12 @@ CONVERSATION_OVERRIDES_QUERY_LINEAGE = str(
     uuid.uuid5(
         uuid.NAMESPACE_URL,
         "https://github.com/microsoft/ESS/queries/customer-conversation-topics",
+    )
+)
+CONVERSATION_REVIEW_DIGEST_LINEAGE = str(
+    uuid.uuid5(
+        uuid.NAMESPACE_URL,
+        "https://github.com/microsoft/ESS/queries/approved-conversation-review-digest",
     )
 )
 OVERRIDES_PARAMETER_EXPRESSION = (
@@ -265,6 +272,9 @@ def build_customer_conversation_topics() -> str:
     ),
     RawValue = try Text.From(#"{CONVERSATION_OVERRIDES_PARAMETER}") otherwise "",
     RawText = if RawValue = null then "" else Text.Trim(RawValue),
+    ApprovedDigest =
+        try Text.Lower(Text.Trim(Text.From(#"{CONVERSATION_REVIEW_DIGEST}")))
+        otherwise "",
     Parsed =
         if RawText = "" then {{}}
         else try Json.Document(Text.ToBinary(RawText, TextEncoding.Utf8))
@@ -310,18 +320,36 @@ def build_customer_conversation_topics() -> str:
           or [Vertical] = null or Text.Trim([Vertical]) = ""
           or [CanonicalTopic] = null or Text.Trim([CanonicalTopic]) = ""
           or [Confidence] = null or [Confidence] < 0 or [Confidence] > 1
-          or [ProviderVersion] = null or Text.Trim([ProviderVersion]) = ""
-          or [ReviewDigest] = null or Text.Length(Text.Trim([ReviewDigest])) <> 64
+          or [ProviderVersion] <> "ESS-SEMANTIC-HUMAN-REVIEW-V1"
+          or [ReviewDigest] = null
+          or Text.Length(Text.Trim([ReviewDigest])) <> 64
+          or Text.Length(
+              Text.Select(
+                  Text.Lower(Text.Trim([ReviewDigest])),
+                  {{"0".."9"}} & {{"a".."f"}}
+              )
+          ) <> 64
     ),
     DuplicateIds = Table.SelectRows(
         Table.Group(Normalized, {{"ConversationTranscriptId"}}, {{{{"Count", Table.RowCount, Int64.Type}}}}),
         each [Count] > 1
+    ),
+    ReviewDigests = List.Distinct(
+        List.Transform(
+            Normalized[ReviewDigest],
+            each if _ = null then "" else Text.Lower(Text.Trim(_))
+        )
     ),
     Validated =
         if Table.RowCount(Invalid) > 0 then
             error "Customer Conversation Topics contains an invalid semantic classification."
         else if Table.RowCount(DuplicateIds) > 0 then
             error "Customer Conversation Topics contains duplicate conversation IDs."
+        else if Table.RowCount(Normalized) > 0
+             and (ApprovedDigest = ""
+                  or List.Count(ReviewDigests) <> 1
+                  or ReviewDigests{{0}} <> ApprovedDigest) then
+            error "Customer Conversation Topics does not match the approved review digest embedded by the guided builder."
         else Normalized,
     Mapping = Record.FromList(
         List.Transform(
@@ -481,7 +509,7 @@ def build_derived_block() -> str:
             topic = if value = null then "" else Text.Trim(Text.From(value)),
             topicLower = Text.Lower(topic),
             topicNormalized = NormalizeNativeTopic(topic),
-            placeholders = {{"no topic detected", "no user intent", "other / uncategorized"}},
+            placeholders = {{"no topic detected", "no user intent", "other uncategorized"}},
             internalPrefixes = {{"[system]", "[internal]", "[admin]", "[debug]", "[test]"}},
             internalNames = {{
                 "conversation start", "conversational boosting", "end of conversation",
@@ -668,6 +696,17 @@ def patch_pbit(source: Path, destination: Path, topic_rules: str, classifier: st
     upsert_expression(
         model,
         {
+            "name": CONVERSATION_REVIEW_DIGEST,
+            "kind": "m",
+            "expression": "null",
+            "lineageTag": CONVERSATION_REVIEW_DIGEST_LINEAGE,
+            "annotations": [{"name": "PBI_ResultType", "value": "Text"}],
+        },
+        "TopicRules",
+    )
+    upsert_expression(
+        model,
+        {
             "name": CONVERSATION_OVERRIDES_PARAMETER,
             "description": CONVERSATION_OVERRIDES_PARAMETER_DESCRIPTION,
             "kind": "m",
@@ -725,6 +764,17 @@ def patch_pbit(source: Path, destination: Path, topic_rules: str, classifier: st
         unapplied_raw = insert_query_raw(
             unapplied_raw,
             {
+                "name": CONVERSATION_REVIEW_DIGEST,
+                "lineageTag": CONVERSATION_REVIEW_DIGEST_LINEAGE,
+                "text": ["null"],
+                "loadAsTableDisabled": True,
+                "resultType": "Text",
+                "isHidden": True,
+            },
+        )
+        unapplied_raw = insert_query_raw(
+            unapplied_raw,
+            {
                 "name": CONVERSATION_OVERRIDES_PARAMETER,
                 "lineageTag": CONVERSATION_OVERRIDES_PARAMETER_LINEAGE,
                 "description": CONVERSATION_OVERRIDES_PARAMETER_DESCRIPTION,
@@ -759,6 +809,11 @@ def patch_pbit(source: Path, destination: Path, topic_rules: str, classifier: st
         )
         unapplied_raw = replace_query_text_raw(unapplied_raw, OVERRIDES_PARAMETER, lambda _: OVERRIDES_PARAMETER_EXPRESSION)
         unapplied_raw = replace_query_text_raw(unapplied_raw, OVERRIDES_QUERY, lambda _: customer_topic_rules)
+        unapplied_raw = replace_query_text_raw(
+            unapplied_raw,
+            CONVERSATION_REVIEW_DIGEST,
+            lambda _: "null",
+        )
         unapplied_raw = replace_query_text_raw(
             unapplied_raw,
             CONVERSATION_OVERRIDES_PARAMETER,

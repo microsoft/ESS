@@ -70,6 +70,10 @@ def assert_customer_neutral_parameters(test_case: unittest.TestCase, schema: dic
     test_case.assertEqual(parameters, DIRECT_PARAMETER_DEFAULTS)
     test_case.assertEqual(expressions["Agent Scope Mode"], '"All Agents"')
     test_case.assertEqual(expressions["Agent Registry JSON"], "null")
+    test_case.assertEqual(
+        expressions["Approved Conversation Review Digest"],
+        "null",
+    )
     feedback = next(
         item
         for item in schema["model"]["expressions"]
@@ -213,6 +217,7 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 ],
             )
             serialized, _ = validate_conversation_topics(source)
+            review_digest = json.loads(serialized)[0]["ReviewDigest"]
             output = root / "semantic-topics.pbit"
             build_package(
                 SOURCE,
@@ -235,6 +240,10 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
             self.assertIn("conversation-1", embedded)
             self.assertIn("Benefits & Retirement", embedded)
             self.assertNotIn("FirstUserMessage", embedded)
+            self.assertEqual(
+                expressions["Approved Conversation Review Digest"],
+                json.dumps(review_digest),
+            )
 
     def test_strips_placeholder_urls_from_packaged_metadata(self):
         value = {

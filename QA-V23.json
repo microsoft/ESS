@@ -1,6 +1,6 @@
 {
   "packageVersion": "V23",
-  "releaseStatus": "V23 local grouped semantic review candidate; GitHub publication pending user approval",
+  "releaseStatus": "V23 local grouped semantic review candidate; second validation defects fixed; GitHub publication pending user approval",
   "baseline": {
     "repository": "microsoft/ESS",
     "commit": "79ca039a66afdfc3c9ed8428aaaad26341bf8a05",
@@ -17,7 +17,7 @@
     "default": "ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit",
     "baseSource": "ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit",
     "baseByteIdentical": false,
-    "sha256": "A9E9683302FB0407EA5215DA1D074A4A5D0BE13BD986100090CDA6FCE535E457",
+    "sha256": "7AB7E65F13AC45F9D3D41A7ABAFC492AFF6E4F01F2001FE805DC3E9F3DC86219",
     "archiveEntries": 349,
     "retainedVersions": [
       "V22",
@@ -47,7 +47,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "FBD966AF4D1CA05EF7B25D776D068AB4E95F87E6B0116C67B187F71C0AC2F235"
+      "sha256": "75DED6CDA1B13FCEA1B70FAB3C9F5CCEC5C867BC9457E5E4C79D16E1471B5CFE"
     },
     {
       "path": "SETUP-CSV-Download.md",
@@ -63,11 +63,11 @@
     },
     {
       "path": "tools\\build_service_refresh_template.py",
-      "sha256": "F3D6C16457DF135F6C99EDC4F2E46E50DD09AF549323D27D53783F301FB21B40"
+      "sha256": "BC24C91143A0747C4A1C7B0E8BDB5B78600B93ECCE1D9BDAC3D69F1F32D1D011"
     },
     {
       "path": "tools\\ess_topic_tuner.py",
-      "sha256": "DF4FCB02E273A5F449164DDC0A02BFE59772397427B8D84B2CF665803EB1E659"
+      "sha256": "524832353E6A4AB30EAB1E8A0FE6705D31D784BBB0F978C26271C97A7AA34121"
     },
     {
       "path": "tools\\guided_dataverse_setup.py",
@@ -75,7 +75,7 @@
     },
     {
       "path": "tools\\test_build_service_refresh_template.py",
-      "sha256": "A7088AB1FCE3AA77BF154D5D47AB2B0DCD95D098E166CD5238310D5D00F1C869"
+      "sha256": "8621F0EC9AEA489FCE25677ABB388D85CE989C5A984A784122AC525D57075CC1"
     },
     {
       "path": "tools\\test_ess_agent_registry.py",
@@ -83,7 +83,7 @@
     },
     {
       "path": "tools\\test_ess_topic_tuner.py",
-      "sha256": "780CCF7D8B69F2B2CB62CD5CE71ED7D9DAF5DC48AA9F7EC052BB10606DFC1DAC"
+      "sha256": "5751BF6055AF674B659DEF8C1C2FF9152BCECCAAF8BBB90F019A00887DF74293"
     },
     {
       "path": "tools\\test_guided_dataverse_setup.py",
@@ -91,7 +91,7 @@
     },
     {
       "path": "tools\\test_topic_classifier_comprehensive.py",
-      "sha256": "6F7F4BB7BA14F3FF60149C09CD932408E9529749C6E4FAC328DDFE0CC6703DA6"
+      "sha256": "8F144475B44B45E072312A42F19149346CADAD1422107A15773F3933E74BD1FC"
     },
     {
       "path": "tools\\test_template_packages.py",
@@ -103,7 +103,7 @@
     },
     {
       "path": "tools\\update_topic_classifier.py",
-      "sha256": "874411B7FEA66A52C18FD480FE2B94FFED431B2FACA4FF12291A56AC7C12511D"
+      "sha256": "0C8AB5D4A74107375B27397C0E773F52142AB74F3B4E22039B2CF29FC2348F7D"
     },
     {
       "path": "TOPIC-TUNER.md",
@@ -134,7 +134,7 @@
     },
     {
       "path": "tools\\build_v23_release_package.py",
-      "sha256": "F4F38BA872AACA1F4760E8C3EAD293030ECBF2894F8DA4FA0727BF1B126644AE"
+      "sha256": "3E8DF0CA921295F95B2B345441C7E37D76081062611830788A909F4A7CC53535"
     },
     {
       "path": "tools\\local_semantic_topic_classifier.py",
@@ -150,7 +150,7 @@
     },
     {
       "path": "tools\\test_build_v23_release_package.py",
-      "sha256": "19E00F1F154F046A15DDDB4CABC3C532BD079B716FA6A84B96FCB515D16B773B"
+      "sha256": "06E3C09B86FDCDC7900A55ACC0C0C83F89EF47D43DD616BCF61555159D857A66"
     },
     {
       "path": "tools\\test_local_semantic_topic_classifier.py",
@@ -166,7 +166,7 @@
       "baselineCommit": "79ca039a66afdfc3c9ed8428aaaad26341bf8a05",
       "packageVersion": "V23",
       "phase": "local-grouped-semantic-review-and-release-package-validation",
-      "testsRun": 231,
+      "testsRun": 233,
       "failures": 0,
       "errors": 0,
       "skipped": 1,
@@ -240,9 +240,14 @@
       "humanApprovalRequired": true,
       "maximumConversationsPerReviewGroup": 10,
       "allGroupedExamplesDisplayed": true,
+      "completeRedactedExamplesDisplayedBeyondModelInputLimit": true,
       "reviewIntegrityBoundToConversationIds": true,
+      "powerQueryRequiresInternalApprovedReviewDigest": true,
       "csvFormulaInjectionNeutralized": true,
-      "powerBiModelCalls": 0
+      "powerBiModelCalls": 0,
+      "laterBusinessNativeTopicOutranksEarlierGenericTrace": true,
+      "pythonPowerQueryPlaceholderParity": true,
+      "releasePackagingRequiresCleanTrackedGitInventory": true
     },
     "optionalAzureProvider": {
       "contractTestsPassed": true,
