@@ -14,6 +14,7 @@ from build_service_refresh_template import (
     normalize_org_data_url,
     serialize_registry,
     strip_packaged_placeholder_examples,
+    validate_conversation_topics,
     validate_credits,
     validate_feedback_events,
     validate_org_data,
@@ -38,6 +39,10 @@ DIRECT_PARAMETER_DEFAULTS = {
         'IsParameterQueryRequired=false]'
     ),
     "Customer Topic Overrides JSON (optional)": (
+        'null meta [IsParameterQuery=true, Type="Text", '
+        'IsParameterQueryRequired=false]'
+    ),
+    "Customer Conversation Topics JSON (optional)": (
         'null meta [IsParameterQuery=true, Type="Text", '
         'IsParameterQueryRequired=false]'
     ),
@@ -75,6 +80,162 @@ def assert_customer_neutral_parameters(test_case: unittest.TestCase, schema: dic
 
 
 class ServiceRefreshTemplateTests(unittest.TestCase):
+    def create_reviewed_topics(
+        self,
+        root: Path,
+        decisions: list[tuple[str, str, str]],
+    ) -> Path:
+        from ess_topic_tuner import (
+            build_semantic_review,
+            reviewed_semantic_topics,
+            write_semantic_review_files,
+        )
+
+        review_rows, evidence_rows = build_semantic_review(
+            [
+                {
+                    "id": conversation_id,
+                    "prompt": f"reviewed example {index}",
+                    "locale": "en-US",
+                    "confidence": 0.9,
+                    "margin": 0.1,
+                    "candidates": [
+                        {
+                            "vertical": vertical,
+                            "topic": topic,
+                            "similarity": 0.9,
+                        }
+                    ],
+                }
+                for index, (conversation_id, vertical, topic) in enumerate(
+                    decisions
+                )
+            ]
+        )
+        decision_by_id = {
+            conversation_id.lower(): (vertical, topic)
+            for conversation_id, vertical, topic in decisions
+        }
+        for row, evidence in zip(review_rows, evidence_rows):
+            conversation_id = evidence["Conversations"][0][
+                "ConversationTranscriptId"
+            ]
+            vertical, topic = decision_by_id[conversation_id]
+            row["Enabled"] = "true"
+            row["DecisionVertical"] = vertical
+            row["DecisionTopic"] = topic
+        review = root / "semantic-topic-review.csv"
+        evidence = root / "semantic-review-evidence.json"
+        key = root / "semantic-review-integrity.key"
+        write_semantic_review_files(
+            review,
+            evidence,
+            key,
+            review_rows,
+            evidence_rows,
+        )
+        mappings = reviewed_semantic_topics(
+            review,
+            evidence,
+            key,
+            ROOT / "taxonomy" / "topics-taxonomy.csv",
+        )
+        path = root / "semantic-conversation-topics.json"
+        path.write_text(json.dumps(mappings), encoding="utf-8")
+        return path
+
+    def test_conversation_topic_validation_is_closed_and_prompt_free(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = self.create_reviewed_topics(
+                root,
+                [
+                    (
+                        "Conversation-2",
+                        "HR",
+                        "Benefits & Retirement",
+                    ),
+                    (
+                        "conversation-1",
+                        "IT",
+                        "Device & Hardware",
+                    ),
+                ],
+            )
+            serialized, audit = validate_conversation_topics(path)
+            rows = json.loads(serialized)
+            self.assertEqual(
+                [row["ConversationTranscriptId"] for row in rows],
+                ["conversation-1", "conversation-2"],
+            )
+            self.assertEqual(audit["classifiedConversations"], 2)
+            valid = json.loads(path.read_text(encoding="utf-8"))
+
+            for invalid, message in (
+                ([{**valid[0], "Prompt": "must not be embedded"}], "exactly"),
+                ([valid[0], {**valid[0]}], "duplicate"),
+                (
+                    [
+                        {
+                            **valid[0],
+                            "CanonicalTopic": "Invented Topic",
+                        }
+                    ],
+                    "outside",
+                ),
+                (
+                    [
+                        {
+                            **valid[0],
+                            "ProviderVersion": (
+                                "ESS-SEMANTIC-LOCAL-E5-ONNX-V1"
+                            ),
+                        }
+                    ],
+                    "ProviderVersion",
+                ),
+            ):
+                path.write_text(json.dumps(invalid), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, message):
+                    validate_conversation_topics(path)
+
+    def test_embeds_exact_semantic_conversation_topics(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = self.create_reviewed_topics(
+                root,
+                [
+                    (
+                        "conversation-1",
+                        "HR",
+                        "Benefits & Retirement",
+                    )
+                ],
+            )
+            serialized, _ = validate_conversation_topics(source)
+            output = root / "semantic-topics.pbit"
+            build_package(
+                SOURCE,
+                output,
+                "https://orgexample.crm.dynamics.com",
+                mode="desktop-validation",
+                conversation_topics_json=serialized,
+            )
+            with zipfile.ZipFile(output) as package:
+                schema = json.loads(
+                    package.read("DataModelSchema").decode("utf-16-le")
+                )
+            expressions = {
+                item["name"]: item["expression"]
+                for item in schema["model"]["expressions"]
+            }
+            embedded = expressions[
+                "Customer Conversation Topics JSON (optional)"
+            ]
+            self.assertIn("conversation-1", embedded)
+            self.assertIn("Benefits & Retirement", embedded)
+            self.assertNotIn("FirstUserMessage", embedded)
+
     def test_strips_placeholder_urls_from_packaged_metadata(self):
         value = {
             "description": (
@@ -107,6 +268,28 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 raw, _ = validate_topic_overrides(path, canonicalize=False)
                 self.assertEqual(json.loads(raw), original)
                 self.assertEqual(path.read_bytes(), preserved)
+
+    def test_topic_rule_validation_rejects_unknown_rule_origin(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "rules.json"
+            path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "Locale": "en",
+                            "Vertical": "Customer",
+                            "CanonicalTopic": "Enrollment",
+                            "Keywords": "device enrollment",
+                            "Exclusions": "",
+                            "Priority": 120,
+                            "RuleOrigin": "UntrustedOrigin",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "invalid RuleOrigin"):
+                validate_topic_overrides(path)
 
     def test_accepts_supported_dataverse_clouds(self):
         valid_urls = (
@@ -208,6 +391,7 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 "Dataverse Environment URL (required)",
                 "Transcript Lookback Days (defaults to 90 days if left blank)",
                 "Customer Topic Overrides JSON (optional)",
+                "Customer Conversation Topics JSON (optional)",
                 "Feedback Events JSON (optional)",
             },
         )
@@ -441,10 +625,16 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
     def test_checked_in_direct_publish_template_is_service_safe(self):
         self.assertTrue(DIRECT_SERVICE.is_file())
         if (ROOT / ".git").exists():
+            git_environment = {
+                key: value
+                for key, value in os.environ.items()
+                if not key.startswith("GIT_CONFIG_")
+            }
             direct_ignore = subprocess.run(
                 ["git", "check-ignore", "--no-index", "-q", "--", DIRECT_SERVICE.name],
                 cwd=ROOT,
                 check=False,
+                env=git_environment,
             )
             self.assertEqual(direct_ignore.returncode, 1)
             for version in ("V21", "V22", "V23"):
@@ -460,6 +650,7 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                     ],
                     cwd=ROOT,
                     check=False,
+                    env=git_environment,
                 )
                 self.assertEqual(customer_ignore.returncode, 0, version)
         with zipfile.ZipFile(DIRECT_SERVICE) as package:

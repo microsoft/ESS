@@ -14,6 +14,7 @@ from topic_classifier import SEPARATOR_CHARACTERS, SEPARATOR_UNICODE_VERSION, cl
 from update_fabric_topic_classifier import build_stage_one, read_taxonomy
 from update_topic_classifier import (
     build_classifier,
+    build_customer_conversation_topics,
     build_customer_topic_rules,
     build_derived_block,
     build_normalization,
@@ -25,11 +26,11 @@ from update_topic_classifier import (
 
 ROOT = Path(__file__).resolve().parents[1]
 TAXONOMY = ROOT / "taxonomy" / "topics-taxonomy.csv"
-DIRECT_SERVICE = (
+V23_SERVICE = (
     ROOT
-    / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
+    / "ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit"
 )
-SOURCE = DIRECT_SERVICE
+SOURCE = V23_SERVICE
 LOCALES = {"*": "en-US", "es": "es-MX", "zh": "zh-CN"}
 
 
@@ -299,7 +300,7 @@ in
         ]
         result = classify("shared", "en-US", synthetic)
         self.assertEqual(result["topic"], "Higher Priority")
-        self.assertEqual(result["version"], "ESS-TOPICS-2026.10+CUSTOMER")
+        self.assertEqual(result["version"], "ESS-TOPICS-2026.11+CUSTOMER")
 
         same_priority = [dict(item, Priority=20) for item in synthetic]
         result = classify("shared", "en-US", same_priority)
@@ -449,6 +450,10 @@ in
             expressions["CustomerTopicRules"].rstrip(),
             build_customer_topic_rules().rstrip(),
         )
+        self.assertEqual(
+            expressions["CustomerConversationTopics"].rstrip(),
+            build_customer_conversation_topics().rstrip(),
+        )
         table = next(
             item
             for item in model["tables"]
@@ -459,11 +464,23 @@ in
         )
         self.assertIn(build_derived_block(), partition)
         self.assertIn(
-            "then ClassifyTopic([FirstUserMessage], [Locale])",
+            "else ClassifyTopic([FirstUserMessage], [Locale])",
             partition,
         )
+        self.assertIn(
+            "Record.Field(CustomerConversationTopics, conversationKey)",
+            partition,
+        )
+        self.assertIn('RuleSource = "Semantic"', partition)
+        self.assertIn("IsBusinessNativeTopic", partition)
+        self.assertIn("NormalizeNativeTopic", partition)
+        self.assertIn("topicNormalized = NormalizeNativeTopic(topic)", partition)
+        self.assertIn('internalPrefixes = {"[system]", "[internal]", "[admin]", "[debug]", "[test]"}', partition)
+        self.assertIn("not List.AnyTrue(List.Transform(internalPrefixes", partition)
         self.assertIn('RuleSource = "Native"', partition)
         self.assertIn('then "Native"', partition)
+        self.assertIn('rule[RuleOrigin] = "CustomerExplicit"', expressions["ClassifyTopic"])
+        self.assertIn("RuleOrigin", expressions["CustomerTopicRules"])
 
     def test_service_refresh_build_preserves_classifier_cleanly(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -495,7 +512,7 @@ in
             )
 
     def test_checked_in_direct_service_pbit_contains_current_classifier(self):
-        with zipfile.ZipFile(DIRECT_SERVICE) as package:
+        with zipfile.ZipFile(V23_SERVICE) as package:
             self.assertIsNone(package.testzip())
             model = json.loads(
                 package.read("DataModelSchema").decode("utf-16-le")

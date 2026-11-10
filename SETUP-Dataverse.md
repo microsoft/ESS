@@ -1,7 +1,7 @@
 # Dataverse Direct setup
 
 > [!IMPORTANT]
-> These instructions require the complete validated V23 package. [Download `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.1/ESS-039417f-optional-fixes-V23.zip), select **Extract All**, and keep the folder structure intact. Do not download or run an individual `.cmd`, `.py`, or `.pbit` file from GitHub. Python remains **3.10 or later**.
+> These instructions require the complete validated V23 package. [Download `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip), select **Extract All**, and keep the folder structure intact. Do not download or run an individual `.cmd`, `.py`, or `.pbit` file from GitHub. Python remains **3.10 or later**.
 
 This is the recommended path for ongoing production reporting from one supported Dataverse environment. Allow about **15-25 minutes** for the first setup when transcripts already exist. Newly generated conversations may require approximately **30 minutes of inactivity** before they appear in Dataverse.
 
@@ -11,7 +11,7 @@ Dataverse Direct reads the `ConversationTranscript` table through the Dataverse 
 
 Complete these prerequisites in order:
 
-1. **Download and extract the complete package.** Use the [V23 release ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23.1/ESS-039417f-optional-fixes-V23.zip), select **Extract All**, and open the extracted `ESS-039417f-optional-fixes-V23` folder. Do not run files from the compressed ZIP.
+1. **Download and extract the complete package.** Use the [V23 release ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip), select **Extract All**, and open the extracted `ESS-039417f-optional-fixes-V23` folder. Do not run files from the compressed ZIP.
 2. **Prepare the report account.** In [Power Platform admin center](https://admin.powerplatform.microsoft.com), open **Manage -> Environments -> select the agent environment -> Settings -> Users + permissions -> Users -> select the account -> Manage security roles**. Assign:
    - **Bot Transcript Viewer**
    - **ESS Power BI Transcript Reader**
@@ -54,7 +54,7 @@ Download the complete ESS package. It includes the command launchers and their P
 
 Use the complete ZIP so these scripts have all required templates and supporting files; no separate repository navigation or individual script download is required.
 
-1. [Download the complete `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.1/ESS-039417f-optional-fixes-V23.zip).
+1. [Download the complete `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip).
 2. Select **Extract All**. Do not run the files from inside the ZIP.
 3. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
 4. Open the extracted `ESS-039417f-optional-fixes-V23` folder.
@@ -67,7 +67,7 @@ Use the complete ZIP so these scripts have all required templates and supporting
 
 | Need | Data or input | Portal and retrieval steps | Required role | Included helper | Expected file or output |
 |---|---|---|---|---|---|
-| Live conversations | Dataverse Environment URL | [Power Apps](https://make.powerapps.com) -> select environment -> **Developer resources -> Environment URL** | Bot Transcript Viewer plus ESS Power BI Transcript Reader; equivalent custom access requires organization-level Read on `conversationtranscript` and `systemuser` | [Download the complete V23 ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23.1/ESS-039417f-optional-fixes-V23.zip) | URL without a trailing slash, such as `https://org.crm.dynamics.com` |
+| Live conversations | Dataverse Environment URL | [Power Apps](https://make.powerapps.com) -> select environment -> **Developer resources -> Environment URL** | Bot Transcript Viewer plus ESS Power BI Transcript Reader; equivalent custom access requires organization-level Read on `conversationtranscript` and `systemuser` | [Download the complete V23 ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip) | URL without a trailing slash, such as `https://org.crm.dynamics.com` |
 
 ### Optional data for full report functionality
 
@@ -79,7 +79,7 @@ Load only the data needed for the report areas you intend to use. The transcript
 | Organization | User roster CSV; direct SharePoint/OneDrive URL for Service refresh | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Users -> Active users -> Export users**, or approved HR/Viva Insights/Graph source | Global Reader, User Administrator, or Global Administrator for Microsoft 365 export; read access to the hosted CSV | [Guided setup included in the complete ESS ZIP](#i-need-organization-data-or-other-optional-enhancements) | Adds department, country, job title, and display-name segmentation across report pages. |
 | Copilot Credits | User-Level Credit Consumption | [Power Platform admin center](https://admin.powerplatform.microsoft.com) -> **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator recommended; tenant administrator or Dynamics 365 Administrator also works | [Guided setup included in the complete ESS ZIP](#i-need-organization-data-or-other-optional-enhancements) | Adds observed credit totals and modeled cost/value measures to **Executive Summary** and **Business Impact**. |
 | Cross-channel feedback | Raw Product Feedback or Monitor export; agent registry only for Product Feedback | [Microsoft 365 admin center](https://admin.microsoft.com) -> **Health -> Product feedback -> Export to CSV** | Microsoft 365 administrator or reader with Product Feedback access | [Guided setup included in the complete ESS ZIP](#i-need-organization-data-or-other-optional-enhancements); see the [feedback guide](./FEEDBACK-INGESTION.md) | Adds Microsoft 365 Copilot and Monitor reactions to **Agent Feedback**; Monitor rows with exact Conversation IDs do not require a registry. Transcript-native reactions already work without this file. |
-| Customer-specific topics | Representative transcript evidence, used only when built-in topics need improvement | [Review when to use or skip it](./TOPIC-TUNER.md) | Transcript read access; no extra cloud role | [Optional topic tuner](./TOPIC-TUNER.md) | Improves classification of recurring customer language in **Conversation Details**, **Improvement Opportunities**, and **Adjust Topic Assumptions**. Skip when native and built-in topics already provide adequate coverage. |
+| Customer-specific topics | Representative transcript evidence, used only when meaningful native and built-in topics need improvement | [Review when to use or skip it](./TOPIC-TUNER.md) | Transcript read access and local permission to process the export; no Azure resource is required | [Local hybrid topic tuner](./TOPIC-TUNER.md) | Groups and prefills local review suggestions; human-approved decisions become prompt-free exact mappings. Power BI refresh never loads or calls a model. |
 
 ## Action 1 - Prepare access and copy the URL
 
@@ -150,7 +150,7 @@ Microsoft 365 Product Feedback needs an approved agent registry. If it is missin
 
 The complete V23 ZIP contains both command launchers and the Python scripts they run. Keep the templates and supporting modules together.
 
-1. [Download the complete `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.1/ESS-039417f-optional-fixes-V23.zip).
+1. [Download the complete `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip).
 2. Select **Extract All**, keep the extracted folder structure intact, and do not run the files from inside the ZIP.
 3. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/).
 4. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
@@ -306,10 +306,11 @@ The same feedback picker also accepts an already prepared `feedback-events.json`
 
 1. Follow [Customer-specific topic tuning](./TOPIC-TUNER.md).
 2. Double-click `TUNE-TOPICS.cmd` and select the representative transcript export.
-3. Follow the tool's **READY**, **REVIEW REQUIRED**, or **STOP** guidance.
-4. Validate the generated **Desktop Validation - Topics - LOCAL ONLY** report.
+3. The bundled local semantic provider runs automatically for unresolved messages. It keeps transcript text on the device; Azure is optional and is never required.
+4. Follow the tool's **READY**, **REVIEW REQUIRED**, or **STOP** guidance.
+5. Validate the generated **Desktop Validation - Topics - LOCAL ONLY** report.
 
-Native Copilot Studio topics remain authoritative. Uncertain rules remain disabled or unassigned.
+Meaningful native Copilot Studio business topics remain authoritative. Generic system topics fall through to exact local semantic mappings and shared deterministic rules. Uncertain messages remain unassigned, and Power BI refresh never loads or calls a model.
 
 ## Action 3 - Publish the Service report
 

@@ -8,6 +8,7 @@ import base64
 import csv
 import gzip
 import hashlib
+import hmac
 import io
 import json
 import os
@@ -23,6 +24,7 @@ from agent_registry import load_registry
 from topic_classifier import canonical_terms, rule_locale
 
 
+ROOT = Path(__file__).resolve().parents[1]
 M_TYPE_BY_TABULAR_TYPE = {
     "string": "nullable text",
     "dateTime": "nullable datetime",
@@ -38,6 +40,7 @@ REGISTRY_EXPRESSION = "Agent Registry JSON"
 ORG_DATA_PARAMETER = "Org Data File"
 CREDITS_PARAMETER = "Agent Credits  (optional)"
 OVERRIDES_PARAMETER = "Customer Topic Overrides JSON (optional)"
+CONVERSATION_TOPICS_PARAMETER = "Customer Conversation Topics JSON (optional)"
 FEEDBACK_PARAMETER = "Feedback Events JSON (optional)"
 DISABLED_FILE_PARAMETERS = (
     ORG_DATA_PARAMETER,
@@ -53,6 +56,41 @@ TOPIC_RULE_COLUMNS = (
     "Exclusions",
     "Priority",
 )
+TOPIC_RULE_ORIGINS = {
+    "CustomerExplicit",
+    "CustomerSaved",
+    "NativeLearned",
+    "SemanticLearned",
+}
+CONVERSATION_TOPIC_COLUMNS = (
+    "ConversationTranscriptId",
+    "Vertical",
+    "CanonicalTopic",
+    "Confidence",
+    "ProviderVersion",
+    "ReviewDigest",
+)
+SEMANTIC_REVIEW_COLUMNS = (
+    "ReviewGroup",
+    "Enabled",
+    "Locale",
+    "SupportingConversations",
+    "SuggestedVertical",
+    "SuggestedTopic",
+    "AlternativeTopics",
+    "MinimumSimilarity",
+    "MinimumMargin",
+    *(f"Example{index}" for index in range(1, 11)),
+    "DecisionVertical",
+    "DecisionTopic",
+    "Notes",
+)
+SEMANTIC_REVIEW_MUTABLE_COLUMNS = {
+    "Enabled",
+    "DecisionVertical",
+    "DecisionTopic",
+    "Notes",
+}
 PPAC_CREDIT_COLUMNS = {
     "User Id",
     "User Email",
@@ -465,6 +503,11 @@ def validate_topic_overrides(path: Path, *, canonicalize: bool = True) -> tuple[
             raise ValueError(
                 f"Customer Topic Overrides rule {row_number} has an invalid Priority."
             ) from error
+        origin = str(row.get("RuleOrigin") or "CustomerSaved").strip()
+        if origin not in TOPIC_RULE_ORIGINS:
+            raise ValueError(
+                f"Customer Topic Overrides rule {row_number} has an invalid RuleOrigin."
+            )
     if canonicalize:
         rows = [{**row, "Locale": rule_locale(str(row.get("Locale") or "")),
                  "Keywords": canonical_terms(str(row["Keywords"])),
@@ -472,6 +515,227 @@ def validate_topic_overrides(path: Path, *, canonicalize: bool = True) -> tuple[
     return (
         json.dumps(rows, ensure_ascii=False, separators=(",", ":")),
         {"contract": "Customer Topic Overrides", "enabledRules": len(rows)},
+    )
+
+
+def _spreadsheet_unescape(value):
+    if (
+        isinstance(value, str)
+        and len(value) >= 2
+        and value[0] == "'"
+        and value[1:].lstrip().startswith(("=", "+", "-", "@"))
+    ):
+        return value[1:]
+    return value
+
+
+def _semantic_review_payload(
+    review_rows: list[dict],
+    evidence_rows: list[dict],
+) -> bytes:
+    immutable = sorted(
+        [
+            {
+                column: str(row.get(column) or "")
+                for column in SEMANTIC_REVIEW_COLUMNS
+                if column not in SEMANTIC_REVIEW_MUTABLE_COLUMNS
+            }
+            for row in review_rows
+        ],
+        key=lambda row: row["ReviewGroup"],
+    )
+    evidence_rows = sorted(
+        evidence_rows,
+        key=lambda row: str(row.get("ReviewGroup") or ""),
+    )
+    return json.dumps(
+        {
+            "version": 1,
+            "review": immutable,
+            "evidence": evidence_rows,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _validate_semantic_review_bundle(
+    mapping_path: Path,
+    mappings: list[dict],
+) -> None:
+    review_path = mapping_path.with_name("semantic-topic-review.csv")
+    evidence_path = mapping_path.with_name("semantic-review-evidence.json")
+    key_path = mapping_path.with_name("semantic-review-integrity.key")
+    try:
+        with review_path.open(
+            "r",
+            encoding="utf-8-sig",
+            newline="",
+        ) as handle:
+            reader = csv.DictReader(handle)
+            if tuple(reader.fieldnames or ()) != SEMANTIC_REVIEW_COLUMNS:
+                raise ValueError("Semantic review columns are invalid.")
+            review_rows = [
+                {
+                    key: _spreadsheet_unescape(value)
+                    for key, value in row.items()
+                }
+                for row in reader
+            ]
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        key = bytes.fromhex(key_path.read_text(encoding="ascii").strip())
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        raise ValueError(
+            "Customer Conversation Topics requires its original reviewed "
+            "semantic-topic-review.csv, evidence, and integrity key."
+        ) from error
+    if (
+        len(key) != 32
+        or not isinstance(evidence, dict)
+        or set(evidence) != {"version", "groups", "integrity"}
+        or evidence["version"] != 1
+        or not isinstance(evidence["groups"], list)
+    ):
+        raise ValueError("Semantic review approval bundle is invalid.")
+    expected = hmac.new(
+        key,
+        _semantic_review_payload(review_rows, evidence["groups"]),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(expected, str(evidence["integrity"])):
+        raise ValueError("Semantic review approval bundle failed integrity validation.")
+
+    evidence_by_group = {
+        str(group.get("ReviewGroup") or ""): group.get("Conversations")
+        for group in evidence["groups"]
+        if isinstance(group, dict)
+    }
+    expected_mappings = []
+    for row in review_rows:
+        if str(row.get("Enabled") or "").strip().lower() not in {
+            "true",
+            "1",
+            "yes",
+            "y",
+        }:
+            continue
+        group_id = str(row.get("ReviewGroup") or "")
+        conversations = evidence_by_group.get(group_id)
+        if not isinstance(conversations, list):
+            raise ValueError("Semantic review approval bundle has missing evidence.")
+        for conversation in conversations:
+            if not isinstance(conversation, dict):
+                raise ValueError("Semantic review approval bundle has invalid evidence.")
+            expected_mappings.append(
+                {
+                    "ConversationTranscriptId": str(
+                        conversation.get("ConversationTranscriptId") or ""
+                    ).strip().lower(),
+                    "Vertical": str(row.get("DecisionVertical") or "").strip(),
+                    "CanonicalTopic": str(row.get("DecisionTopic") or "").strip(),
+                    "Confidence": 1.0,
+                    "ProviderVersion": "ESS-SEMANTIC-HUMAN-REVIEW-V1",
+                    "ReviewDigest": expected,
+                }
+            )
+    expected_mappings.sort(
+        key=lambda row: row["ConversationTranscriptId"]
+    )
+    if mappings != expected_mappings:
+        raise ValueError(
+            "Customer Conversation Topics does not match the reviewed semantic decisions."
+        )
+
+
+def validate_conversation_topics(path: Path) -> tuple[str, dict]:
+    rows = load_json_array(path, "Customer Conversation Topics")
+    with (ROOT / "taxonomy" / "topics-taxonomy.csv").open(
+        "r",
+        encoding="utf-8-sig",
+        newline="",
+    ) as handle:
+        taxonomy_pairs = {
+            (
+                str(row.get("Vertical") or "").strip(),
+                str(row.get("CanonicalTopic") or "").strip(),
+            )
+            for row in csv.DictReader(handle)
+        }
+
+    normalized = []
+    seen_ids = set()
+    required = set(CONVERSATION_TOPIC_COLUMNS)
+    for row_number, row in enumerate(rows, start=1):
+        if set(row) != required:
+            raise ValueError(
+                "Customer Conversation Topics row "
+                f"{row_number} must contain exactly: {sorted(required)}"
+            )
+        conversation_id = str(row["ConversationTranscriptId"] or "").strip().lower()
+        if not conversation_id or len(conversation_id) > 256:
+            raise ValueError(
+                f"Customer Conversation Topics row {row_number} has an invalid ConversationTranscriptId."
+            )
+        if conversation_id in seen_ids:
+            raise ValueError(
+                f"Customer Conversation Topics contains duplicate ID {conversation_id}."
+            )
+        seen_ids.add(conversation_id)
+
+        vertical = str(row["Vertical"] or "").strip()
+        topic = str(row["CanonicalTopic"] or "").strip()
+        if (vertical, topic) not in taxonomy_pairs:
+            raise ValueError(
+                f"Customer Conversation Topics row {row_number} is outside the checked-in taxonomy."
+            )
+        confidence_value = row["Confidence"]
+        if isinstance(confidence_value, bool):
+            raise ValueError(
+                f"Customer Conversation Topics row {row_number} has invalid Confidence."
+            )
+        try:
+            confidence = float(confidence_value)
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                f"Customer Conversation Topics row {row_number} has invalid Confidence."
+            ) from error
+        if not 0 <= confidence <= 1:
+            raise ValueError(
+                f"Customer Conversation Topics row {row_number} has Confidence outside 0-to-1."
+            )
+        provider_version = str(row["ProviderVersion"] or "").strip()
+        if provider_version != "ESS-SEMANTIC-HUMAN-REVIEW-V1":
+            raise ValueError(
+                f"Customer Conversation Topics row {row_number} has an invalid ProviderVersion."
+            )
+        review_digest = str(row["ReviewDigest"] or "").strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", review_digest):
+            raise ValueError(
+                f"Customer Conversation Topics row {row_number} has an invalid ReviewDigest."
+            )
+        normalized.append(
+            {
+                "ConversationTranscriptId": conversation_id,
+                "Vertical": vertical,
+                "CanonicalTopic": topic,
+                "Confidence": confidence,
+                "ProviderVersion": provider_version,
+                "ReviewDigest": review_digest,
+            }
+        )
+    normalized.sort(key=lambda row: row["ConversationTranscriptId"])
+    if len({row["ReviewDigest"] for row in normalized}) > 1:
+        raise ValueError(
+            "Customer Conversation Topics must come from one reviewed approval set."
+        )
+    _validate_semantic_review_bundle(path, normalized)
+    return (
+        json.dumps(normalized, ensure_ascii=False, separators=(",", ":")),
+        {
+            "contract": "Customer Conversation Topics",
+            "classifiedConversations": len(normalized),
+        },
     )
 
 
@@ -750,6 +1014,7 @@ def update_parameter_metadata(
     org_data_file: Path | None = None,
     credits_file: Path | None = None,
     overrides_json: str | None = None,
+    conversation_topics_json: str | None = None,
     feedback_json: str | None = None,
 ) -> None:
     parameter_expression = (
@@ -787,6 +1052,7 @@ def update_parameter_metadata(
             str(credits_file.resolve()) if credits_file is not None else None
         ),
         OVERRIDES_PARAMETER: overrides_json,
+        CONVERSATION_TOPICS_PARAMETER: conversation_topics_json,
         FEEDBACK_PARAMETER: feedback_json,
     }
     for name, value in parameter_values.items():
@@ -865,6 +1131,7 @@ def build_package(
     org_data_url: str | None = None,
     credits_file: Path | None = None,
     overrides_json: str | None = None,
+    conversation_topics_json: str | None = None,
     feedback_json: str | None = None,
 ) -> None:
     if mode not in BUILD_MODES:
@@ -882,7 +1149,14 @@ def build_package(
     if org_data_url is not None:
         org_data_url = normalize_org_data_url(org_data_url)
     if mode == "service-direct" and any(
-        (environment_url, registry_json, org_data_url, overrides_json, feedback_json)
+        (
+            environment_url,
+            registry_json,
+            org_data_url,
+            overrides_json,
+            conversation_topics_json,
+            feedback_json,
+        )
     ):
         raise ValueError(
             "Service-direct mode must remain customer-neutral. Enter the Environment "
@@ -918,6 +1192,7 @@ def build_package(
         org_data_file,
         credits_file,
         overrides_json,
+        conversation_topics_json,
         feedback_json,
     )
 
@@ -1000,6 +1275,11 @@ def main() -> None:
         help="Validated customer-topic-overrides.json to embed.",
     )
     parser.add_argument(
+        "--conversation-topics-json",
+        type=Path,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "--feedback-events-json",
         type=Path,
         help="Validated feedback-events.json to embed.",
@@ -1030,6 +1310,7 @@ def main() -> None:
         args.agent_registry_json
         or args.org_data_url
         or args.topic_overrides_json
+        or args.conversation_topics_json
         or args.feedback_events_json
     ):
         raise ValueError(
@@ -1068,6 +1349,13 @@ def main() -> None:
         )
         validation["sources"].append(result)
 
+    conversation_topics_json = None
+    if args.conversation_topics_json:
+        conversation_topics_json, result = validate_conversation_topics(
+            args.conversation_topics_json
+        )
+        validation["sources"].append(result)
+
     feedback_json = None
     if args.feedback_events_json:
         feedback_json, result = validate_feedback_events(
@@ -1086,6 +1374,7 @@ def main() -> None:
         org_data_url=args.org_data_url,
         credits_file=args.agent_credits_file,
         overrides_json=overrides_json,
+        conversation_topics_json=conversation_topics_json,
         feedback_json=feedback_json,
     )
     validation["output"] = str(args.output.resolve())

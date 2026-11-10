@@ -3,7 +3,7 @@
 Use this Power BI solution to understand adoption, conversation outcomes, employee feedback, topics, business impact, and improvement opportunities for Microsoft Copilot Studio Employee Self-Service agents.
 
 > [!IMPORTANT]
-> **Use the complete validated V23 package:** [download `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.1/ESS-039417f-optional-fixes-V23.zip), select **Extract All**, and keep the extracted folder structure intact. Do not download or run an individual `.cmd`, `.py`, or `.pbit` file from GitHub. The templates and Python modules were tested together. Python remains **3.10+**.
+> **Use the complete validated V23 package:** [download `ESS-039417f-optional-fixes-V23.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip), select **Extract All**, and keep the extracted folder structure intact. Do not download or run an individual `.cmd`, `.py`, or `.pbit` file from GitHub. The templates and Python modules were tested together. Python remains **3.10+**.
 
 ![Animated preview of the ESS Adoption Intelligence dashboard](./images/dashboard-preview.gif)
 
@@ -18,7 +18,7 @@ Preview resources:
 
 Before running a launcher:
 
-1. [Download the complete V23 ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23.1/ESS-039417f-optional-fixes-V23.zip) and select **Extract All**. Do not run files from inside the ZIP.
+1. [Download the complete V23 ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip) and select **Extract All**. Do not run files from inside the ZIP.
 2. Ask a Power Platform administrator to assign the report account **Bot Transcript Viewer** and **ESS Power BI Transcript Reader** in the environment that hosts the agent. An equivalent custom role must provide organization-level Read on `conversationtranscript` and `systemuser`. **Environment Maker is not sufficient; System Administrator is not required.**
 3. In [Power Apps](https://make.powerapps.com), select that environment, open **Developer resources**, and copy the **Environment URL**.
 4. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/). Install [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add python.exe to PATH** only when using the guided setup or optional preparation tools.
@@ -100,7 +100,7 @@ These inputs enable specific report areas; they are not required for the transcr
 | **Users / organization** | Department, country, job title, display name | Microsoft 365 admin center: **Users -> Active users -> Export users**, or an approved HR/Viva Insights/Graph source | Global Reader, User Administrator, or Global Administrator for the Microsoft 365 export; other sources use their own access model | CSV and Dataverse Desktop accept `OrgData.csv`; the Dataverse guided builder can embed a format-validated SharePoint/OneDrive CSV path as a static Service source; Universal Lake/Fabric can automate Entra ingestion |
 | **Copilot Credits** | Observed tenant, agent, and user credit consumption | Power Platform admin center: **Licensing -> Copilot Studio -> Summary -> Download report** | Power Platform Administrator is recommended least privilege; tenant administrator or Dynamics 365 Administrator also works | CSV/Dataverse Desktop use the User-Level file; Fabric uses all three files and [`Copilot_Credit_Consumption_Ingester.ipynb`](./Fabric/notebooks/Copilot_Credit_Consumption_Ingester.ipynb) |
 | **External Product Feedback** | Microsoft 365 Copilot Chat and exported Monitor reactions beyond the reactions already found in transcripts | Microsoft 365 admin center: **Health -> Product feedback -> Export to CSV** | A Microsoft 365 administrator or reader with Product Feedback access; Compliance Administrator or Global Administrator only when identity details or deletion are required | Dataverse prepares raw exports in its guided setup; CSV/Fabric use the [feedback guide](./FEEDBACK-INGESTION.md) |
-| **Customer-specific topics** | Better coverage for recurring customer language that native and built-in topics do not classify reliably | Learn from the customer's native Copilot Studio topic evidence | Transcript read access; no additional cloud role | Use the [optional topic tuner](./TOPIC-TUNER.md) only after reviewing when to use or skip it |
+| **Customer-specific topics** | Better coverage for customer language that meaningful native and built-in topics do not classify reliably | Use the bundled local multilingual model to group and prefill review suggestions; approved decisions become exact mappings, while repeated labeled evidence can produce reusable deterministic rules | Transcript read access and local permission to process the export; no Azure resource is required | Use the [local hybrid topic tuner](./TOPIC-TUNER.md) after validating the baseline |
 
 To share the report or schedule refresh, follow the [refresh and publication guide](./AUTO-REFRESH.md) after the intended data sources work in Desktop.
 
@@ -111,7 +111,7 @@ The complete corrected V23 ZIP contains these report artifacts:
 | File | Use |
 |---|---|
 | [`ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V23%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit) | Default customer-neutral template for the validated V23 package. Use it directly for the four supported Service parameters, or use the guided setup for independently selected organization, registry, feedback, credits, and topic enhancements. |
-| [`ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V22%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit) | Unchanged pinned V22 template retained for comparison and rollback. The V23 base PBIT is a separately named, byte-identical copy; setup behavior, not the report model, is corrected. |
+| [`ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V22%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit) | Unchanged pinned V22 template retained for comparison and rollback. V23 has its own updated topic-classification contract; V22 remains unchanged. |
 | [`ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28Dataverse%29%20V21%20-%20Power%20BI%20Service%20-%20PUBLISH%20THIS.pbit) | Previous Dataverse V21 design retained as a rollback backup. |
 | [`ESS Dashboard - Dynamic Topics (CSV) V18.pbit`](./ESS%20Dashboard%20-%20Dynamic%20Topics%20%28CSV%29%20V18.pbit) | CSV Upload template |
 | [`ESS - Fabric V2.pbit`](./ESS%20-%20Fabric%20V2.pbit) | Fabric/Lakehouse template |
@@ -119,7 +119,7 @@ The complete corrected V23 ZIP contains these report artifacts:
 
 V22 and V21 are retained unchanged for comparison and rollback.
 
-**Validation:** 189 Python regression tests passed, including real offline builds covering the baseline and each eligible enhancement across Desktop and Service. Authorized runtime QA also completed a clean Power BI Desktop refresh and an actual Power BI Service refresh using the validated least-privilege roles. The Service model contained only the Dataverse `Cds` cloud source and no local-file or Web source. Tests ran with Python 3.14.5; the package requirement remains Python 3.10+. See [`QA-V23.json`](./QA-V23.json) for provenance and validation evidence.
+**Validation:** 231 Python regression tests pass, with one expected skip when the optional standalone Power Query runtime is unavailable. The real bundled local ONNX model passed multilingual inference and hash validation, all 29 Python files pass a Python 3.10 grammar check, and offline builds cover the baseline, grouped semantic review, human-approved mappings, and eligible Desktop and Service enhancements. Authorized runtime QA previously completed clean Power BI Desktop and Service refreshes using the validated least-privilege roles. The optional Azure provider is not required for the local workflow and is not included in its release-readiness claim. See [`QA-V23.json`](./QA-V23.json) for provenance and validation evidence.
 
 ## Before collecting data
 
@@ -180,8 +180,10 @@ All CSV and Dataverse pages work from transcript data. Optional sources enrich s
 - Copilot Studio's native topic remains authoritative when present.
 - Conversations without a native topic use the shared English, Spanish, and Chinese taxonomy in `taxonomy/topics-taxonomy.csv`.
 - Matching is conservative: complete words or phrases, scoring, exclusions, confidence, and ambiguity handling prevent weak matches from becoming business labels.
-- The optional private tuner learns only from local transcript evidence and emits reviewed rule files without exporting full prompts.
-- Classification runs locally in Power Query or inside the customer's Fabric workspace. No transcript text is sent to an external classification service.
+- Deterministic tuning and the default bundled multilingual semantic model run locally. Model and tokenizer hashes are verified before inference, and transcript text is not sent off-device.
+- Local model results are suggestion-only. A person approves, corrects, or leaves each grouped pattern unclassified; approved decisions become prompt-free exact conversation-ID mappings.
+- Azure OpenAI or Microsoft Foundry remains an explicit optional customer-owned provider, not a requirement.
+- Power BI classification uses embedded mappings and deterministic rules. Desktop and Service refreshes never load or call a model.
 
 See [Customer-specific topic tuning](./TOPIC-TUNER.md) for the optional post-validation workflow.
 

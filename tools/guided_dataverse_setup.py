@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import importlib.util
 import json
 import os
 import shutil
@@ -34,6 +35,12 @@ FEEDBACK_NORMALIZER = ROOT / "tools" / "ess_feedback_normalizer.py"
 GENERATED_DIR = ROOT / "Generated Templates"
 DEFAULT_SETTINGS = GENERATED_DIR / "dataverse-setup.json"
 PREPARED_FEEDBACK = GENERATED_DIR / "Prepared Inputs" / "feedback-events.csv"
+LOCAL_RUNTIME_DIR = (
+    Path(os.environ.get("LOCALAPPDATA") or Path.home())
+    / "ESS"
+    / "semantic-runtime"
+    / f"python-{sys.version_info.major}.{sys.version_info.minor}"
+)
 OUTPUT_NAMES = {
     "desktop-validation": (
         f"ESS Dashboard - Dynamic Topics (Dataverse) {SETUP_VERSION} - "
@@ -58,6 +65,7 @@ class SetupOptions:
     org_data_url: str = ""
     agent_credits_file: str = ""
     topic_overrides_json: str = ""
+    conversation_topics_json: str = ""
     feedback_events_json: str = ""
     feedback_input_files: list[str] = field(default_factory=list)
 
@@ -89,6 +97,7 @@ OPTIONAL_FILES = (
     ),
 )
 OPTIONAL_FILE_FIELDS = tuple(item[0] for item in OPTIONAL_FILES) + (
+    "conversation_topics_json",
     "org_data_url",
     "feedback_events_json",
     "feedback_input_files",
@@ -99,7 +108,10 @@ SKIP_FIELDS = {
     "--skip-agent-registry": ("agent_registry_json",),
     "--skip-org-data": ("org_data_file", "org_data_url"),
     "--skip-agent-credits": ("agent_credits_file",),
-    "--skip-topic-overrides": ("topic_overrides_json",),
+    "--skip-topic-overrides": (
+        "topic_overrides_json",
+        "conversation_topics_json",
+    ),
     "--skip-feedback": ("feedback_events_json", "feedback_input_files"),
 }
 
@@ -142,8 +154,48 @@ def parse_args() -> argparse.Namespace:
     topics = parser.add_mutually_exclusive_group()
     topics.add_argument("--topic-overrides-json", type=Path)
     topics.add_argument("--skip-topic-overrides", action="store_true", help="Use native and built-in topics only.")
+    parser.add_argument(
+        "--conversation-topics-json",
+        type=Path,
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument("--tune-topics", action="store_true", help="Tune an exported transcript CSV using saved setup choices.")
     parser.add_argument("--topic-transcripts", type=Path, help="Optional transcript CSV for --tune-topics; otherwise a file picker opens.")
+    semantic = parser.add_mutually_exclusive_group()
+    semantic.add_argument(
+        "--semantic-classification",
+        action="store_true",
+        dest="semantic_classification",
+        help="Use closed-taxonomy semantic classification for unresolved messages.",
+    )
+    semantic.add_argument(
+        "--no-semantic-classification",
+        action="store_false",
+        dest="semantic_classification",
+        help="Run deterministic topic tuning without a semantic provider.",
+    )
+    parser.set_defaults(semantic_classification=None)
+    parser.add_argument(
+        "--semantic-provider",
+        choices=("local", "azure"),
+        default=None,
+        help="Use the bundled local classifier by default; Azure remains optional.",
+    )
+    parser.add_argument(
+        "--semantic-endpoint",
+        default=os.environ.get("ESS_SEMANTIC_ENDPOINT", ""),
+    )
+    parser.add_argument(
+        "--semantic-deployment",
+        default=os.environ.get("ESS_SEMANTIC_DEPLOYMENT", ""),
+    )
+    parser.add_argument(
+        "--local-model-dir",
+        type=Path,
+        default=ROOT / "models" / "multilingual-e5-small",
+    )
+    parser.add_argument("--local-min-similarity", type=float, default=0.82)
+    parser.add_argument("--local-min-margin", type=float, default=0.01)
     feedback = parser.add_mutually_exclusive_group()
     feedback.add_argument("--feedback-events-json", type=Path)
     feedback.add_argument(
@@ -177,6 +229,9 @@ def load_settings(path: Path) -> SetupOptions | None:
         org_data_url=str(payload.get("org_data_url") or ""),
         agent_credits_file=str(payload.get("agent_credits_file") or ""),
         topic_overrides_json=str(payload.get("topic_overrides_json") or ""),
+        conversation_topics_json=str(
+            payload.get("conversation_topics_json") or ""
+        ),
         feedback_events_json=str(payload.get("feedback_events_json") or ""),
         feedback_input_files=[
             str(value)
@@ -189,8 +244,13 @@ def load_settings(path: Path) -> SetupOptions | None:
 def setup_input_paths(options: SetupOptions | None) -> list[str]:
     if options is None:
         return []
-    return [getattr(options, field_name) for field_name, _, _, _ in OPTIONAL_FILES] + [
-        options.feedback_events_json, *options.feedback_input_files,
+    return [
+        getattr(options, field_name)
+        for field_name, _, _, _ in OPTIONAL_FILES
+    ] + [
+        options.conversation_topics_json,
+        options.feedback_events_json,
+        *options.feedback_input_files,
     ]
 
 
@@ -324,9 +384,14 @@ def merge_cli_options(
     ):
         clear_optional_files(options)
     for field_name, _, _, _ in OPTIONAL_FILES:
-        argument = getattr(args, field_name)
+        argument = getattr(args, field_name, None)
         if argument:
             setattr(options, field_name, str(argument.resolve()))
+    conversation_topics = getattr(args, "conversation_topics_json", None)
+    if conversation_topics:
+        options.conversation_topics_json = str(
+            conversation_topics.resolve()
+        )
     org_data_url = getattr(args, "org_data_url", None)
     if org_data_url:
         options.org_data_url = org_data_url.strip()
@@ -495,6 +560,10 @@ def print_selection_summary(mode: str, options: SetupOptions) -> None:
         else:
             value = getattr(options, field_name)
         print(f"  - {label}: {value or 'skipped'}")
+    print(
+        "  - Exact semantic conversation topics: "
+        f"{options.conversation_topics_json or 'skipped'}"
+    )
     feedback = ", ".join(options.feedback_input_files) or options.feedback_events_json
     print(f"  - Microsoft 365 feedback: {feedback or 'skipped'}")
 
@@ -567,6 +636,7 @@ def build_command(
     reusable = (
         ("agent_registry_json", "--agent-registry-json"),
         ("topic_overrides_json", "--topic-overrides-json"),
+        ("conversation_topics_json", "--conversation-topics-json"),
         ("feedback_events_json", "--feedback-events-json"),
     )
     desktop_only = (
@@ -614,6 +684,9 @@ def validation_summary(validation: dict) -> list[str]:
             "Copilot credit consumption"
         ),
         "Customer Topic Overrides": "Approved topic rules",
+        "Customer Conversation Topics": (
+            "Human-approved conversation topics"
+        ),
         "Feedback Events": "Prepared feedback",
     }
     for source in validation.get("sources") or []:
@@ -623,6 +696,8 @@ def validation_summary(validation: dict) -> list[str]:
             count = source.get("enabledRules")
         if count is None:
             count = source.get("events")
+        if count is None:
+            count = source.get("classifiedConversations")
         lines.append(f"{label}: {count} rows")
     return lines
 
@@ -631,6 +706,77 @@ def last_process_message(completed: subprocess.CompletedProcess[str]) -> str:
     output = completed.stderr or completed.stdout or ""
     lines = [line.strip() for line in output.splitlines() if line.strip()]
     return lines[-1] if lines else "The template builder returned an unknown error."
+
+
+def local_semantic_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    required = ("numpy", "onnxruntime", "tokenizers")
+    if all(importlib.util.find_spec(name) is not None for name in required):
+        return environment
+
+    LOCAL_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    if sys.version_info >= (3, 14):
+        packages = (
+            "numpy==2.4.6",
+            "onnxruntime==1.26.0",
+            "tokenizers==0.23.1",
+        )
+    else:
+        packages = (
+            "numpy==2.2.6",
+            "onnxruntime==1.23.2",
+            "tokenizers==0.22.1",
+        )
+    print(
+        "\nPreparing the local semantic runtime once. This downloads Python "
+        "runtime libraries only; no transcript data is uploaded."
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--only-binary=:all:",
+            "--target",
+            str(LOCAL_RUNTIME_DIR),
+            *packages,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    if completed.returncode:
+        raise ValueError(
+            "The local semantic runtime could not be installed: "
+            f"{last_process_message(completed)}"
+        )
+    environment["PYTHONPATH"] = os.pathsep.join(
+        [
+            str(LOCAL_RUNTIME_DIR),
+            environment.get("PYTHONPATH", ""),
+        ]
+    ).rstrip(os.pathsep)
+    verification = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import numpy, onnxruntime, tokenizers",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=environment,
+    )
+    if verification.returncode:
+        raise ValueError(
+            "The local semantic runtime was installed but could not be loaded: "
+            f"{last_process_message(verification)}"
+        )
+    return environment
 
 
 def tune_topics(args: argparse.Namespace) -> int:
@@ -649,6 +795,62 @@ def tune_topics(args: argparse.Namespace) -> int:
             print("No export selected. Template unchanged.")
             return 0
         source = Path(selected)
+    use_semantic = getattr(args, "semantic_classification", None)
+    semantic_endpoint = str(getattr(args, "semantic_endpoint", "") or "").strip()
+    semantic_deployment = str(getattr(args, "semantic_deployment", "") or "").strip()
+    if use_semantic is None:
+        use_semantic = True
+    use_semantic = bool(use_semantic)
+    requested_provider = getattr(args, "semantic_provider", None)
+    semantic_provider = str(
+        requested_provider
+        or (
+            "azure"
+            if semantic_endpoint or semantic_deployment
+            else "local"
+        )
+    ).strip().lower()
+    local_model_dir = Path(
+        getattr(
+            args,
+            "local_model_dir",
+            ROOT / "models" / "multilingual-e5-small",
+        )
+    )
+    local_min_similarity = float(
+        getattr(args, "local_min_similarity", 0.82)
+    )
+    local_min_margin = float(getattr(args, "local_min_margin", 0.01))
+    if use_semantic and semantic_provider == "local":
+        print(
+            "\nThe bundled local semantic classifier will analyze unresolved "
+            "messages on this device. Transcript text is not sent to a model service."
+        )
+    if use_semantic and semantic_provider == "azure":
+        print(
+            "\nAzure semantic mode sends PII-redacted unresolved first-user "
+            "messages to the customer-owned approved endpoint."
+        )
+        print(
+            "Redaction reduces exposure but does not guarantee anonymity. Use Azure "
+            "mode only with customer approval."
+        )
+        if not semantic_endpoint:
+            if args.non_interactive:
+                raise ValueError(
+                    "Semantic topic tuning requires --semantic-endpoint."
+                )
+            semantic_endpoint = input(
+                "Paste the customer-owned Azure OpenAI resource endpoint: "
+            ).strip()
+        if not semantic_deployment:
+            if args.non_interactive:
+                raise ValueError(
+                    "Semantic topic tuning requires --semantic-deployment."
+                )
+            semantic_deployment = input(
+                "Enter the approved Azure model deployment name: "
+            ).strip()
     output = args.output or GENERATED_DIR / TOPIC_OUTPUT_NAME
     protected_inputs = [SOURCE_TEMPLATE, settings_file, source, *setup_input_paths(stored)]
     reject_output_collisions(output, [*feedback_output_paths(PREPARED_FEEDBACK), *protected_inputs])
@@ -663,11 +865,43 @@ def tune_topics(args: argparse.Namespace) -> int:
         "--template-output", str(output.resolve()),
     ]
     command.extend(selected_skip_flags(args))
+    if use_semantic:
+        command.extend(
+            [
+                "--semantic-classification",
+                "--semantic-provider",
+                semantic_provider,
+                "--local-model-dir",
+                str(local_model_dir.resolve()),
+                "--local-min-similarity",
+                str(local_min_similarity),
+                "--local-min-margin",
+                str(local_min_margin),
+            ]
+        )
+        if semantic_provider == "azure":
+            command.extend(
+                [
+                "--semantic-endpoint",
+                semantic_endpoint,
+                "--semantic-deployment",
+                semantic_deployment,
+                ]
+            )
     if args.no_open:
         command.append("--no-open")
     if args.non_interactive:
         command.append("--non-interactive")
-    return subprocess.run(command, check=False).returncode
+    environment = (
+        local_semantic_environment()
+        if use_semantic and semantic_provider == "local"
+        else os.environ.copy()
+    )
+    return subprocess.run(
+        command,
+        check=False,
+        env=environment,
+    ).returncode
 
 
 def main() -> int:

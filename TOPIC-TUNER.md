@@ -2,15 +2,17 @@
 
 Use this optional workflow when meaningful customer terminology is repeatedly left as **Other / Uncategorized** or assigned to a topic that is too broad.
 
-The tuner runs locally, proposes reusable topic rules, and creates a new validation report. It does not change native Copilot Studio topics or modify an existing report.
+The tuner first applies deterministic ESS rules, then uses the bundled local multilingual model to rank closed-taxonomy suggestions for unresolved first-user messages. The local model does not send transcript text off-device and never activates its own label. It groups similar suggestions into review rows containing at most ten redacted examples. A person approves, corrects, or leaves each group unclassified; only those decisions become exact conversation-ID mappings.
+
+The tuner does not change Copilot Studio topics, send credentials to Power BI, or make model calls during Power BI Desktop or Service refresh.
 
 ## Should you use the topic tuner?
 
 | Use it when | Skip it when |
 |---|---|
-| The same meaningful customer terms are missed across several conversations. | Native Copilot Studio topics and the built-in ESS taxonomy already classify the conversations correctly. |
-| You have representative conversations that can support or validate a rule. | The gap is isolated, ambiguous, or lacks enough evidence for a safe rule. |
-| A customer can review and approve the proposed business labels. | The baseline report has an access, environment, retention, or loading problem. |
+| The same meaningful customer terms are missed across several conversations. | Meaningful native Copilot Studio topics and the built-in ESS taxonomy already classify the conversations correctly. |
+| You have representative conversations that can validate the intended coverage. | The gap is caused by missing transcript access or missing user-message text. |
+| The customer permits local processing of its exported transcript on its own device. | The baseline report has an access, environment, retention, or loading problem. |
 
 > [!IMPORTANT]
 > Topic tuning is not required for the ESS report. Complete the [guided Dataverse baseline setup](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements) first so the tuner has saved setup state. Topic rules cannot repair missing permissions, an incorrect Environment URL, expired transcripts, or disabled transcript capture.
@@ -22,7 +24,7 @@ The tuner runs locally, proposes reusable topic rules, and creates a new validat
 | 1 | [Confirm the baseline and prepare evidence](#step-1---confirm-the-baseline-and-prepare-evidence) | A working Dataverse report and representative conversations |
 | 2 | [Export the conversations](#step-2---export-the-conversations) | A local `ConversationTranscript` CSV |
 | 3 | [Run the topic tuner](#step-3---run-the-topic-tuner) | A `READY`, `REVIEW REQUIRED`, or `STOP` result |
-| 4 | [Follow the result](#step-4---follow-the-result) | Approved rules embedded in a new validation template |
+| 4 | [Follow the result](#step-4---follow-the-result) | Approved rules and grouped semantic decisions embedded in a new validation template |
 | 5 | [Validate the improvement](#step-5---validate-the-improvement) | Confirmed topic behavior in Power BI Desktop |
 | 6 | [Publish only if needed](#step-6---publish-only-if-needed) | A separate Service-safe report for scheduled refresh |
 
@@ -30,23 +32,34 @@ The tuner runs locally, proposes reusable topic rules, and creates a new validat
 
 You need:
 
-- the [complete validated V23 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23.1/ESS-039417f-optional-fixes-V23.zip), extracted with its folder structure intact;
+- the [complete validated V23 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.zip), extracted with its folder structure intact;
 - [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add Python to PATH** selected during installation;
 - a successful [Dataverse V23 baseline](SETUP-Dataverse.md);
 - permission to export `ConversationTranscript` from the same Dataverse environment; and
 - a customer-controlled folder for the transcript export and review files.
 
-No additional Python packages, PowerShell commands, LLM, or external classification service are required.
+The complete release package includes the hash-verified multilingual E5 model. On the first local semantic run, the launcher prepares the required Python runtime libraries automatically if they are not already installed. This downloads runtime libraries only; transcript text is not uploaded.
+
+The optional Azure provider additionally requires:
+
+- explicit customer approval to send redacted unresolved first-user messages to a model;
+- a customer-owned Azure OpenAI or Microsoft Foundry endpoint ending in `.openai.azure.com`, `.services.ai.azure.com`, or `.cognitiveservices.azure.com`;
+- an approved model deployment that supports structured JSON output; and
+- an API key supplied through the secure prompt or the temporary `ESS_SEMANTIC_API_KEY` environment variable.
+
+The endpoint, deployment, and API key are not embedded in the generated report. The API key is never written to settings or diagnostics.
 
 ## Step 1 - Confirm the baseline and prepare evidence
 
 1. Complete [Option B in the Dataverse setup guide](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements).
 2. Confirm that **Total Conversations** is non-zero and the expected agent appears in the Agent filter.
 3. Identify recurring customer terms that are currently unclassified or classified too broadly.
-4. Include several distinct conversations that demonstrate the intended meaning. For automatic learning, the default gate requires at least five distinct supporting conversations.
+4. Include several distinct conversations that demonstrate the intended meaning. Automatic deterministic and semantic learning both require at least five distinct supporting conversations by default.
 5. Use **Start over** between test conversations so each example is retained as a separate conversation.
 
-Native Copilot Studio topic evidence is the safest source for automatic learning. Repeated terms without native topic evidence can still become review candidates, but the customer must provide and approve their meaning.
+Meaningful native Copilot Studio business-topic evidence is the safest source for automatic learning. Generic states such as `[System] - Response Preparation`, internal/admin/debug/test topics, fallback, greeting, sign-in, and reset topics are not treated as authoritative business labels; they fall through to the shared classifier.
+
+The five-conversation gate applies to reusable learned rules. Local model scores and margins are advisory ranking signals, not proof of correctness. Every local semantic group requires human approval before its conversation IDs receive a topic. Low-information messages are omitted from review and remain **Other / Uncategorized**.
 
 ## Step 2 - Export the conversations
 
@@ -73,7 +86,10 @@ The CSV is used only as local evidence for the tuner. Dataverse remains the repo
    - the `tools` folder
 4. Double-click **`TUNE-TOPICS.cmd`**.
 5. Select the exported `ConversationTranscript` CSV.
-6. Leave the window open while the tuner analyzes the file.
+6. Leave the window open while the bundled local classifier analyzes unresolved messages.
+7. If the local Python runtime libraries are missing, the launcher prepares them once. This step does not send transcript data.
+
+Local semantic processing stays on the customer's device. Common email, URL, GUID, IPv4, phone-number, and long-number patterns are still removed before inference and rule learning to minimize retained evidence.
 
 By default, the tuner deliberately reuses the Dataverse URL and optional inputs saved by setup. It does not ask you to select those files again, and does not silently discard a missing saved file. To change them interactively, rerun `START-HERE-DATAVERSE.cmd` first and independently keep, replace, or skip each enhancement.
 
@@ -87,6 +103,8 @@ python tools\ess_topic_tuner.py `
 ```
 
 The guided `--tune-topics` entry point forwards the same four flags. Do not use `--skip-topic-overrides` with tuning: tuning applies new approved rules rather than skipping them. Other saved enhancements remain deliberately reusable unless explicitly skipped.
+
+For unattended local semantic execution, pass `--semantic-classification --semantic-provider local`. Azure remains available only as an explicit alternative with `--semantic-provider azure`, `--semantic-endpoint`, and `--semantic-deployment`; provide its API key only through `ESS_SEMANTIC_API_KEY`.
 
 Review files are written under:
 
@@ -102,13 +120,16 @@ The tool reports one of three outcomes:
 
 | Result | What it means | What you do |
 |---|---|---|
-| **READY** | One or more approved rules are ready. | Continue with the new validation template opened by the tool. |
+| **READY** | One or more deterministic rules are ready without semantic review. | Continue with the new validation template opened by the tool. |
+| **REVIEW REQUIRED - grouped semantic suggestions** | The local model grouped unresolved conversations and prefilled likely topics and alternatives. | Approve, correct, or leave each group disabled in `semantic-topic-review.csv`; save and return to the same window. |
 | **REVIEW REQUIRED** | Candidate rules need customer judgment. | Review one CSV, then return to the same window. |
 | **STOP** | No safe, useful rule can be produced from this export. | Keep the existing report unchanged. |
 
+A local suggestion becomes a Power BI topic only after a person enables its review group and confirms or corrects the taxonomy decision. Every redacted example in the group is displayed, groups contain at most ten conversations, and mixed groups must remain disabled. The resulting embedded mapping contains the conversation ID, human-approved topic, vertical, and review provenance—never the prompt.
+
 ### READY
 
-The tuner validates the approved rules, embeds them in a new template, and opens:
+The tuner validates approved deterministic rules and any human-approved semantic groups, embeds them in a new template, and opens:
 
 ```text
 Generated Templates\ESS Dashboard - Dynamic Topics (Dataverse) V23 - Desktop Validation - Topics - LOCAL ONLY.pbit
@@ -147,7 +168,8 @@ Do not change the template or import the empty JSON. The message explains why th
 | Existing topics already cover the export | Keep the baseline report. |
 | Too little repeated evidence | Collect more distinct representative conversations. |
 | Ambiguous terminology | Add native-labeled examples that distinguish the meanings. |
-| No usable native topic evidence | Add meaningful native topic evidence, or review repeated terms manually when candidates are available. |
+| No usable native topic evidence | Confirm the complete package contains the local model pack and rerun. The customer does not need an Azure endpoint. |
+| Semantic results are low-confidence, abstained, or inconsistent | Keep those conversations unclassified. Do not weaken the confidence or validation gates merely to force coverage. |
 
 `STOP` is a safe result, not a failed installation.
 
@@ -169,10 +191,16 @@ In the newly opened **Desktop Validation - Topics - LOCAL ONLY** template:
 
 Classification follows this order:
 
-1. Native Copilot Studio topic
-2. Approved customer rule
-3. Built-in ESS taxonomy
-4. Other / Uncategorized
+1. Meaningful native Copilot Studio business topic
+2. Exact human-approved semantic mapping for the current conversation ID
+3. Explicit reviewed customer rule
+4. Previously approved legacy customer rule without recorded provenance
+5. Cross-validated native-topic learned rule
+6. Cross-validated semantic learned rule
+7. Built-in ESS taxonomy
+8. Other / Uncategorized
+
+Generic system/internal/admin/debug/test topics are not preserved as business topics. They fall through to human-approved exact mappings and deterministic rules. The local model is used only while tuning; Power BI Desktop and Power BI Service refresh use embedded conversation mappings and deterministic rules and never load or call the model.
 
 > [!IMPORTANT]
 > This is the local topic-validation output and may contain local Organization or Credits file paths. For shared Power BI Service access, continue to Step 6 and generate the separate **Power BI Service - PUBLISH THIS** output.
@@ -186,8 +214,8 @@ For shared Power BI Service access:
 1. Close the Desktop validation report.
 2. Return to the extracted `ESS-039417f-optional-fixes-V23` folder.
 3. Double-click **`BUILD-SERVICE-REFRESH.cmd`**.
-4. When asked whether to reuse the saved setup, choose **Yes**, then explicitly **keep** the approved topic rules. Independently keep, replace, or skip the other enhancements. Choosing No starts without the approved topic-rule selection.
-5. Confirm the validation summary lists **Approved topic rules** with the expected non-zero rule count.
+4. When asked whether to reuse the saved setup, choose **Yes**, then explicitly **keep** the approved topic rules. Human-approved exact conversation mappings are retained with that saved setup. Independently keep, replace, or skip the other enhancements.
+5. Confirm the validation summary lists the expected approved rule count and exact semantic conversation-topic file.
 6. Open the generated file whose name ends with:
 
    ```text
@@ -209,16 +237,29 @@ In the Service builder, explicitly **keep** the saved approved topic rules; Ente
 | `TUNE-TOPICS.cmd` is missing | Extract the complete corrected `ESS-039417f-optional-fixes-V23.zip`. Open the inner package folder if Windows created nested folders; do not download individual scripts. |
 | A saved optional file is missing | Restore it, rerun guided setup to replace/skip it, or use the applicable tuner skip flag for registry, organization, credits, or feedback. Printed recovery commands retain skip flags. New approved topic rules replace the saved topic-rule selection. Other saved choices are not silently discarded. |
 | **STOP** with no rules | Keep the existing report. Collect better evidence only when a meaningful classification gap remains. |
+| Local model file is missing or fails its hash check | Extract the complete release ZIP again. Do not download individual scripts or model files. |
+| Local semantic runtime cannot be prepared | Confirm Python can reach PyPI for the one-time runtime-library download, or ask IT to allow/install `numpy`, `onnxruntime`, and `tokenizers`. No transcript text is included in that download. |
+| Azure endpoint is rejected | Azure is optional. Use the bundled local provider, or supply an HTTPS customer-owned Azure resource endpoint with an approved suffix. |
+| Many rows remain **Other / Uncategorized** | Review `semantic-classification-audit.csv`. Low-information, low-similarity, closely tied, or out-of-taxonomy messages intentionally remain unclassified. |
 | A generated PBIT cannot be replaced | Close the previously opened Topics validation report, then retry. |
 | Queries are blocked or a cyclic reference appears after opening the PBIT | Close without saving, reopen it, wait for all parameter values to stabilize, and then select **Load**. |
 | Scheduled refresh is unavailable | Confirm that you published **Power BI Service - PUBLISH THIS**. The **Desktop Validation - LOCAL ONLY** report is the separate local input-checking output. |
 
 ## Privacy and safety
 
-- Processing is local and uses the Python standard library.
-- The tuner makes no network, LLM, or external API calls.
-- Common email, URL, phone, GUID, IP-address, and long-number patterns are removed before phrase learning.
-- Redaction reduces exposure but does not guarantee anonymity; business terms can still be sensitive.
+- Deterministic and default semantic processing are local.
+- The bundled model is pinned to `intfloat/multilingual-e5-small` revision `614241f622f53c4eeff9890bdc4f31cfecc418b3`; its model and tokenizer hashes are verified before every load.
+- Local inference uses ONNX Runtime with `CPUExecutionProvider`; no transcript text is sent to a model service.
+- Azure processing is optional, disabled unless explicitly selected, and requires customer approval.
+- When Azure is selected, only unresolved first-user messages are sent to the customer-owned approved endpoint.
+- Common email, URL, phone, GUID, IP-address, and long-number patterns are removed first, and text is capped at 4,000 characters.
+- Redaction reduces exposure but does not guarantee anonymity. Names, uncommon identifiers, customer terminology, and confidential business phrases may remain.
+- Requests use structured output constrained to the checked-in ESS taxonomy and set `store` to `false`.
+- The provider cannot add a new canonical topic. Unknown, malformed, missing, duplicate, low-confidence, or out-of-taxonomy results are rejected.
+- The API key comes from a secure prompt or `ESS_SEMANTIC_API_KEY`; it is never persisted.
+- Semantic audit files contain hashes, labels, confidence, status, provider version, and deployment name, but no prompt text.
+- Local model output is suggestion-only. A human must approve or correct each grouped pattern before a prompt-free exact conversation mapping is embedded.
+- Power BI receives validated deterministic rules and human-approved prompt-free exact conversation mappings. Desktop and Service refresh never load the local model or call an endpoint.
 - Keep transcripts and tuner outputs inside the customer environment and review them before sharing.
 - Existing approved rules are preserved until another validated template build succeeds.
 
@@ -234,9 +275,11 @@ This guided apply workflow targets **Dataverse V23**. The unchanged V22 and V21 
 
 ### Learning and matching safeguards
 
-Automatic rules require at least five distinct supporting conversations, at least 90% cross-topic precision, and deterministic conversation-level five-fold validation with at least three correct held-out matches and 90% precision. Do not lower these thresholds merely to force output.
+Automatic rules require at least five distinct supporting conversations, at least 90% cross-topic precision, and deterministic conversation-level five-fold validation with at least three correct held-out matches and 90% precision. Local cosine similarity and runner-up margin are displayed only to help review; they never bypass human approval.
 
-Native topics remain authoritative. Customer rules apply only when a native topic is absent. Approved customer rules then take precedence over built-in rules.
+Meaningful native business topics remain authoritative. Generic system/internal/admin/debug/test states are excluded from learning and fall through to the shared classifier. Explicit reviewed rules take precedence over saved approved rules, native-topic learned rules, semantic learned rules, and built-in rules.
+
+When locale is unknown, candidate extraction uses the combined supported-language stop-word set while retaining wildcard locale matching. This prevents common words such as `what`, `the`, `can`, and `for` from becoming customer rules merely because Dataverse did not provide a locale.
 
 English customer rules include explicit singular/plural alternatives for a limited vocabulary, including `ticket/tickets`, `device/devices`, and `policy/policies`. This is not general fuzzy matching or synonym generation.
 
@@ -249,10 +292,13 @@ Each analysis validates and loads the previously approved rules selected in save
 Merge precedence is:
 
 1. Explicit reviewed overrides
-2. Saved approved rules
-3. Newly learned rules
+2. Previously approved legacy rules without recorded provenance
+3. Meaningful native-topic learned rules
+4. Semantic learned rules
 
 Equivalent rules use normalized locale, keyword, and exclusion sets. Within one source, higher priority wins, followed by stable topic and vertical ordering. Rules with distinct match conditions are retained.
+
+Newly published rules retain their recorded provenance on later runs, so an explicit reviewed rule remains explicit and learned rules retain their native or semantic safeguards.
 
 A missing, invalid, or empty saved-rules file stops analysis before outputs are written. `STOP` and failed review runs leave the active setup unchanged.
 
@@ -260,13 +306,19 @@ A missing, invalid, or empty saved-rules file stops analysis before outputs are 
 
 | File | Purpose |
 |---|---|
-| `customer-topic-overrides.csv` | The only customer review file; approved rules plus disabled candidates |
+| `customer-topic-overrides.csv` | Deterministic approved rules plus disabled rule candidates |
+| `semantic-topic-review.csv` | Grouped local suggestions, alternatives, all redacted examples in each group, and customer decision fields |
+| `semantic-review-evidence.json` | Prompt-free conversation IDs and model candidates used to apply approved review groups; do not edit |
+| `semantic-review-integrity.key` | Local integrity key binding displayed review context to exact conversation IDs; keep it in the Topic Review folder and do not edit or share it |
 | `customer-topic-overrides.json` | Enabled rules embedded by the build |
 | `approved-*.json` | Active reviewed-rules file referenced by saved setup after a successful reviewed build; retain it while using that setup |
 | `topic-enrichment.csv` | Hashed conversation keys and predicted topics |
 | `classification-audit.csv` | Matching, ambiguity, source, and classifier diagnostics |
 | `topic-learning-audit.csv` | Native evidence and held-out validation metrics |
-| `privacy-report.json` | Aggregate counts, redactions, and workflow outcome |
+| `semantic-classification-audit.csv` | Hashed suggestion or Azure classification, confidence, status, provider version, and deployment; no prompt text |
+| `semantic-learning-audit.csv` | Deterministic rule-learning and held-out validation metrics derived from accepted Azure labels; local suggestions never train rules before review |
+| `semantic-conversation-topics.json` | Exact conversation ID, human-approved closed-taxonomy topic, vertical, and review provenance; no prompt text |
+| `privacy-report.json` | Aggregate counts, redactions, semantic request metrics, and workflow outcome |
 
 The PBIT output cannot replace the source template, customer inputs, saved setup, any tuner diagnostic, or prepared-feedback file. Paths are normalized case-insensitively and checked before writes.
 
@@ -280,6 +332,30 @@ The launcher is recommended for customers. Advanced users can run:
 python .\tools\ess_topic_tuner.py --input "C:\AgentData\ConversationTranscripts.csv" --output-dir "C:\AgentData\topic-review"
 ```
 
+Default local semantic mode:
+
+```powershell
+python .\tools\ess_topic_tuner.py `
+  --input "C:\AgentData\ConversationTranscripts.csv" `
+  --output-dir "C:\AgentData\topic-review" `
+  --semantic-classification `
+  --semantic-provider local
+```
+
+Optional customer-approved Azure provider:
+
+```powershell
+$env:ESS_SEMANTIC_API_KEY = Read-Host "Azure OpenAI API key" -MaskInput
+python .\tools\ess_topic_tuner.py `
+  --input "C:\AgentData\ConversationTranscripts.csv" `
+  --output-dir "C:\AgentData\topic-review" `
+  --semantic-classification `
+  --semantic-provider azure `
+  --semantic-endpoint "https://customer-resource.openai.azure.com" `
+  --semantic-deployment "approved-deployment"
+Remove-Item Env:\ESS_SEMANTIC_API_KEY
+```
+
 Useful options:
 
 | Option | Purpose |
@@ -290,6 +366,14 @@ Useful options:
 | `--no-open` | Build without opening Power BI Desktop |
 | `--settings-file` | Select a specific saved Dataverse setup |
 | `--overrides` | Include a previously reviewed override CSV |
+| `--semantic-classification` | Enable closed-taxonomy semantic classification; guided tuning enables the local provider by default |
+| `--semantic-provider` | `local` by default, or explicit optional `azure` |
+| `--local-model-dir` | Hash-verified bundled multilingual E5 model directory |
+| `--local-min-similarity` | Advisory local similarity threshold recorded for diagnostics; it does not auto-approve labels |
+| `--local-min-margin` | Advisory top-topic margin recorded for diagnostics; it does not auto-approve labels |
+| `--semantic-endpoint` | Customer-owned Azure OpenAI or Microsoft Foundry resource endpoint |
+| `--semantic-deployment` | Approved customer model deployment |
+| `--semantic-min-confidence` | Minimum accepted model confidence; default `0.90` |
 | `--apply` / `--review` | Recovery actions printed by the tool |
 
 `--json` and `--analyze-only` cannot be combined with `--apply` or `--review`.

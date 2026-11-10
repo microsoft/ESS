@@ -20,6 +20,7 @@ from guided_dataverse_setup import (
     collect_interactive_options,
     load_settings,
     last_process_message,
+    local_semantic_environment,
     merge_cli_options,
     prepare_feedback,
     save_settings,
@@ -33,6 +34,28 @@ from build_service_refresh_template import (
 
 
 class GuidedDataverseSetupTests(unittest.TestCase):
+    def test_local_semantic_runtime_bootstraps_without_transcript_arguments(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch(
+            "guided_dataverse_setup.LOCAL_RUNTIME_DIR",
+            Path(temporary) / "runtime",
+        ), patch(
+            "guided_dataverse_setup.importlib.util.find_spec",
+            return_value=None,
+        ), patch(
+            "guided_dataverse_setup.subprocess.run",
+        ) as runner:
+            runner.return_value = subprocess.CompletedProcess([], 0, "", "")
+            environment = local_semantic_environment()
+
+        self.assertEqual(runner.call_count, 2)
+        install = runner.call_args_list[0].args[0]
+        self.assertIn("pip", install)
+        self.assertIn("--only-binary=:all:", install)
+        self.assertNotIn("transcript", " ".join(install).lower())
+        verify = runner.call_args_list[1]
+        self.assertIn("PYTHONPATH", verify.kwargs["env"])
+        self.assertIn(str(Path(temporary) / "runtime"), environment["PYTHONPATH"])
+
     def test_default_output_names_make_publication_choice_unambiguous(self) -> None:
         desktop_name = OUTPUT_NAMES["desktop-validation"]
         service_name = OUTPUT_NAMES["service-refresh"]
@@ -421,6 +444,7 @@ class GuidedDataverseSetupTests(unittest.TestCase):
             original = settings.read_bytes()
             args = Namespace(mode="desktop-validation", settings_file=settings, topic_transcripts=None, output=None, no_open=False, non_interactive=False)
             with patch("guided_dataverse_setup.select_file", return_value=str(root / "transcripts.csv")) as picker, \
+                 patch("guided_dataverse_setup.ask_yes_no", return_value=False), \
                  patch("guided_dataverse_setup.subprocess.run") as runner:
                 runner.return_value.returncode = 0
                 self.assertEqual(tune_topics(args), 0)
@@ -434,6 +458,67 @@ class GuidedDataverseSetupTests(unittest.TestCase):
                 self.assertNotIn("--analyze-only", command)
                 self.assertNotIn("--environment-url", command)
                 self.assertEqual(settings.read_bytes(), original)
+
+    def test_topic_launcher_forwards_explicit_semantic_opt_in_without_persisting_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            settings = root / "settings.json"
+            save_settings(settings, SetupOptions(environment_url="https://savedqa.crm.dynamics.com"))
+            original = settings.read_bytes()
+            args = Namespace(
+                mode="desktop-validation",
+                settings_file=settings,
+                topic_transcripts=root / "transcripts.csv",
+                output=None,
+                no_open=True,
+                non_interactive=True,
+                semantic_classification=True,
+                semantic_endpoint="https://customer.openai.azure.com",
+                semantic_deployment="approved-model",
+            )
+            with patch.dict(os.environ, {"ESS_SEMANTIC_API_KEY": "secret-sentinel"}), \
+                 patch("guided_dataverse_setup.subprocess.run") as runner:
+                runner.return_value.returncode = 0
+                self.assertEqual(tune_topics(args), 0)
+            command = runner.call_args.args[0]
+            self.assertIn("--semantic-classification", command)
+            self.assertEqual(
+                command[command.index("--semantic-endpoint") + 1],
+                "https://customer.openai.azure.com",
+            )
+            self.assertEqual(
+                command[command.index("--semantic-deployment") + 1],
+                "approved-model",
+            )
+            self.assertNotIn("secret-sentinel", command)
+            self.assertEqual(settings.read_bytes(), original)
+
+    def test_noninteractive_semantic_tuning_requires_endpoint_and_deployment(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            settings = root / "settings.json"
+            save_settings(settings, SetupOptions(environment_url="https://savedqa.crm.dynamics.com"))
+            base = {
+                "mode": "desktop-validation",
+                "settings_file": settings,
+                "topic_transcripts": root / "transcripts.csv",
+                "output": None,
+                "no_open": True,
+                "non_interactive": True,
+                "semantic_classification": True,
+            }
+            with patch("guided_dataverse_setup.subprocess.run") as runner:
+                with self.assertRaisesRegex(ValueError, "--semantic-endpoint"):
+                    tune_topics(Namespace(**base, semantic_endpoint="", semantic_deployment="approved-model"))
+                with self.assertRaisesRegex(ValueError, "--semantic-deployment"):
+                    tune_topics(
+                        Namespace(
+                            **base,
+                            semantic_endpoint="https://customer.openai.azure.com",
+                            semantic_deployment="",
+                        )
+                    )
+                runner.assert_not_called()
 
     def test_topic_launcher_cancel_and_missing_baseline_do_not_run_tuner(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1259,6 +1344,10 @@ class GuidedDataverseSetupTests(unittest.TestCase):
                         "contract": "Customer Topic Overrides",
                         "enabledRules": 2,
                     },
+                    {
+                        "contract": "Customer Conversation Topics",
+                        "classifiedConversations": 18,
+                    },
                     {"contract": "Feedback Events", "events": 6},
                 ],
             }
@@ -1271,6 +1360,7 @@ class GuidedDataverseSetupTests(unittest.TestCase):
                 "Agent registry: 4 aliases",
                 "Organization data: 303 rows",
                 "Approved topic rules: 2 rows",
+                "Human-approved conversation topics: 18 rows",
                 "Prepared feedback: 6 rows",
             ],
         )

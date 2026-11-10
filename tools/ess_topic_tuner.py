@@ -1,7 +1,10 @@
 import argparse
 import csv
+import getpass
 import hashlib
+import hmac
 import json
+import os
 import re
 import subprocess
 import sys
@@ -11,7 +14,10 @@ from collections import Counter, defaultdict
 from itertools import product
 from pathlib import Path
 
-from build_service_refresh_template import validate_topic_overrides
+from build_service_refresh_template import (
+    validate_conversation_topics,
+    validate_topic_overrides,
+)
 from guided_dataverse_setup import (
     DEFAULT_SETTINGS, GENERATED_DIR, PREPARED_FEEDBACK, SKIP_FIELDS, SOURCE_TEMPLATE, TOPIC_OUTPUT_NAME,
     feedback_output_paths, load_settings, reject_output_collisions, selected_skip_flags, setup_input_paths,
@@ -19,6 +25,7 @@ from guided_dataverse_setup import (
 from topic_classifier import (
     CLASSIFIER_VERSION,
     RULE_COLUMNS,
+    RULE_ORIGIN_RANKS,
     classify,
     contains_term,
     language_prefix,
@@ -26,18 +33,39 @@ from topic_classifier import (
     normalize,
     rule_locale,
 )
+from semantic_topic_classifier import (
+    PROVIDER_VERSION as AZURE_PROVIDER_VERSION,
+    SemanticConfig,
+    build_topic_catalog,
+    classify_semantic_batch,
+)
+from local_semantic_topic_classifier import (
+    LOCAL_PROVIDER_VERSION,
+    LocalSemanticConfig,
+    classify_local_batch,
+)
 
 
-TUNER_VERSION = "ESS-TOPIC-TUNER-2026.12"
+TUNER_VERSION = "ESS-TOPIC-TUNER-2026.15"
+DEFAULT_LOCAL_MODEL_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "models"
+    / "multilingual-e5-small"
+)
+PUBLIC_RULE_COLUMNS = (*RULE_COLUMNS, "RuleOrigin")
 PRODUCT_TRUTH = (
     "This local tool learns terminology from usable native Copilot Studio topic evidence.\n"
+    "The bundled local semantic classifier suggests checked-in ESS taxonomy topics for unresolved messages "
+    "without sending transcript text off-device.\n"
+    "Customer-owned Azure semantic classification remains an explicit optional provider.\n"
     "It cannot invent authoritative business topics from unlabeled conversations, even 500 of them.\n"
-    "Repeated unlabeled phrases need customer review. Weak or ambiguous rules stay disabled.\n"
-    "Native topics remain authoritative; not every unclassified conversation will receive a topic."
+    "Local semantic suggestions require one human approve, correct, or leave-unclassified decision per grouped pattern.\n"
+    "Meaningful native business topics remain authoritative; not every unclassified conversation will receive a topic."
 )
 OVERRIDE_COLUMNS = (
     "Enabled",
     *RULE_COLUMNS,
+    "RuleOrigin",
     "Frequency",
     "ReviewStatus",
     "Notes",
@@ -62,6 +90,36 @@ LEARNING_AUDIT_COLUMNS = (
     "AutoEnabled",
     "Status",
 )
+SEMANTIC_AUDIT_COLUMNS = (
+    "ConversationHash",
+    "SemanticTopic",
+    "SemanticVertical",
+    "SemanticConfidence",
+    "Status",
+    "ProviderVersion",
+    "ModelDeployment",
+)
+SEMANTIC_REVIEW_COLUMNS = (
+    "ReviewGroup",
+    "Enabled",
+    "Locale",
+    "SupportingConversations",
+    "SuggestedVertical",
+    "SuggestedTopic",
+    "AlternativeTopics",
+    "MinimumSimilarity",
+    "MinimumMargin",
+    *(f"Example{index}" for index in range(1, 11)),
+    "DecisionVertical",
+    "DecisionTopic",
+    "Notes",
+)
+SEMANTIC_REVIEW_MUTABLE_COLUMNS = {
+    "Enabled",
+    "DecisionVertical",
+    "DecisionTopic",
+    "Notes",
+}
 PLACEHOLDER_TOPICS = {"", "No Topic Detected", "No User Intent", "Other / Uncategorized"}
 PLACEHOLDER_TOPIC_KEYS = {normalize(topic) for topic in PLACEHOLDER_TOPICS}
 NON_LEARNABLE_NATIVE_TOPICS = {
@@ -72,13 +130,25 @@ NON_LEARNABLE_NATIVE_TOPICS = {
     "fallback",
     "goodbye",
     "greeting",
+    "logging",
     "multiple topics matched",
     "on error",
     "reset conversation",
+    "sign in",
+    "signin",
     "start over",
+    "thumbs down",
+    "thumbs up",
     "unknown intent",
     "unknownintent",
 }
+NON_LEARNABLE_NATIVE_TOPIC_PREFIXES = (
+    "[system]",
+    "[internal]",
+    "[admin]",
+    "[debug]",
+    "[test]",
+)
 TRUE_VALUES = {"1", "true", "yes", "y"}
 ENGLISH_NOUN_FORMS = {
     "ticket": "tickets", "request": "requests", "day": "days",
@@ -130,6 +200,11 @@ def parse_args() -> argparse.Namespace:
     action = parser.add_mutually_exclusive_group()
     action.add_argument("--apply", type=Path, help="Apply non-empty approved JSON using saved Dataverse setup choices.")
     action.add_argument("--review", type=Path, help="Validate the reviewed CSV, export enabled rules, and apply them.")
+    action.add_argument(
+        "--review-semantic",
+        type=Path,
+        help="Validate grouped local semantic decisions and apply exact conversation topics.",
+    )
     parser.add_argument("--settings-file", type=Path, default=DEFAULT_SETTINGS)
     for flag in SKIP_FIELDS:
         if flag != "--skip-topic-overrides":
@@ -175,12 +250,77 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--hash-salt", default="")
     parser.add_argument("--skip-invalid", action="store_true")
+    parser.add_argument(
+        "--semantic-classification",
+        action="store_true",
+        help=(
+            "Classify unresolved messages with the selected closed-taxonomy semantic provider."
+        ),
+    )
+    parser.add_argument(
+        "--semantic-provider",
+        choices=("local", "azure"),
+        default="local",
+        help="Semantic provider. Local ONNX is the customer-default; Azure is optional.",
+    )
+    parser.add_argument(
+        "--semantic-endpoint",
+        default=os.environ.get("ESS_SEMANTIC_ENDPOINT", ""),
+        help="Customer-owned Azure OpenAI or Microsoft Foundry resource endpoint.",
+    )
+    parser.add_argument(
+        "--semantic-deployment",
+        default=os.environ.get("ESS_SEMANTIC_DEPLOYMENT", ""),
+        help="Approved Azure model deployment name.",
+    )
+    parser.add_argument(
+        "--semantic-min-confidence",
+        type=float,
+        default=0.90,
+        help="Minimum provider confidence accepted as semantic training evidence.",
+    )
+    parser.add_argument(
+        "--local-model-dir",
+        type=Path,
+        default=DEFAULT_LOCAL_MODEL_DIR,
+        help="Hash-verified local multilingual E5 ONNX model directory.",
+    )
+    parser.add_argument(
+        "--local-min-similarity",
+        type=float,
+        default=0.82,
+        help="Advisory local similarity threshold recorded for grouped review.",
+    )
+    parser.add_argument(
+        "--local-min-margin",
+        type=float,
+        default=0.01,
+        help="Advisory local runner-up margin recorded for grouped review.",
+    )
+    parser.add_argument(
+        "--semantic-batch-size",
+        type=int,
+        default=20,
+        help="Maximum redacted messages sent in each semantic request.",
+    )
+    parser.add_argument(
+        "--semantic-timeout",
+        type=int,
+        default=90,
+        help="Semantic request timeout in seconds.",
+    )
     args = parser.parse_args()
-    if (args.json or args.analyze_only) and (args.apply or args.review):
-        parser.error("--json and --analyze-only cannot be combined with --apply or --review.")
+    if (args.json or args.analyze_only) and (
+        args.apply or args.review or args.review_semantic
+    ):
+        parser.error(
+            "--json and --analyze-only cannot be combined with apply or review actions."
+        )
     if args.json:
         args.analyze_only = True
-    if not (args.apply or args.review) and (args.input is None or args.output_dir is None):
+    if not (
+        args.apply or args.review or args.review_semantic
+    ) and (args.input is None or args.output_dir is None):
         parser.error("Analysis requires --input and --output-dir.")
     return args
 
@@ -195,6 +335,25 @@ def read_csv(path: Path) -> tuple[list[str], list[dict]]:
             return list(reader.fieldnames or []), rows
     finally:
         csv.field_size_limit(previous_limit)
+
+
+def spreadsheet_safe(value):
+    if not isinstance(value, str):
+        return value
+    if value.lstrip().startswith(("=", "+", "-", "@")):
+        return "'" + value
+    return value
+
+
+def spreadsheet_unescape(value):
+    if (
+        isinstance(value, str)
+        and len(value) >= 2
+        and value[0] == "'"
+        and value[1:].lstrip().startswith(("=", "+", "-", "@"))
+    ):
+        return value[1:]
+    return value
 
 
 def resolve_column(
@@ -395,7 +554,12 @@ def is_usable_native_topic(value: str | None) -> bool:
 
 
 def is_learnable_native_topic(value: str | None) -> bool:
-    return is_usable_native_topic(value) and normalize(value) not in NON_LEARNABLE_NATIVE_TOPICS
+    topic = str(value or "").strip()
+    return (
+        is_usable_native_topic(topic)
+        and normalize(topic) not in NON_LEARNABLE_NATIVE_TOPICS
+        and not topic.casefold().startswith(NON_LEARNABLE_NATIVE_TOPIC_PREFIXES)
+    )
 
 
 def classify_records(records: list[dict], rules: list[dict], salt: str) -> tuple[list[dict], list[dict], list[dict]]:
@@ -404,7 +568,7 @@ def classify_records(records: list[dict], rules: list[dict], salt: str) -> tuple
     uncategorized = []
     for index, record in enumerate(records, start=1):
         native_topic = str(record.get("native_topic") or "").strip()
-        if is_usable_native_topic(native_topic):
+        if is_learnable_native_topic(native_topic):
             result = {
                 "topic": native_topic,
                 "vertical": "Native",
@@ -464,6 +628,607 @@ def redact_text(value: str, counts: Counter) -> str:
         redacted, replacements = pattern.subn(" ", redacted)
         counts[name] += replacements
     return redacted
+
+
+def semantic_config(args: argparse.Namespace) -> SemanticConfig:
+    endpoint = str(args.semantic_endpoint or "").strip()
+    deployment = str(args.semantic_deployment or "").strip()
+    if not endpoint:
+        raise ValueError(
+            "Semantic classification requires --semantic-endpoint or ESS_SEMANTIC_ENDPOINT."
+        )
+    if not deployment:
+        raise ValueError(
+            "Semantic classification requires --semantic-deployment or ESS_SEMANTIC_DEPLOYMENT."
+        )
+    api_key = os.environ.pop("ESS_SEMANTIC_API_KEY", "")
+    if not api_key and not args.non_interactive and sys.stdin.isatty():
+        api_key = getpass.getpass(
+            "Enter the customer-owned Azure OpenAI API key (not saved): "
+        )
+    if not api_key:
+        raise ValueError(
+            "Semantic classification requires ESS_SEMANTIC_API_KEY or an interactive key entry."
+        )
+    return SemanticConfig(
+        endpoint=endpoint,
+        deployment=deployment,
+        api_key=api_key,
+        timeout_seconds=args.semantic_timeout,
+    )
+
+
+def local_semantic_config(args: argparse.Namespace) -> LocalSemanticConfig:
+    return LocalSemanticConfig(
+        model_dir=Path(
+            getattr(args, "local_model_dir", DEFAULT_LOCAL_MODEL_DIR)
+        ),
+        min_similarity=float(
+            getattr(args, "local_min_similarity", 0.82)
+        ),
+        min_margin=float(getattr(args, "local_min_margin", 0.03)),
+    )
+
+
+def classify_semantic_evidence(
+    records: list[dict],
+    built_in_rules: list[dict],
+    args: argparse.Namespace,
+) -> tuple[list[dict], list[dict], list[dict], Counter, dict]:
+    provider = str(
+        getattr(args, "semantic_provider", "azure") or "azure"
+    ).strip().lower()
+    if provider not in {"local", "azure"}:
+        raise ValueError("Semantic provider must be local or azure.")
+    provider_version = (
+        LOCAL_PROVIDER_VERSION
+        if provider == "local"
+        else AZURE_PROVIDER_VERSION
+    )
+    deployment_name = (
+        "intfloat/multilingual-e5-small"
+        if provider == "local"
+        else getattr(args, "semantic_deployment", "")
+    )
+    pii_counts = Counter()
+    prepared = []
+    skipped = []
+    for index, record in enumerate(records, start=1):
+        redacted = redact_text(
+            str(record.get("prompt") or ""),
+            pii_counts,
+        ).strip()
+        conversation_hash = hash_identifier(
+            str(record.get("id") or f"semantic-{index}"),
+            args.hash_salt,
+        )
+        if not redacted:
+            skipped.append(
+                {
+                    "ConversationHash": conversation_hash,
+                    "SemanticTopic": "",
+                    "SemanticVertical": "",
+                    "SemanticConfidence": "",
+                    "Status": "EmptyAfterRedaction",
+                    "ProviderVersion": provider_version,
+                    "ModelDeployment": deployment_name,
+                }
+            )
+            continue
+        language = language_prefix(record.get("locale")) or "*"
+        if not extract_terms(redacted, language):
+            skipped.append(
+                {
+                    "ConversationHash": conversation_hash,
+                    "SemanticTopic": "",
+                    "SemanticVertical": "",
+                    "SemanticConfidence": "",
+                    "Status": "InsufficientSemanticContent",
+                    "ProviderVersion": provider_version,
+                    "ModelDeployment": deployment_name,
+                }
+            )
+            continue
+        prepared.append(
+            {
+                "id": f"S{index:06d}",
+                "language": language if language != "*" else "unknown",
+                "text": redacted[:4000],
+                "record": record,
+                "conversation_hash": conversation_hash,
+            }
+        )
+
+    if not prepared:
+        return [], [], skipped, pii_counts, {
+            "redactedMessagesSent": 0,
+            "messagesProcessedLocally": 0,
+            "requests": 0,
+            "localBatches": 0,
+            "accepted": 0,
+            "suggested": 0,
+            "abstained": 0,
+            "lowConfidence": 0,
+            "emptyAfterRedaction": sum(
+                row["Status"] == "EmptyAfterRedaction"
+                for row in skipped
+            ),
+            "insufficientContent": sum(
+                row["Status"] == "InsufficientSemanticContent"
+                for row in skipped
+            ),
+            "provider": provider,
+            "providerVersion": provider_version,
+            "modelDeployment": deployment_name,
+        }
+
+    catalog = build_topic_catalog(built_in_rules)
+    results = []
+    request_count = 0
+    config = (
+        local_semantic_config(args)
+        if provider == "local"
+        else semantic_config(args)
+    )
+    for start in range(0, len(prepared), args.semantic_batch_size):
+        batch = prepared[start : start + args.semantic_batch_size]
+        provider_items = [
+            {
+                "id": item["id"],
+                "language": item["language"],
+                "text": item["text"],
+            }
+            for item in batch
+        ]
+        if provider == "local":
+            results.extend(
+                classify_local_batch(
+                    provider_items,
+                    catalog,
+                    config,
+                )
+            )
+        else:
+            results.extend(
+                classify_semantic_batch(
+                    provider_items,
+                    catalog,
+                    config,
+                )
+            )
+        request_count += 1
+
+    result_by_id = {result["id"]: result for result in results}
+    training_records = []
+    suggestion_records = []
+    audits = list(skipped)
+    accepted = 0
+    for item in prepared:
+        result = result_by_id[item["id"]]
+        topic = result["topic"]
+        confidence = result["confidence"]
+        candidates = result.get("candidates") or []
+        semantic_vertical = result["vertical"]
+        if provider == "local" and candidates:
+            status = "Suggested"
+            record = item["record"]
+            top_candidate = candidates[0]
+            topic = top_candidate["topic"]
+            semantic_vertical = top_candidate["vertical"]
+            suggestion_records.append(
+                {
+                    "id": record.get("id"),
+                    "prompt": item["text"],
+                    "locale": record.get("locale"),
+                    "confidence": confidence,
+                    "margin": float(result.get("margin") or 0),
+                    "candidates": candidates,
+                    "semantic_provider_version": provider_version,
+                }
+            )
+        elif topic is None:
+            status = "Abstained"
+        elif (
+            provider == "azure"
+            and confidence < args.semantic_min_confidence
+        ):
+            status = "LowConfidence"
+        else:
+            status = "Accepted"
+            accepted += 1
+            record = item["record"]
+            training_records.append(
+                {
+                    "id": record.get("id"),
+                    "prompt": item["text"],
+                    "locale": record.get("locale"),
+                    "native_topic": "",
+                    "semantic_topic": topic,
+                    "semantic_vertical": semantic_vertical,
+                    "semantic_confidence": confidence,
+                    "semantic_provider_version": provider_version,
+                    "training_examples": [
+                        {
+                            "record_id": record.get("id"),
+                            "prompt": item["text"],
+                            "locale": record.get("locale"),
+                            "native_topic": topic,
+                            "vertical": semantic_vertical,
+                        }
+                    ],
+                }
+            )
+        audits.append(
+            {
+                "ConversationHash": item["conversation_hash"],
+                "SemanticTopic": topic or "",
+                "SemanticVertical": semantic_vertical,
+                "SemanticConfidence": f"{confidence:.4f}",
+                "Status": status,
+                "ProviderVersion": provider_version,
+                "ModelDeployment": deployment_name,
+            }
+        )
+    return training_records, suggestion_records, audits, pii_counts, {
+        "redactedMessagesSent": (
+            len(prepared) if provider == "azure" else 0
+        ),
+        "messagesProcessedLocally": (
+            len(prepared) if provider == "local" else 0
+        ),
+        "requests": request_count if provider == "azure" else 0,
+        "localBatches": request_count if provider == "local" else 0,
+        "accepted": accepted,
+        "suggested": len(suggestion_records),
+        "abstained": sum(row["Status"] == "Abstained" for row in audits),
+        "lowConfidence": sum(row["Status"] == "LowConfidence" for row in audits),
+        "emptyAfterRedaction": sum(
+            row["Status"] == "EmptyAfterRedaction"
+            for row in skipped
+        ),
+        "insufficientContent": sum(
+            row["Status"] == "InsufficientSemanticContent"
+            for row in skipped
+        ),
+        "provider": provider,
+        "providerVersion": provider_version,
+        "modelDeployment": deployment_name,
+    }
+
+
+def mark_semantic_learning(
+    rows: list[dict],
+    audits: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    marked_rows = []
+    for row in rows:
+        review_status = row["ReviewStatus"]
+        if review_status == "AutoValidated":
+            review_status = "SemanticValidated"
+        elif review_status == "NeedsReview":
+            review_status = "SemanticNeedsReview"
+        marked_rows.append(
+            {
+                **row,
+                "ReviewStatus": review_status,
+                "Notes": row["Notes"].replace(
+                    "native topic evidence",
+                    "high-confidence semantic evidence",
+                ),
+            }
+        )
+    marked_audits = []
+    for row in audits:
+        status = row["Status"]
+        if status == "AutoValidated":
+            status = "SemanticValidated"
+        elif status == "NeedsReview":
+            status = "SemanticNeedsReview"
+        marked_audits.append({**row, "Status": status})
+    return marked_rows, marked_audits
+
+
+def build_semantic_review(
+    suggestions: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    grouped = defaultdict(list)
+    for suggestion in suggestions:
+        candidates = suggestion.get("candidates") or []
+        if not candidates:
+            continue
+        language = language_prefix(suggestion.get("locale")) or "*"
+        top = candidates[0]
+        runner_up = candidates[1]["topic"] if len(candidates) > 1 else ""
+        key = (
+            language,
+            str(top["vertical"]),
+            str(top["topic"]),
+            str(runner_up),
+        )
+        grouped[key].append(suggestion)
+
+    review_rows = []
+    evidence_rows = []
+    for key, grouped_items in sorted(grouped.items()):
+        language, vertical, topic, runner_up = key
+        ordered_items = sorted(
+            grouped_items,
+            key=lambda value: (
+                -float(value.get("confidence") or 0),
+                str(value.get("id") or ""),
+            ),
+        )
+        for chunk_index, start in enumerate(
+            range(0, len(ordered_items), 10),
+            start=1,
+        ):
+            items = ordered_items[start : start + 10]
+            group_id = "SG-" + hash_identifier(
+                "\0".join((*key, str(chunk_index))),
+                "semantic-review-group",
+            )[:12]
+            representatives = []
+            for item in items:
+                example = " ".join(
+                    str(item.get("prompt") or "").split()
+                )
+                if example:
+                    representatives.append(example)
+            alternatives = []
+            for item in items:
+                for candidate in (item.get("candidates") or [])[1:5]:
+                    label = (
+                        f"{candidate['vertical']} :: {candidate['topic']}"
+                    )
+                    if label not in alternatives:
+                        alternatives.append(label)
+            minimum_similarity = min(
+                float(item.get("confidence") or 0)
+                for item in items
+            )
+            minimum_margin = min(
+                float(item.get("margin") or 0)
+                for item in items
+            )
+            review_row = {
+                    "ReviewGroup": group_id,
+                    "Enabled": "false",
+                    "Locale": language,
+                    "SupportingConversations": str(len(items)),
+                    "SuggestedVertical": vertical,
+                    "SuggestedTopic": topic,
+                    "AlternativeTopics": " | ".join(alternatives[:6]),
+                    "MinimumSimilarity": f"{minimum_similarity:.4f}",
+                    "MinimumMargin": f"{minimum_margin:.4f}",
+                    "DecisionVertical": vertical,
+                    "DecisionTopic": topic,
+                    "Notes": (
+                        "Approve only when every displayed redacted example has "
+                        "the same business meaning. Change Decision fields to one "
+                        "ESS taxonomy topic, or leave Enabled=false."
+                    ),
+                }
+            review_row.update(
+                {
+                    f"Example{index}": (
+                        representatives[index - 1]
+                        if index <= len(representatives)
+                        else ""
+                    )
+                    for index in range(1, 11)
+                }
+            )
+            review_rows.append(review_row)
+            evidence_rows.append(
+                {
+                    "ReviewGroup": group_id,
+                    "Conversations": [
+                        {
+                            "ConversationTranscriptId": str(
+                                item.get("id") or ""
+                            ).strip().lower(),
+                            "Candidates": item.get("candidates") or [],
+                        }
+                        for item in items
+                    ],
+                }
+            )
+    return review_rows, evidence_rows
+
+
+def semantic_review_payload(
+    review_rows: list[dict],
+    evidence_rows: list[dict],
+) -> bytes:
+    immutable_rows = sorted(
+        [
+        {
+            column: str(row.get(column) or "")
+            for column in SEMANTIC_REVIEW_COLUMNS
+            if column not in SEMANTIC_REVIEW_MUTABLE_COLUMNS
+        }
+        for row in review_rows
+        ],
+        key=lambda row: row["ReviewGroup"],
+    )
+    evidence_rows = sorted(
+        evidence_rows,
+        key=lambda row: str(row.get("ReviewGroup") or ""),
+    )
+    payload = {
+        "version": 1,
+        "review": immutable_rows,
+        "evidence": evidence_rows,
+    }
+    return json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def write_semantic_review_files(
+    review_path: Path,
+    evidence_path: Path,
+    key_path: Path,
+    review_rows: list[dict],
+    evidence_rows: list[dict],
+) -> None:
+    key = os.urandom(32)
+    integrity = hmac.new(
+        key,
+        semantic_review_payload(review_rows, evidence_rows),
+        hashlib.sha256,
+    ).hexdigest()
+    write_csv(review_path, review_rows, SEMANTIC_REVIEW_COLUMNS)
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "groups": evidence_rows,
+                "integrity": integrity,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    key_path.write_text(key.hex() + "\n", encoding="ascii")
+    try:
+        os.chmod(key_path, 0o600)
+    except OSError:
+        pass
+
+
+def reviewed_semantic_topics(
+    review_path: Path,
+    evidence_path: Path,
+    key_path: Path,
+    taxonomy_path: Path,
+) -> list[dict]:
+    with review_path.open(
+        "r",
+        encoding="utf-8-sig",
+        newline="",
+    ) as handle:
+        reader = csv.DictReader(handle)
+        if tuple(reader.fieldnames or ()) != SEMANTIC_REVIEW_COLUMNS:
+            raise ValueError(
+                "Semantic review columns changed. Use the unmodified "
+                "semantic-topic-review.csv generated by the tuner."
+            )
+        review_rows = [
+            {
+                key: spreadsheet_unescape(value)
+                for key, value in row.items()
+            }
+            for row in reader
+        ]
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    if (
+        not isinstance(evidence, dict)
+        or set(evidence) != {"version", "groups", "integrity"}
+        or evidence["version"] != 1
+        or not isinstance(evidence["groups"], list)
+        or not isinstance(evidence["integrity"], str)
+    ):
+        raise ValueError("Semantic review evidence is invalid.")
+    try:
+        key = bytes.fromhex(key_path.read_text(encoding="ascii").strip())
+    except (OSError, ValueError) as error:
+        raise ValueError("Semantic review integrity key is missing or invalid.") from error
+    if len(key) != 32:
+        raise ValueError("Semantic review integrity key is missing or invalid.")
+    expected_integrity = hmac.new(
+        key,
+        semantic_review_payload(review_rows, evidence["groups"]),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(
+        expected_integrity,
+        evidence["integrity"],
+    ):
+        raise ValueError(
+            "Semantic review or evidence changed outside the allowed decision fields. "
+            "Rerun the tuner to create a fresh review."
+        )
+    review_digest = evidence["integrity"]
+    evidence = evidence["groups"]
+    evidence_by_group = {}
+    for row in evidence:
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"ReviewGroup", "Conversations"}
+            or not isinstance(row["ReviewGroup"], str)
+            or not isinstance(row["Conversations"], list)
+            or row["ReviewGroup"] in evidence_by_group
+        ):
+            raise ValueError("Semantic review evidence is invalid.")
+        evidence_by_group[row["ReviewGroup"]] = row["Conversations"]
+
+    catalog = build_topic_catalog(load_rules(taxonomy_path))
+    allowed = {
+        (entry["vertical"], entry["topic"])
+        for entry in catalog
+    }
+    approved = []
+    seen_conversations = set()
+    seen_groups = set()
+    for row_number, row in enumerate(review_rows, start=1):
+        group_id = str(row.get("ReviewGroup") or "").strip()
+        if not group_id or group_id in seen_groups:
+            raise ValueError(
+                f"Semantic review row {row_number} has a missing or duplicate ReviewGroup."
+            )
+        seen_groups.add(group_id)
+        if group_id not in evidence_by_group:
+            raise ValueError(
+                f"Semantic review row {row_number} has no matching evidence."
+            )
+        if str(row.get("Enabled") or "").strip().lower() not in TRUE_VALUES:
+            continue
+        vertical = str(row.get("DecisionVertical") or "").strip()
+        topic = str(row.get("DecisionTopic") or "").strip()
+        if (vertical, topic) not in allowed:
+            raise ValueError(
+                f"Semantic review row {row_number} must use one checked-in Vertical and CanonicalTopic."
+            )
+        for conversation in evidence_by_group[group_id]:
+            if (
+                not isinstance(conversation, dict)
+                or set(conversation)
+                != {"ConversationTranscriptId", "Candidates"}
+            ):
+                raise ValueError("Semantic review evidence conversation is invalid.")
+            conversation_id = str(
+                conversation["ConversationTranscriptId"] or ""
+            ).strip().lower()
+            if (
+                not conversation_id
+                or conversation_id in seen_conversations
+            ):
+                raise ValueError(
+                    "Semantic review evidence has a missing or duplicate conversation ID."
+                )
+            seen_conversations.add(conversation_id)
+            approved.append(
+                {
+                    "ConversationTranscriptId": conversation_id,
+                    "Vertical": vertical,
+                    "CanonicalTopic": topic,
+                    "Confidence": 1.0,
+                    "ProviderVersion": (
+                        "ESS-SEMANTIC-HUMAN-REVIEW-V1"
+                    ),
+                    "ReviewDigest": review_digest,
+                }
+            )
+    return sorted(
+        approved,
+        key=lambda row: row["ConversationTranscriptId"],
+    )
 
 
 def candidate_terms(
@@ -535,7 +1300,11 @@ def extract_terms(value: str, language: str) -> list[str]:
     ]
     if language == "en":
         tokens = [ENGLISH_SINGULARS.get(token, token) for token in tokens]
-    stopwords = STOPWORDS.get(language, set())
+    stopwords = (
+        STOPWORDS.get(language, set())
+        if language != "*"
+        else set().union(*STOPWORDS.values())
+    )
 
     def meaningful(token: str) -> bool:
         return len(token) >= 3 and token not in stopwords
@@ -792,6 +1561,7 @@ def learn_native_topic_rules(
     max_keywords: int,
     validation_folds: int,
     min_validation_conversations: int,
+    rule_origin: str = "NativeLearned",
 ) -> tuple[list[dict], list[dict], list[dict], Counter]:
     pii_counts = Counter()
     examples = []
@@ -812,6 +1582,7 @@ def learn_native_topic_rules(
                     "locale": str(example.get("locale") or ""),
                     "language": language,
                     "native_topic": topic,
+                    "vertical": str(example.get("vertical") or "").strip(),
                     "normalized_text": customer_match_text(redacted, language),
                     "terms": terms,
                 }
@@ -943,6 +1714,7 @@ def learn_native_topic_rules(
             "Keywords": "|".join(selected_terms),
             "Exclusions": "",
             "Priority": "120",
+            "RuleOrigin": rule_origin,
             "Frequency": str(len(matched_target)),
             "ReviewStatus": status,
             "Notes": (
@@ -955,7 +1727,12 @@ def learn_native_topic_rules(
         if auto_enabled:
             auto_rows.append(row)
 
-    return generated_rows, rules_from_override_rows(auto_rows), audit_rows, pii_counts
+    return (
+        generated_rows,
+        rules_from_override_rows(auto_rows, default_origin=rule_origin),
+        audit_rows,
+        pii_counts,
+    )
 
 
 def _select_distinct_terms(
@@ -990,6 +1767,15 @@ def _is_auto_term_specific(term: str, support: int, topic_conversations: int) ->
 
 
 def infer_vertical(examples: list[dict], built_in_rules: list[dict]) -> str:
+    declared_verticals = Counter(
+        str(example.get("vertical") or "").strip()
+        for example in examples
+        if str(example.get("vertical") or "").strip()
+    )
+    if declared_verticals:
+        vertical, count = declared_verticals.most_common(1)[0]
+        if count == sum(declared_verticals.values()):
+            return vertical
     verticals = Counter()
     for example in examples:
         result = classify(example["prompt"], example["locale"], built_in_rules)
@@ -1005,10 +1791,16 @@ def read_override_rows(path: Path | None) -> list[dict]:
     if path is None:
         return []
     fieldnames, rows = read_csv(path)
-    missing = set(OVERRIDE_COLUMNS) - set(fieldnames)
+    missing = (set(OVERRIDE_COLUMNS) - {"RuleOrigin"}) - set(fieldnames)
     if missing:
         raise ValueError(f"{path} is missing override columns: {sorted(missing)}")
-    return [{column: row.get(column, "") for column in OVERRIDE_COLUMNS} for row in rows]
+    return [
+        {
+            column: spreadsheet_unescape(row.get(column, ""))
+            for column in OVERRIDE_COLUMNS
+        }
+        for row in rows
+    ]
 
 
 def approved_rules(path: Path | None) -> list[dict]:
@@ -1025,10 +1817,21 @@ def saved_override_rows(settings_file: Path) -> list[dict]:
         if not validation["enabledRules"]:
             raise ValueError("The saved approved-rule list is empty.")
         rules = json.loads(payload)
-        rules_from_override_rows([{**row, "Enabled": "true"} for row in rules])
+        rules_from_override_rows(
+            [{**row, "Enabled": "true"} for row in rules],
+            default_origin="CustomerSaved",
+        )
     except (OSError, ValueError) as error:
         raise ValueError(f"Saved topic rules {path} are missing or invalid: {error}") from error
-    return [{**rule, "Enabled": "true", "ReviewStatus": "PreviouslyApproved"} for rule in rules]
+    return [
+        {
+            **rule,
+            "RuleOrigin": str(rule.get("RuleOrigin") or "CustomerSaved"),
+            "Enabled": "true",
+            "ReviewStatus": "PreviouslyApproved",
+        }
+        for rule in rules
+    ]
 
 
 def customer_rule_key(rule: dict) -> tuple:
@@ -1054,12 +1857,24 @@ def merge_customer_rules(saved: list[dict], explicit: list[dict], learned: list[
 
 def publication_rule_counts(rules: list[dict]) -> Counter:
     return Counter(
-        tuple((column, rule.get(column)) for column in RULE_COLUMNS)
+        tuple(
+            (
+                column,
+                rule.get(column)
+                if column != "RuleOrigin"
+                else str(rule.get(column) or "CustomerExplicit"),
+            )
+            for column in PUBLIC_RULE_COLUMNS
+        )
         for rule in rules
     )
 
 
-def rules_from_override_rows(rows: list[dict]) -> list[dict]:
+def rules_from_override_rows(
+    rows: list[dict],
+    *,
+    default_origin: str = "CustomerExplicit",
+) -> list[dict]:
     rules = []
     for row in rows:
         if str(row.get("Enabled") or "").strip().lower() not in TRUE_VALUES:
@@ -1077,6 +1892,12 @@ def rules_from_override_rows(rows: list[dict]) -> list[dict]:
         keywords = expand_customer_terms(str(row["Keywords"]).strip(), rule_locale(row.get("Locale")))
         if not keywords:
             raise ValueError("Enabled override row has no Keywords after normalization")
+        review_status = str(row.get("ReviewStatus") or "").strip()
+        origin = str(row.get("RuleOrigin") or "").strip() or default_origin
+        if review_status in {"Candidate", "NeedsReview", "SemanticNeedsReview"}:
+            origin = "CustomerExplicit"
+        if origin not in RULE_ORIGIN_RANKS or origin == "BuiltIn":
+            raise ValueError("Enabled override row has an invalid RuleOrigin")
         rules.append(
             {
                 "Locale": rule_locale(row.get("Locale")),
@@ -1086,6 +1907,7 @@ def rules_from_override_rows(rows: list[dict]) -> list[dict]:
                 "Exclusions": expand_customer_terms(str(row.get("Exclusions") or "").strip(), language_prefix(row.get("Locale")) or "*"),
                 "Priority": priority,
                 "RuleSource": "Customer",
+                "RuleOrigin": origin,
             }
         )
     return rules
@@ -1096,7 +1918,13 @@ def write_csv(path: Path, rows: list[dict], fieldnames: tuple[str, ...]) -> None
     with path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(
+            {
+                column: spreadsheet_safe(row.get(column, ""))
+                for column in fieldnames
+            }
+            for row in rows
+        )
 
 
 def next_command(args: argparse.Namespace, action: str, path: Path) -> str:
@@ -1113,12 +1941,48 @@ def next_command(args: argparse.Namespace, action: str, path: Path) -> str:
 
 def workflow_outcome(report: dict, rows: list[dict], args: argparse.Namespace) -> dict:
     enabled = report["enabledCustomerRulesWritten"]
+    semantic_conversations = report.get(
+        "semanticConversationOverridesWritten",
+        0,
+    )
     pending = sum(str(row.get("Enabled") or "").strip().lower() not in TRUE_VALUES for row in rows)
-    outcome = {"approvedRules": enabled, "reviewItems": pending}
-    if report.get("publicationRequired", report.get("newOrUpdatedApprovedRules", enabled)):
+    outcome = {
+        "approvedRules": enabled,
+        "semanticConversations": semantic_conversations,
+        "reviewItems": pending,
+    }
+    suggestion_groups = report.get("semanticSuggestionGroups", 0)
+    if suggestion_groups:
+        review = tuner_output_paths(args.output_dir)["semantic_review"]
+        outcome.update(
+            status="semantic-review-required",
+            message=(
+                f"REVIEW REQUIRED: {suggestion_groups} grouped local semantic "
+                "suggestion(s) are ready for approve, correct, or leave-unclassified decisions."
+            ),
+            reviewFile=str(review.resolve()),
+            semanticSuggestionGroups=suggestion_groups,
+        )
+        if args.analyze_only or args.non_interactive:
+            outcome["action"] = next_command(
+                args,
+                "--review-semantic",
+                review,
+            )
+    elif (
+        report.get(
+            "publicationRequired",
+            report.get("newOrUpdatedApprovedRules", enabled),
+        )
+        or semantic_conversations
+    ):
         outcome.update(
             status="ready",
-            message=f"READY: {enabled} approved rule(s) can be applied. Disabled items are not included.",
+            message=(
+                f"READY: {enabled} approved rule(s) and "
+                f"{semantic_conversations} exact semantic conversation topic(s) "
+                "can be applied. Disabled items are not included."
+            ),
         )
         if args.analyze_only:
             outcome["action"] = next_command(args, "--apply", tuner_output_paths(args.output_dir)["rules"])
@@ -1151,7 +2015,18 @@ def workflow_outcome(report: dict, rows: list[dict], args: argparse.Namespace) -
 
 def print_outcome(outcome: dict) -> None:
     print("\n" + outcome["message"])
-    if outcome["status"] == "review-required":
+    if outcome["status"] == "semantic-review-required":
+        print("Review only this file: " + outcome["reviewFile"])
+        print(
+            "For each grouped pattern, verify the redacted examples, correct "
+            "DecisionVertical or DecisionTopic when needed, and set Enabled=true "
+            "only when the whole group has one meaning."
+        )
+        print(
+            "Leave mixed, unclear, or unsafe groups disabled. Save and close "
+            "the CSV; another tuner analysis run is not needed."
+        )
+    elif outcome["status"] == "review-required":
         print("Review only this file: " + outcome["reviewFile"])
         print("Fill in Vertical and CanonicalTopic; adjust Keywords or Exclusions if needed.")
         print("Set Enabled=true only for rules you approve; leave unsafe or ambiguous rows disabled.")
@@ -1167,7 +2042,10 @@ def print_outcome(outcome: dict) -> None:
         print("Do not import the JSON or enter its path in Power BI. Its contents will be embedded.")
     if "action" in outcome:
         print(outcome["action"])
-        print("Do not import the JSON or enter its path in Power BI. Rules are embedded in the new template.")
+        print(
+            "Do not import review artifacts into Power BI. Approved content "
+            "is embedded in the new template."
+        )
     elif outcome["status"] == "stop":
         print("Do not import the empty JSON. No template was created or changed.")
 
@@ -1177,6 +2055,12 @@ def tuner_output_paths(output_dir: Path) -> dict[str, Path]:
         "enrichment": output_dir / "topic-enrichment.csv",
         "classification_audit": output_dir / "classification-audit.csv",
         "learning_audit": output_dir / "topic-learning-audit.csv",
+        "semantic_audit": output_dir / "semantic-classification-audit.csv",
+        "semantic_learning_audit": output_dir / "semantic-learning-audit.csv",
+        "semantic_review": output_dir / "semantic-topic-review.csv",
+        "semantic_review_evidence": output_dir / "semantic-review-evidence.json",
+        "semantic_review_key": output_dir / "semantic-review-integrity.key",
+        "semantic_conversation_topics": output_dir / "semantic-conversation-topics.json",
         "review": output_dir / "customer-topic-overrides.csv",
         "rules": output_dir / "customer-topic-overrides.json",
         "privacy_report": output_dir / "privacy-report.json",
@@ -1196,12 +2080,22 @@ def validate_tuner_output(args: argparse.Namespace, *additional_inputs: Path) ->
     output = args.template_output or GENERATED_DIR / TOPIC_OUTPUT_NAME
     stored = load_settings(args.settings_file)
     protected = [SOURCE_TEMPLATE, args.settings_file, *setup_input_paths(stored), *additional_inputs]
-    protected.extend(getattr(args, name, None) for name in ("input", "taxonomy", "overrides", "apply", "review"))
+    protected.extend(
+        getattr(args, name, None)
+        for name in (
+            "input",
+            "taxonomy",
+            "overrides",
+            "apply",
+            "review",
+            "review_semantic",
+        )
+    )
     output_dir = getattr(args, "output_dir", None)
     artifact_directories = set()
     if output_dir is not None:
         artifact_directories.add(Path(output_dir).resolve())
-    for action_name in ("apply", "review"):
+    for action_name in ("apply", "review", "review_semantic"):
         action_path = getattr(args, action_name, None)
         if action_path is not None:
             artifact_directories.add(Path(action_path).resolve().parent)
@@ -1223,8 +2117,20 @@ def apply_dataverse_rules(
 ) -> int:
     output = validated_output or validate_tuner_output(args, path)
     _, validation = validate_topic_overrides(path)
-    if not validation["enabledRules"]:
-        raise ValueError("No approved rules are available. Keep the existing template unchanged; do not import the empty JSON.")
+    conversation_topics = path.with_name("semantic-conversation-topics.json")
+    conversation_validation = {"classifiedConversations": 0}
+    if conversation_topics.exists():
+        _, conversation_validation = validate_conversation_topics(
+            conversation_topics
+        )
+    if (
+        not validation["enabledRules"]
+        and not conversation_validation["classifiedConversations"]
+    ):
+        raise ValueError(
+            "No approved rules or exact semantic conversation topics are available. "
+            "Keep the existing template unchanged; do not import the empty JSON."
+        )
     settings = args.settings_file.resolve()
     stored = load_settings(settings)
     if stored is None or not stored.environment_url:
@@ -1235,9 +2141,27 @@ def apply_dataverse_rules(
         "--settings-file", str(settings), "--topic-overrides-json", str(path.resolve()),
         "--output", str(output.resolve()), "--no-open" if args.no_open else "--open",
     ]
+    if conversation_topics.exists():
+        command.extend(
+            [
+                "--conversation-topics-json",
+                str(conversation_topics.resolve()),
+            ]
+        )
     command.extend(selected_skip_flags(args))
-    print(f"Applying {validation['enabledRules']} approved rule(s) using saved Dataverse choices.", flush=True)
-    return subprocess.run(command, check=False).returncode
+    print(
+        f"Applying {validation['enabledRules']} approved rule(s) and "
+        f"{conversation_validation['classifiedConversations']} exact semantic "
+        "conversation topic(s) using saved Dataverse choices.",
+        flush=True,
+    )
+    child_environment = os.environ.copy()
+    child_environment.pop("ESS_SEMANTIC_API_KEY", None)
+    return subprocess.run(
+        command,
+        check=False,
+        env=child_environment,
+    ).returncode
 
 
 def review_and_apply(path: Path, args: argparse.Namespace) -> int:
@@ -1252,7 +2176,7 @@ def review_and_apply(path: Path, args: argparse.Namespace) -> int:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix="approved-", suffix=".json",
                                          dir=path.parent, delete=False) as candidate:
             output = Path(candidate.name)
-            json.dump([{column: rule[column] for column in RULE_COLUMNS} for rule in rules], candidate,
+            json.dump([{column: rule[column] for column in PUBLIC_RULE_COLUMNS} for rule in rules], candidate,
                       ensure_ascii=False, separators=(",", ":"))
             candidate.write("\n")
         result = apply_dataverse_rules(
@@ -1277,6 +2201,68 @@ def review_and_apply(path: Path, args: argparse.Namespace) -> int:
                     output.unlink(missing_ok=True)
 
 
+def review_semantic_and_apply(
+    path: Path,
+    args: argparse.Namespace,
+) -> int:
+    evidence = path.with_name("semantic-review-evidence.json")
+    key_path = path.with_name("semantic-review-integrity.key")
+    rules = path.with_name("customer-topic-overrides.json")
+    mapping = path.with_name("semantic-conversation-topics.json")
+    if not evidence.exists() or not key_path.exists() or not rules.exists():
+        raise ValueError(
+            "Semantic review requires the original Topic Review folder with "
+            "semantic-review-evidence.json, semantic-review-integrity.key, "
+            "and customer-topic-overrides.json."
+        )
+    validated_output = validate_tuner_output(
+        args,
+        path,
+        evidence,
+        key_path,
+        rules,
+        mapping,
+    )
+    approved = reviewed_semantic_topics(
+        path,
+        evidence,
+        key_path,
+        args.taxonomy,
+    )
+    if not approved:
+        print(
+            "STOP: No semantic suggestion groups were approved. "
+            "The existing template remains unchanged."
+        )
+        return 0
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=".semantic-conversation-topics.",
+        suffix=".json",
+        dir=mapping.parent,
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
+    try:
+        temporary.write_text(
+            json.dumps(
+                approved,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        validate_conversation_topics(temporary)
+        os.replace(temporary, mapping)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return apply_dataverse_rules(
+        rules,
+        args,
+        validated_output=validated_output,
+    )
+
+
 def finish_analysis(
     outcome: dict,
     args: argparse.Namespace,
@@ -1290,6 +2276,33 @@ def finish_analysis(
             args,
             validated_output=validated_output,
         )
+    if outcome["status"] == "semantic-review-required":
+        review = Path(outcome["reviewFile"])
+        if not args.non_interactive and sys.stdin.isatty():
+            print(
+                "You can finish grouped semantic review in this session; "
+                "another tuner run is not needed."
+            )
+            if hasattr(os, "startfile"):
+                try:
+                    os.startfile(str(review.resolve()))
+                except OSError as error:
+                    print(
+                        f"Open the review file manually: {review.resolve()} "
+                        f"({error})"
+                    )
+            try:
+                answer = input(
+                    "Edit, save and close semantic-topic-review.csv. Press Enter "
+                    "to validate and build, or type skip to leave the template unchanged: "
+                )
+            except EOFError:
+                answer = "skip"
+            if not answer.strip():
+                return review_semantic_and_apply(review, args)
+            print("Template unchanged. After review, use:")
+        print(next_command(args, "--review-semantic", review))
+        return 0
     if outcome["status"] == "review-required" and not args.non_interactive and sys.stdin.isatty():
         print("You can finish review in this session; another run is not needed.")
         try:
@@ -1315,6 +2328,11 @@ def main() -> int:
         return apply_dataverse_rules(args.apply, args)
     if args.review:
         return review_and_apply(args.review, args)
+    if args.review_semantic:
+        return review_semantic_and_apply(
+            args.review_semantic,
+            args,
+        )
     requested_output_dir = args.output_dir
     args.output_dir = select_analysis_output_dir(requested_output_dir)
     validated_output = validate_tuner_output(
@@ -1322,7 +2340,10 @@ def main() -> int:
         *tuner_output_paths(requested_output_dir).values(),
     )
     saved_rows = saved_override_rows(args.settings_file)
-    published_rules = [{column: row[column] for column in RULE_COLUMNS} for row in saved_rows]
+    published_rules = [
+        {column: row[column] for column in PUBLIC_RULE_COLUMNS}
+        for row in saved_rows
+    ]
     if not args.json:
         print(PRODUCT_TRUTH, flush=True)
     if args.min_frequency < 2:
@@ -1337,6 +2358,16 @@ def main() -> int:
         raise ValueError("--validation-folds must be at least 2")
     if args.min_validation_conversations < 1:
         raise ValueError("--min-validation-conversations must be positive")
+    if not 0.5 <= args.semantic_min_confidence <= 1.0:
+        raise ValueError("--semantic-min-confidence must be between 0.5 and 1.0")
+    if not 0 <= args.local_min_similarity <= 1:
+        raise ValueError("--local-min-similarity must be between 0 and 1")
+    if not 0 <= args.local_min_margin <= 1:
+        raise ValueError("--local-min-margin must be between 0 and 1")
+    if args.semantic_batch_size < 1 or args.semantic_batch_size > 50:
+        raise ValueError("--semantic-batch-size must be between 1 and 50")
+    if args.semantic_timeout < 1:
+        raise ValueError("--semantic-timeout must be positive")
 
     built_in_rules = load_rules(args.taxonomy)
     explicit_rows = read_override_rows(args.overrides)
@@ -1359,9 +2390,97 @@ def main() -> int:
         validation_folds=args.validation_folds,
         min_validation_conversations=args.min_validation_conversations,
     )
-    customer_rules = merge_customer_rules(saved_rules, rules_from_override_rows(explicit_rows), learned_rules)
+    explicit_rules = rules_from_override_rows(explicit_rows)
+    customer_rules = merge_customer_rules(saved_rules, explicit_rules, learned_rules)
     all_rules = customer_rules + built_in_rules
-    enrichments, audits, uncategorized = classify_records(records, all_rules, args.hash_salt)
+    _, _, initial_uncategorized = classify_records(
+        records,
+        all_rules,
+        args.hash_salt,
+    )
+    semantic_rows = []
+    semantic_rules = []
+    semantic_audit = []
+    semantic_learning_audit = []
+    semantic_suggestions = []
+    semantic_review_rows = []
+    semantic_review_evidence = []
+    semantic_conversation_rows = []
+    semantic_pii_counts = Counter()
+    semantic_learning_pii_counts = Counter()
+    semantic_stats = {
+        "redactedMessagesSent": 0,
+        "messagesProcessedLocally": 0,
+        "requests": 0,
+        "localBatches": 0,
+        "accepted": 0,
+        "suggested": 0,
+        "abstained": 0,
+        "lowConfidence": 0,
+        "emptyAfterRedaction": 0,
+        "insufficientContent": 0,
+        "provider": args.semantic_provider if args.semantic_classification else "",
+        "providerVersion": "",
+        "modelDeployment": "",
+    }
+    if args.semantic_classification and initial_uncategorized:
+        (
+            semantic_records,
+            semantic_suggestions,
+            semantic_audit,
+            semantic_pii_counts,
+            semantic_stats,
+        ) = (
+            classify_semantic_evidence(
+                initial_uncategorized,
+                built_in_rules,
+                args,
+            )
+        )
+        (
+            semantic_review_rows,
+            semantic_review_evidence,
+        ) = build_semantic_review(
+            semantic_suggestions
+        )
+        if semantic_records:
+            (
+                semantic_rows,
+                semantic_rules,
+                semantic_learning_audit,
+                semantic_learning_pii_counts,
+            ) = learn_native_topic_rules(
+                semantic_records,
+                built_in_rules,
+                existing_override_rows + learned_rows,
+                min_frequency=args.min_frequency,
+                min_precision=args.min_native_topic_precision,
+                max_keywords=args.max_native_keywords,
+                validation_folds=args.validation_folds,
+                min_validation_conversations=args.min_validation_conversations,
+                rule_origin="SemanticLearned",
+            )
+            semantic_rows, semantic_learning_audit = mark_semantic_learning(
+                semantic_rows,
+                semantic_learning_audit,
+            )
+    combined_learned_rules = merge_customer_rules(
+        [],
+        learned_rules,
+        semantic_rules,
+    )
+    new_learned_rows = [*semantic_rows, *learned_rows]
+    customer_rules = merge_customer_rules(
+        saved_rules,
+        explicit_rules,
+        combined_learned_rules,
+    )
+    all_rules = customer_rules + built_in_rules
+    enrichments, audits, uncategorized = classify_records(
+        records,
+        all_rules,
+        args.hash_salt,
+    )
     candidates, candidate_pii_counts = candidate_terms(
         uncategorized,
         all_rules,
@@ -1371,17 +2490,17 @@ def main() -> int:
 
     existing_keywords = {
         normalize(term)
-        for row in existing_override_rows + learned_rows
+        for row in existing_override_rows + new_learned_rows
         for term in row.get("Keywords", "").split("|")
         if normalize(term)
     }
     candidates = [row for row in candidates if normalize(row["Keywords"]) not in existing_keywords]
-    approved_metadata = {customer_rule_key(row): row for row in learned_rows + existing_override_rows
+    approved_metadata = {customer_rule_key(row): row for row in new_learned_rows + existing_override_rows
                          if str(row.get("Enabled") or "").strip().lower() in TRUE_VALUES}
     override_rows = [
         {**approved_metadata[customer_rule_key(rule)], **rule, "Enabled": "true"}
         for rule in customer_rules
-    ] + [row for row in existing_override_rows + learned_rows
+    ] + [row for row in existing_override_rows + new_learned_rows
          if str(row.get("Enabled") or "").strip().lower() not in TRUE_VALUES] + candidates
     override_rows = [
         {**{column: row.get(column, "") for column in OVERRIDE_COLUMNS},
@@ -1401,10 +2520,36 @@ def main() -> int:
         "MatchScore", "Confidence", "Ambiguous", "Source", "RuleSource", "ClassifierVersion"
     ))
     write_csv(outputs["learning_audit"], learning_audit, LEARNING_AUDIT_COLUMNS)
+    write_csv(
+        outputs["semantic_audit"],
+        semantic_audit,
+        SEMANTIC_AUDIT_COLUMNS,
+    )
+    write_csv(
+        outputs["semantic_learning_audit"],
+        semantic_learning_audit,
+        LEARNING_AUDIT_COLUMNS,
+    )
+    write_semantic_review_files(
+        outputs["semantic_review"],
+        outputs["semantic_review_evidence"],
+        outputs["semantic_review_key"],
+        semantic_review_rows,
+        semantic_review_evidence,
+    )
+    outputs["semantic_conversation_topics"].write_text(
+        json.dumps(
+            semantic_conversation_rows,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     write_csv(outputs["review"], override_rows, OVERRIDE_COLUMNS)
 
     public_rules = [
-        {column: rule[column] for column in RULE_COLUMNS}
+        {column: rule[column] for column in PUBLIC_RULE_COLUMNS}
         for rule in customer_rules
     ]
     desired_rule_counts = publication_rule_counts(public_rules)
@@ -1416,7 +2561,12 @@ def main() -> int:
 
     source_counts = Counter(row["Source"] for row in enrichments)
     language_counts = Counter(row["Language"] or "unknown" for row in enrichments)
-    pii_counts = learning_pii_counts + candidate_pii_counts
+    pii_counts = (
+        learning_pii_counts
+        + candidate_pii_counts
+        + semantic_pii_counts
+        + semantic_learning_pii_counts
+    )
     auto_validated_rules = sum(row["ReviewStatus"] == "AutoValidated" for row in learned_rows)
     review_required_rules = sum(row["ReviewStatus"] == "NeedsReview" for row in learned_rows)
     report = {
@@ -1453,13 +2603,58 @@ def main() -> int:
         "minimumValidationConversations": args.min_validation_conversations,
         "autoValidatedNativeTopicRules": auto_validated_rules,
         "nativeTopicRulesNeedingReview": review_required_rules,
+        "semanticClassificationEnabled": args.semantic_classification,
+        "semanticProvider": semantic_stats.get("provider", ""),
+        "semanticProviderVersion": semantic_stats.get(
+            "providerVersion",
+            "",
+        ),
+        "semanticModelDeployment": semantic_stats.get(
+            "modelDeployment",
+            "",
+        ),
+        "semanticMinimumConfidence": (
+            args.semantic_min_confidence
+            if args.semantic_provider == "azure"
+            else None
+        ),
+        "localSemanticSimilarityReference": (
+            args.local_min_similarity
+            if args.semantic_provider == "local"
+            else None
+        ),
+        "localSemanticMarginReference": (
+            args.local_min_margin
+            if args.semantic_provider == "local"
+            else None
+        ),
+        "semanticClassification": semantic_stats,
+        "semanticSuggestionGroups": len(semantic_review_rows),
+        "semanticConversationOverridesWritten": len(
+            semantic_conversation_rows
+        ),
+        "semanticRulesValidated": sum(
+            row["ReviewStatus"] == "SemanticValidated"
+            for row in semantic_rows
+        ),
+        "semanticRulesNeedingReview": sum(
+            row["ReviewStatus"] == "SemanticNeedsReview"
+            for row in semantic_rows
+        ),
         "enabledCustomerRulesWritten": len(customer_rules),
         "piiPatternsRedactedBeforeTopicLearning": dict(sorted(learning_pii_counts.items())),
         "piiPatternsRedactedBeforeCandidateExtraction": dict(
             sorted(candidate_pii_counts.items())
         ),
+        "piiPatternsRedactedBeforeSemanticClassification": dict(
+            sorted(semantic_pii_counts.items())
+        ),
+        "piiPatternsRedactedBeforeSemanticRuleLearning": dict(
+            sorted(semantic_learning_pii_counts.items())
+        ),
         "piiPatternsRedactedTotal": dict(sorted(pii_counts.items())),
         "rawTranscriptTextWritten": False,
+        "rawTranscriptTextSentToSemanticProvider": False,
         "warning": (
             "Learned and candidate keywords are privacy-reduced, not guaranteed anonymous. They can still contain "
             "repeated business-sensitive terms. Keep outputs inside the customer environment and review before sharing."
