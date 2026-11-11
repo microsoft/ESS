@@ -1,7 +1,7 @@
 # Dataverse Direct setup
 
 > [!IMPORTANT]
-> These instructions require the complete validated V23.2 package. [Download `ESS-039417f-optional-fixes-V23.2.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip), select **Extract All**, and keep the folder structure intact. Do not download or run an individual `.cmd`, `.py`, or `.pbit` file from GitHub. Python remains **3.10 or later**.
+> These instructions require the complete validated V23.2 package. [Download `ESS-039417f-optional-fixes-V23.2.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip), select **Extract All**, and keep the folder structure intact. Do not download or run an individual `.cmd`, `.py`, or `.pbit` file from GitHub. Use **Python 3.10 through 3.14**; Python 3.15 is not yet supported by the required NumPy and ONNX Runtime libraries.
 
 This is the recommended path for ongoing production reporting from one supported Dataverse environment. Allow about **15-25 minutes** for the first setup when transcripts already exist. Newly generated conversations may require approximately **30 minutes of inactivity** before they appear in Dataverse.
 
@@ -18,7 +18,7 @@ Complete these prerequisites in order:
 
    If the ESS role is not present, use a customer-approved custom role with organization-level Read on `conversationtranscript` and `systemuser`. **Environment Maker is not sufficient. System Administrator is not required.**
 3. **Copy the required URL.** In [Power Apps](https://make.powerapps.com), select the same environment, open **Developer resources**, and copy **Environment URL**.
-4. **Install the desktop prerequisites.** Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/). For the guided path, install [Python 3.10 or later](https://www.python.org/downloads/windows/) and select **Add python.exe to PATH**.
+4. **Install the desktop prerequisites.** Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/). For the guided path, install [Python 3.14](https://www.python.org/downloads/windows/) and select **Add python.exe to PATH**. Python 3.10 through 3.14 is supported; 3.15 is not.
 5. **Retrieve only the optional files you plan to use.** The [files, portals, and roles table](#files-portals-and-required-roles) links directly to the organization, credits, feedback, registry, and topic instructions. None is required for the transcript-only baseline.
 6. **Run setup from the extracted folder.** Double-click `START-HERE-DATAVERSE.cmd`, or open PowerShell in that folder and run:
 
@@ -56,7 +56,7 @@ Use the complete ZIP so these scripts have all required templates and supporting
 
 1. [Download the complete `ESS-039417f-optional-fixes-V23.2.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip).
 2. Select **Extract All**. Do not run the files from inside the ZIP.
-3. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
+3. Install [Python 3.14](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`. Python 3.10 through 3.14 is supported; 3.15 is not.
 4. Open the extracted `ESS-039417f-optional-fixes-V23.2` folder.
 5. Double-click [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd). The command file runs the required Python setup script automatically.
 6. Continue with [Option B](#option-b---guided-setup-with-optional-enhancements). When the report is ready for publication, use [`BUILD-SERVICE-REFRESH.cmd`](./BUILD-SERVICE-REFRESH.cmd) as directed in Action 3.
@@ -153,7 +153,7 @@ The complete V23 ZIP contains both command launchers and the Python scripts they
 1. [Download the complete `ESS-039417f-optional-fixes-V23.2.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip).
 2. Select **Extract All**, keep the extracted folder structure intact, and do not run the files from inside the ZIP.
 3. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/).
-4. Install [Python 3.10 or later](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`.
+4. Install [Python 3.14](https://www.python.org/downloads/windows/) and make sure the Python launcher is available on `PATH`. Python 3.10 through 3.14 is supported; 3.15 is not.
 5. Open the extracted `ESS-039417f-optional-fixes-V23.2` folder and double-click [`START-HERE-DATAVERSE.cmd`](./START-HERE-DATAVERSE.cmd). The command file automatically runs [`tools\guided_dataverse_setup.py`](./tools/guided_dataverse_setup.py) and creates a **Desktop Validation - LOCAL ONLY** report for checking the selected inputs.
 6. Paste the Environment URL. For a baseline, skip every enhancement; alternatively, select only what you need, such as organization data alone. A baseline-first check is recommended, not a requirement to provide more files.
 7. When the guided checks complete, open the report.
@@ -187,7 +187,7 @@ The lookback parameter limits the server-side query. It does not change retentio
 
 ### Command-line selection and saved settings
 
-From the extracted V23 package folder, run `python tools\guided_dataverse_setup.py --version` to confirm **ESS Dataverse setup V23 (Python 3.10+)**.
+From the extracted V23 package folder, run `python tools\guided_dataverse_setup.py --version` to confirm **ESS Dataverse setup V23 (Python 3.10-3.14)**.
 
 Non-interactive runs reuse saved settings unless an input is replaced or explicitly skipped. Use these controls to ignore inherited selections without deleting source files:
 

@@ -2342,8 +2342,11 @@ def finish_analysis(
 
 def main() -> int:
     args = parse_args()
-    if sys.version_info < (3, 10):
-        raise ValueError("Python 3.10 or later is required.")
+    if not (3, 10) <= sys.version_info[:2] < (3, 15):
+        raise ValueError(
+            "Python 3.10 through 3.14 is required. Python 3.15 is not yet "
+            "supported by the required NumPy and ONNX Runtime libraries."
+        )
     if args.apply:
         return apply_dataverse_rules(args.apply, args)
     if args.review:

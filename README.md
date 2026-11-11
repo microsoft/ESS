@@ -3,7 +3,7 @@
 Use this Power BI solution to understand adoption, conversation outcomes, employee feedback, topics, business impact, and improvement opportunities for Microsoft Copilot Studio Employee Self-Service agents.
 
 > [!IMPORTANT]
-> **Use the complete validated V23.2 package:** [download `ESS-039417f-optional-fixes-V23.2.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip), select **Extract All**, and keep the extracted folder structure intact. Do not download or run an individual `.cmd`, `.py`, or `.pbit` file from GitHub. The templates and Python modules were tested together. Python remains **3.10+**.
+> **Use the complete validated V23.2 package:** [download `ESS-039417f-optional-fixes-V23.2.zip`](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip), select **Extract All**, and keep the extracted folder structure intact. Do not download or run an individual `.cmd`, `.py`, or `.pbit` file from GitHub. The templates and Python modules were tested together. Use **Python 3.10 through 3.14**; Python 3.15 is not yet supported by the required NumPy and ONNX Runtime libraries.
 
 ![Animated preview of the ESS Adoption Intelligence dashboard](./images/dashboard-preview.gif)
 
@@ -21,7 +21,7 @@ Before running a launcher:
 1. [Download the complete V23.2 ZIP](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip) and select **Extract All**. Do not run files from inside the ZIP.
 2. Ask a Power Platform administrator to assign the report account **Bot Transcript Viewer** and **ESS Power BI Transcript Reader** in the environment that hosts the agent. An equivalent custom role must provide organization-level Read on `conversationtranscript` and `systemuser`. **Environment Maker is not sufficient; System Administrator is not required.**
 3. In [Power Apps](https://make.powerapps.com), select that environment, open **Developer resources**, and copy the **Environment URL**.
-4. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/). Install [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add python.exe to PATH** only when using the guided setup or optional preparation tools.
+4. Install [Power BI Desktop](https://powerbi.microsoft.com/desktop/). Install [Python 3.14](https://www.python.org/downloads/windows/) with **Add python.exe to PATH** when using the guided setup or optional preparation tools. Python 3.10 through 3.14 is supported; 3.15 is not.
 5. Open the extracted package folder. Double-click `START-HERE-DATAVERSE.cmd`, or run `.\START-HERE-DATAVERSE.cmd` from PowerShell in that folder.
 
 Complete three actions:

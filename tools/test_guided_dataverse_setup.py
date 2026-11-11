@@ -1110,17 +1110,42 @@ class GuidedDataverseSetupTests(unittest.TestCase):
         self.assertIn("cannot be combined with --tune-topics", error.getvalue())
 
     def test_v23_version_and_template_names_are_explicit(self) -> None:
-        from guided_dataverse_setup import SOURCE_TEMPLATE, parse_args
+        from guided_dataverse_setup import (
+            ROOT,
+            SOURCE_TEMPLATE,
+            parse_args,
+            validate_runtime,
+        )
 
         output = io.StringIO()
         with patch("sys.argv", ["setup", "--version"]), patch("sys.stdout", output), patch("sys.stderr"), self.assertRaises(SystemExit) as result:
             parse_args()
         self.assertEqual(result.exception.code, 0)
         self.assertIn("V23", output.getvalue())
+        self.assertIn("Python 3.10-3.14", output.getvalue())
         self.assertIn("V23", SOURCE_TEMPLATE.name)
         self.assertTrue(SOURCE_TEMPLATE.is_file())
         for name in (*OUTPUT_NAMES.values(), TOPIC_OUTPUT_NAME):
             self.assertIn("V23", name)
+        with patch(
+            "guided_dataverse_setup.sys.version_info",
+            (3, 15, 0),
+        ), self.assertRaisesRegex(RuntimeError, "3.15"):
+            validate_runtime()
+        with patch(
+            "guided_dataverse_setup.sys.version_info",
+            (3, 14, 0),
+        ):
+            validate_runtime()
+        launcher = (ROOT / "START-HERE-DATAVERSE.cmd").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("3.14 3.13 3.12 3.11 3.10", launcher)
+        self.assertIn("Python 3.15 is not yet supported", launcher)
+        self.assertNotIn(
+            'py -3 "tools\\guided_dataverse_setup.py"',
+            launcher,
+        )
 
     def test_independent_optional_build_matrix_ignores_all_skipped_saved_files(self) -> None:
         from build_service_refresh_template import expression_text

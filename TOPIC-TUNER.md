@@ -33,7 +33,7 @@ The tuner does not change Copilot Studio topics, send credentials to Power BI, o
 You need:
 
 - the [complete validated V23.2 package](https://github.com/microsoft/ESS/releases/download/dataverse-v23.2/ESS-039417f-optional-fixes-V23.2.zip), extracted with its folder structure intact;
-- [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add Python to PATH** selected during installation;
+- [Python 3.14](https://www.python.org/downloads/windows/) with **Add Python to PATH** selected during installation. Python 3.10 through 3.14 is supported; Python 3.15 is not yet supported by the required NumPy and ONNX Runtime libraries;
 - a successful [Dataverse V23 baseline](SETUP-Dataverse.md);
 - permission to export `ConversationTranscript` from the same Dataverse environment; and
 - a customer-controlled folder for the transcript export and review files.
@@ -233,7 +233,7 @@ In the Service builder, explicitly **keep** the saved approved topic rules; Ente
 | Message or symptom | What to do |
 |---|---|
 | **No saved Dataverse setup** | Complete the [guided Dataverse baseline](SETUP-Dataverse.md#option-b---guided-setup-with-optional-enhancements) once from this extracted package. |
-| **Python is not recognized** | Install [Python 3.10 or later](https://www.python.org/downloads/windows/) with **Add Python to PATH**, then reopen the launcher. |
+| **Python is not recognized or Python 3.15 is selected** | Install [Python 3.14](https://www.python.org/downloads/windows/) with **Add Python to PATH**, then reopen the launcher. Python 3.15 may remain installed; the corrected launcher prefers 3.14. |
 | `TUNE-TOPICS.cmd` is missing | Extract the complete corrected `ESS-039417f-optional-fixes-V23.2.zip`. Open the inner package folder if Windows created nested folders; do not download individual scripts. |
 | A saved optional file is missing | Restore it, rerun guided setup to replace/skip it, or use the applicable tuner skip flag for registry, organization, credits, or feedback. Printed recovery commands retain skip flags. New approved topic rules replace the saved topic-rule selection. Other saved choices are not silently discarded. |
 | **STOP** with no rules | Keep the existing report. Collect better evidence only when a meaningful classification gap remains. |

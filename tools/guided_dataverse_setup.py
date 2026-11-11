@@ -134,7 +134,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=f"Build validated ESS Dataverse {SETUP_VERSION} templates through a guided setup."
     )
-    parser.add_argument("--version", action="version", version=f"ESS Dataverse setup {SETUP_VERSION} (Python 3.10+)")
+    parser.add_argument("--version", action="version", version=f"ESS Dataverse setup {SETUP_VERSION} (Python 3.10-3.14)")
     parser.add_argument(
         "--mode",
         choices=("desktop-validation", "service-refresh"),
@@ -658,10 +658,11 @@ def build_command(
 
 
 def validate_runtime() -> None:
-    if sys.version_info < (3, 10):
+    if not (3, 10) <= sys.version_info[:2] < (3, 15):
         raise RuntimeError(
-            "Python 3.10 or later is required. Download it from "
-            "https://www.python.org/downloads/windows/."
+            "Python 3.10 through 3.14 is required. Python 3.15 is not yet "
+            "supported by the required NumPy and ONNX Runtime libraries. "
+            "Download Python 3.14 from https://www.python.org/downloads/windows/."
         )
     for path in (SOURCE_TEMPLATE, BUILDER, FEEDBACK_NORMALIZER):
         if not path.exists():

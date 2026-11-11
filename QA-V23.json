@@ -10,8 +10,11 @@
   },
   "python": {
     "minimum": "3.10",
+    "maximum": "3.14",
     "testedRuntime": "3.14.5",
-    "minimumRuntimeExecuted": false
+    "minimumRuntimeExecuted": false,
+    "python315RejectedWithActionableMessage": true,
+    "launcherPrefersCompatibleInstalledVersion": true
   },
   "template": {
     "default": "ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit",
@@ -47,7 +50,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "797AB1C40D92418732F0832A196DC5A60A6E0D9281E33826174279CDF91FD7ED"
+      "sha256": "0206C4EC232CEF08222256C2179AA10411C4F2696BF459F232C988A977FD77D9"
     },
     {
       "path": "SETUP-CSV-Download.md",
@@ -55,11 +58,15 @@
     },
     {
       "path": "SETUP-Dataverse.md",
-      "sha256": "55ECDE782019AEF0E8736D51269036F6B4BD4D04F919AB4B0D6DC8C3ED91CC56"
+      "sha256": "25D30B132AC8DDCEB8AE15E5F32BA350DA14126DC644BCF077E1456B0A09962C"
     },
     {
       "path": "SETUP-Fabric.md",
       "sha256": "58CA69A11F387EC8931939944F301B3939D43CBF0AE9BC42DBF45E612D0C63B6"
+    },
+    {
+      "path": "START-HERE-DATAVERSE.cmd",
+      "sha256": "D06594C6A89137179488B049F305E4BA06F8E6B8D172C79D31F7C4C3544011C2"
     },
     {
       "path": "tools\\build_service_refresh_template.py",
@@ -67,11 +74,11 @@
     },
     {
       "path": "tools\\ess_topic_tuner.py",
-      "sha256": "565C9DC59EC2D4D2B5F41654DD7C23BE4805C3E60713FCE54CDF48B33AD79AC4"
+      "sha256": "AFB70FD15B204A09D44654478C8BDE66779DFDBAFF06CAF6CA37010CE74F28B4"
     },
     {
       "path": "tools\\guided_dataverse_setup.py",
-      "sha256": "C63FC32E5525D41FC3244D50DC3B146C087455A2D82303AA792CE9F4592DDF12"
+      "sha256": "031A10F1D306C9D0559B137D99730B832814AC5395CBEE203BF9F49C6A1398DB"
     },
     {
       "path": "tools\\test_build_service_refresh_template.py",
@@ -87,7 +94,7 @@
     },
     {
       "path": "tools\\test_guided_dataverse_setup.py",
-      "sha256": "03E8232FECF27E885DED684B017056FDCC9BA0ABA9A73935AB196F9E23992BAC"
+      "sha256": "7E6FC00BAE0164AF881F6275A05EE020992A4EA4E3AD57CBDB6C33848378CF12"
     },
     {
       "path": "tools\\test_topic_classifier_comprehensive.py",
@@ -107,7 +114,7 @@
     },
     {
       "path": "TOPIC-TUNER.md",
-      "sha256": "417A8B3B77AAFBDC96AC843A2F1BEE25687BD5D6E782903D911BCC9AE07A7B36"
+      "sha256": "23279D63B042014EF59476540F07A63ADE65BF9C9DCB717DFA507F0D22C83CAC"
     }
   ],
   "addedFiles": [
