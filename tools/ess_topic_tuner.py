@@ -15,6 +15,7 @@ from itertools import product
 from pathlib import Path
 
 from build_service_refresh_template import (
+    semantic_review_payload,
     validate_conversation_topics,
     validate_topic_overrides,
 )
@@ -1049,38 +1050,6 @@ def build_semantic_review(
                 }
             )
     return review_rows, evidence_rows
-
-
-def semantic_review_payload(
-    review_rows: list[dict],
-    evidence_rows: list[dict],
-) -> bytes:
-    immutable_rows = sorted(
-        [
-        {
-            column: str(row.get(column) or "")
-            for column in SEMANTIC_REVIEW_COLUMNS
-            if column not in SEMANTIC_REVIEW_MUTABLE_COLUMNS
-        }
-        for row in review_rows
-        ],
-        key=lambda row: row["ReviewGroup"],
-    )
-    evidence_rows = sorted(
-        evidence_rows,
-        key=lambda row: str(row.get("ReviewGroup") or ""),
-    )
-    payload = {
-        "version": 1,
-        "review": immutable_rows,
-        "evidence": evidence_rows,
-    }
-    return json.dumps(
-        payload,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
 
 
 def write_semantic_review_files(

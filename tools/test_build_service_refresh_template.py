@@ -245,6 +245,80 @@ class ServiceRefreshTemplateTests(unittest.TestCase):
                 json.dumps(review_digest),
             )
 
+    def test_spreadsheet_review_retains_only_approved_ids_in_both_builders(self):
+        from ess_topic_tuner import (
+            SEMANTIC_REVIEW_COLUMNS,
+            read_csv,
+            reviewed_semantic_topics,
+            write_csv,
+        )
+
+        approved_id = "aabbccdd-1122-4333-8444-556677889900"
+        disabled_id = "bbccddee-2233-4444-8555-667788990011"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            mapping = self.create_reviewed_topics(
+                root,
+                [
+                    (approved_id, "HR", "Payroll & Compensation"),
+                    (disabled_id, "IT", "Device & Hardware"),
+                ],
+            )
+            review = root / "semantic-topic-review.csv"
+            _, rows = read_csv(review)
+            for row in rows:
+                row["Enabled"] = (
+                    "TRUE" if row["DecisionTopic"] == "Payroll & Compensation"
+                    else "FALSE"
+                )
+                for column in ("MinimumSimilarity", "MinimumMargin"):
+                    row[column] = str(float(row[column]))
+            write_csv(review, rows, SEMANTIC_REVIEW_COLUMNS)
+            mappings = reviewed_semantic_topics(
+                review,
+                root / "semantic-review-evidence.json",
+                root / "semantic-review-integrity.key",
+                ROOT / "taxonomy" / "topics-taxonomy.csv",
+            )
+            self.assertEqual(len(mappings), 1)
+            mapping.write_text(json.dumps(mappings), encoding="utf-8")
+            serialized, _ = validate_conversation_topics(mapping)
+
+            for mode in ("desktop-validation", "service-refresh"):
+                with self.subTest(mode=mode):
+                    output = root / f"{mode}.pbit"
+                    build_package(
+                        SOURCE, output, "https://orgexample.crm.dynamics.com",
+                        mode=mode, conversation_topics_json=serialized,
+                    )
+                    with zipfile.ZipFile(output) as package:
+                        self.assertIsNone(package.testzip())
+                        schema = json.loads(
+                            package.read("DataModelSchema").decode("utf-16-le")
+                        )
+                    expressions = {
+                        item["name"]: expression_text(item["expression"])
+                        for item in schema["model"]["expressions"]
+                    }
+                    parameter = expressions[
+                        "Customer Conversation Topics JSON (optional)"
+                    ].split(" meta ", 1)[0]
+                    embedded = json.loads(parameter[1:-1].replace('""', '"'))
+                    self.assertEqual(embedded, mappings)
+                    self.assertEqual(
+                        expressions["Approved Conversation Review Digest"],
+                        json.dumps(mappings[0]["ReviewDigest"]),
+                    )
+                    lookup = {
+                        row["ConversationTranscriptId"]: row for row in embedded
+                    }
+                    refreshed_id = f" {approved_id.upper()} "
+                    self.assertEqual(
+                        lookup[refreshed_id.strip().lower()]["CanonicalTopic"],
+                        "Payroll & Compensation",
+                    )
+                    self.assertNotIn(disabled_id, lookup)
+
     def test_strips_placeholder_urls_from_packaged_metadata(self):
         value = {
             "description": (

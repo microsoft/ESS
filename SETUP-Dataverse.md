@@ -307,10 +307,10 @@ The same feedback picker also accepts an already prepared `feedback-events.json`
 1. Follow [Customer-specific topic tuning](./TOPIC-TUNER.md).
 2. Double-click `TUNE-TOPICS.cmd` and select the representative transcript export.
 3. The bundled local semantic provider runs automatically for unresolved messages. It keeps transcript text on the device; Azure is optional and is never required.
-4. Follow the tool's **READY**, **REVIEW REQUIRED**, or **STOP** guidance.
+4. Follow the tool's **READY**, **REVIEW REQUIRED**, or **STOP** guidance. For grouped review, save `semantic-topic-review.csv`, return to the same tuner window, and press **Enter**. Confirm the applied exact-conversation count and successful build, not just the presence of review files. Value-preserving spreadsheet score formatting is accepted; altered evidence is not.
 5. Validate the generated **Desktop Validation - Topics - LOCAL ONLY** report.
 
-Meaningful native Copilot Studio business topics remain authoritative. Generic system topics fall through to exact local semantic mappings and shared deterministic rules. Uncertain messages remain unassigned, and Power BI refresh never loads or calls a model.
+Meaningful native Copilot Studio business topics remain authoritative. Generic system topics fall through to exact human-approved conversation mappings and shared deterministic rules. Uncertain messages remain unassigned, and Power BI refresh never loads or calls a model. Analysis CSV counts are not post-review report counts; compare the refreshed generated report with the same environment, agent, date window, and filters.
 
 ## Action 3 - Publish the Service report
 

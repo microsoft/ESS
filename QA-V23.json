@@ -1,6 +1,60 @@
 {
   "packageVersion": "V23.2",
-  "releaseStatus": "V23 local grouped semantic review candidate; third validation defects fixed; GitHub publication pending user approval",
+  "releaseStatus": "V23.2 grouped-review spreadsheet repair validated; customer refreshed-report acceptance remains pending",
+  "unpublishedGroupedReviewRepair": {
+    "date": "2026-11-11",
+    "checkpointHead": "72c3fff",
+    "status": "Implementation repaired and tested; customer refreshed-report acceptance remains unverified",
+    "testedWorktreeSourceSha256": {
+      "tools/build_service_refresh_template.py": "B6C0566383780A53343D60C272B5E29AB42A2B5B34E2BDE764B387A34A4020E8",
+      "tools/ess_topic_tuner.py": "2CF82AF9D37312B10572333A42F60CD0283A37A1B408F6454C8E0A6F909F8B61",
+      "tools/test_build_service_refresh_template.py": "4ED9FAFFC6CFC4B2B9B9767FAB84EB0FBB27FA992E4828C6F95AF91B61B9B6E8",
+      "tools/test_ess_topic_tuner.py": "F5B13E7B9D71733CEAB65AD402D2297A2B2209385BF6FE74C672B12579D01C21",
+      "tools/test_topic_classifier_comprehensive.py": "17934B4784E8C20547A43A83C00D335EE88DE6AEAE656C999E3CC38C8D5B1C05"
+    },
+    "integrityContract": {
+      "sharedOwner": "build_service_refresh_template.semantic_review_payload",
+      "scoreRepresentation": "Exact Decimal equality to the original four-decimal value; no significant precision may be discarded",
+      "originalReviewDigestPreserved": true,
+      "changedScoresAndEvidenceRejected": true,
+      "automaticSemanticActivation": false
+    },
+    "validation": {
+      "testsRun": 235,
+      "passed": 234,
+      "failures": 0,
+      "errors": 0,
+      "optionalPqtestSkipped": 1,
+      "realPinnedOnnxInferenceExecuted": true,
+      "python310GrammarFiles": 29,
+      "python310RuntimeExecuted": false,
+      "spreadsheetRoundTripRegression": true,
+      "desktopAndServiceMappingDigestRetention": true,
+      "disabledGroupExcludedFromEmbeddedMappings": true,
+      "unchangedReviewValidatedLocallyWithoutWritingDiagnosticFiles": true,
+      "modelCompleteTestZipInspected": true,
+      "testZipBuiltFromTrackedWorktreeSnapshot": true,
+      "testZipContainsCustomerArtifacts": false,
+      "testZipDeterministic": true,
+      "v23RegenerationByteIdempotent": true,
+      "shippedV23ClassifierContractMatchesSource": true,
+      "v21V22Unchanged": true,
+      "productionCleanWorktreeGuardUnchangedAndEnforced": true
+    },
+    "privacy": {
+      "customerDiagnosticsAddedToRepository": false,
+      "customerPbitsGenerated": 0,
+      "liveServicesCalled": 0,
+      "published": false
+    },
+    "remainingGates": [
+      "Customer-generated Topics PBIT and matching refreshed-report evidence were not provided.",
+      "Refreshed Dataverse ID matching, final topics, and the reported visual count require customer-side verification.",
+      "Standalone Power Query execution is skipped because PQTest is unavailable.",
+      "The customer RC2 asset checksum and exact executable component versions remain unverified.",
+      "Production release packaging still requires a clean Git worktree; the guard is unchanged."
+    ]
+  },
   "baseline": {
     "repository": "microsoft/ESS",
     "commit": "79ca039a66afdfc3c9ed8428aaaad26341bf8a05",
@@ -50,7 +104,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "0206C4EC232CEF08222256C2179AA10411C4F2696BF459F232C988A977FD77D9"
+      "sha256": "8124072BF71D8C49E8B4D3C20FC7DF204617A2C7981F3B83D27884DFEDB97D29"
     },
     {
       "path": "SETUP-CSV-Download.md",
@@ -58,7 +112,7 @@
     },
     {
       "path": "SETUP-Dataverse.md",
-      "sha256": "25D30B132AC8DDCEB8AE15E5F32BA350DA14126DC644BCF077E1456B0A09962C"
+      "sha256": "EFA2B9DDBDB51D980C3E726A358423D4D44053C169AFAF66466FE83D9B623AD1"
     },
     {
       "path": "SETUP-Fabric.md",
@@ -70,11 +124,11 @@
     },
     {
       "path": "tools\\build_service_refresh_template.py",
-      "sha256": "F32FCAAA0E83797B837AD04EDC864E15E853F2A09B37B6D922B8CDBEF9A999CA"
+      "sha256": "B6C0566383780A53343D60C272B5E29AB42A2B5B34E2BDE764B387A34A4020E8"
     },
     {
       "path": "tools\\ess_topic_tuner.py",
-      "sha256": "AFB70FD15B204A09D44654478C8BDE66779DFDBAFF06CAF6CA37010CE74F28B4"
+      "sha256": "2CF82AF9D37312B10572333A42F60CD0283A37A1B408F6454C8E0A6F909F8B61"
     },
     {
       "path": "tools\\guided_dataverse_setup.py",
@@ -82,7 +136,7 @@
     },
     {
       "path": "tools\\test_build_service_refresh_template.py",
-      "sha256": "8621F0EC9AEA489FCE25677ABB388D85CE989C5A984A784122AC525D57075CC1"
+      "sha256": "4ED9FAFFC6CFC4B2B9B9767FAB84EB0FBB27FA992E4828C6F95AF91B61B9B6E8"
     },
     {
       "path": "tools\\test_ess_agent_registry.py",
@@ -90,7 +144,7 @@
     },
     {
       "path": "tools\\test_ess_topic_tuner.py",
-      "sha256": "92BAB4E4B46F8D4D806778CB7B2B803B6FA2FAA1431659F89B6D639CACB04C55"
+      "sha256": "F5B13E7B9D71733CEAB65AD402D2297A2B2209385BF6FE74C672B12579D01C21"
     },
     {
       "path": "tools\\test_guided_dataverse_setup.py",
@@ -98,7 +152,7 @@
     },
     {
       "path": "tools\\test_topic_classifier_comprehensive.py",
-      "sha256": "E25F774313E8D88FC2119C89A267F80B4F794CA7CF19B57FB22A07FC94DB440F"
+      "sha256": "17934B4784E8C20547A43A83C00D335EE88DE6AEAE656C999E3CC38C8D5B1C05"
     },
     {
       "path": "tools\\test_template_packages.py",
@@ -114,7 +168,7 @@
     },
     {
       "path": "TOPIC-TUNER.md",
-      "sha256": "23279D63B042014EF59476540F07A63ADE65BF9C9DCB717DFA507F0D22C83CAC"
+      "sha256": "8DE8217688F06C0262375FF0C09E3FC9365A9EC5DEF6C06513BA4970B977B246"
     }
   ],
   "addedFiles": [
@@ -173,7 +227,7 @@
       "baselineCommit": "79ca039a66afdfc3c9ed8428aaaad26341bf8a05",
       "packageVersion": "V23.2",
       "phase": "local-grouped-semantic-review-and-release-package-validation",
-      "testsRun": 233,
+      "testsRun": 235,
       "failures": 0,
       "errors": 0,
       "skipped": 1,

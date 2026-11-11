@@ -2473,6 +2473,78 @@ class TopicTunerTests(unittest.TestCase):
                 runner.call_args.args[0],
             )
 
+    def test_grouped_semantic_review_accepts_spreadsheet_numeric_formatting(self) -> None:
+        from ess_topic_tuner import (
+            SEMANTIC_REVIEW_COLUMNS,
+            build_semantic_review,
+            reviewed_semantic_topics,
+            write_csv,
+            write_semantic_review_files,
+        )
+        from build_service_refresh_template import validate_conversation_topics
+
+        repo = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rows, evidence = build_semantic_review(
+                [
+                    {
+                        "id": "11111111-2222-4333-8444-555555555555",
+                        "prompt": "change where my wages arrive",
+                        "locale": "en-US",
+                        "confidence": 0.9,
+                        "margin": 0.1,
+                        "candidates": [
+                            {
+                                "topic": "Payroll & Compensation",
+                                "vertical": "HR",
+                                "similarity": 0.9,
+                            }
+                        ],
+                    }
+                ]
+            )
+            review = root / "semantic-topic-review.csv"
+            evidence_path = root / "semantic-review-evidence.json"
+            key_path = root / "semantic-review-integrity.key"
+            write_semantic_review_files(
+                review, evidence_path, key_path, rows, evidence
+            )
+            rows[0]["Enabled"] = "TRUE"
+            for column in ("MinimumSimilarity", "MinimumMargin"):
+                rows[0][column] = str(float(rows[0][column]))
+            write_csv(review, rows, SEMANTIC_REVIEW_COLUMNS)
+
+            mappings = reviewed_semantic_topics(
+                review, evidence_path, key_path,
+                repo / "taxonomy" / "topics-taxonomy.csv",
+            )
+            self.assertEqual(len(mappings), 1)
+            self.assertEqual(mappings[0]["CanonicalTopic"], "Payroll & Compensation")
+            mapping = root / "semantic-conversation-topics.json"
+            mapping.write_text(json.dumps(mappings), encoding="utf-8")
+            _, validation = validate_conversation_topics(mapping)
+            self.assertEqual(validation["classifiedConversations"], 1)
+
+            for column, value in (
+                ("MinimumSimilarity", "0.8"),
+                ("MinimumSimilarity", "0.900000000000001"),
+                ("MinimumMargin", "0.100000000000001"),
+                ("MinimumMargin", "NaN"),
+                ("MinimumMargin", "Infinity"),
+                ("MinimumMargin", ""),
+            ):
+                with self.subTest(column=column, value=value):
+                    changed = [{**rows[0], column: value}]
+                    write_csv(review, changed, SEMANTIC_REVIEW_COLUMNS)
+                    with self.assertRaises(ValueError):
+                        reviewed_semantic_topics(
+                            review, evidence_path, key_path,
+                            repo / "taxonomy" / "topics-taxonomy.csv",
+                        )
+                    with self.assertRaises(ValueError):
+                        validate_conversation_topics(mapping)
+
     def test_grouped_semantic_review_rejects_context_or_evidence_tampering(self) -> None:
         from ess_topic_tuner import (
             build_semantic_review,

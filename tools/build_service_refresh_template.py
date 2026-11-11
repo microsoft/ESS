@@ -18,6 +18,7 @@ import tempfile
 import uuid
 import zipfile
 import xml.etree.ElementTree as ET
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import unquote, urlparse, urlunparse
 
@@ -531,7 +532,7 @@ def _spreadsheet_unescape(value):
     return value
 
 
-def _semantic_review_payload(
+def semantic_review_payload(
     review_rows: list[dict],
     evidence_rows: list[dict],
 ) -> bytes:
@@ -546,6 +547,20 @@ def _semantic_review_payload(
         ],
         key=lambda row: row["ReviewGroup"],
     )
+    for row in immutable:
+        for column in ("MinimumSimilarity", "MinimumMargin"):
+            try:
+                score = Decimal(row[column])
+                canonical_score = score.quantize(Decimal("0.0001"))
+            except (InvalidOperation, ValueError):
+                raise ValueError(
+                    "Semantic review scores must retain their original four-decimal values."
+                ) from None
+            if not score.is_finite() or score != canonical_score:
+                raise ValueError(
+                    "Semantic review scores must retain their original four-decimal values."
+                )
+            row[column] = format(canonical_score, ".4f")
     evidence_rows = sorted(
         evidence_rows,
         key=lambda row: str(row.get("ReviewGroup") or ""),
@@ -607,7 +622,7 @@ def _validate_semantic_review_bundle(
         raise ValueError("Semantic review approval bundle is invalid.")
     expected = hmac.new(
         key,
-        _semantic_review_payload(review_rows, evidence["groups"]),
+        semantic_review_payload(review_rows, evidence["groups"]),
         hashlib.sha256,
     ).hexdigest()
     if not hmac.compare_digest(expected, str(evidence["integrity"])):

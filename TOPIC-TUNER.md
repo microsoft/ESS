@@ -139,6 +139,18 @@ Continue to [Step 5](#step-5---validate-the-improvement).
 
 Do not browse for a rules JSON in Power BI or add it as a data source. The approved rules are already embedded.
 
+### Grouped semantic review
+
+1. Open the exact `semantic-topic-review.csv` path printed by the tuner.
+2. Change only **Enabled**, **DecisionVertical**, **DecisionTopic**, and **Notes**. Set **Enabled** to `TRUE` only when every displayed example supports the decision; leave mixed or uncertain groups disabled.
+3. Keep the decision within the checked-in ESS taxonomy. A more detailed customer taxonomy is not automatically added by enabling a group.
+4. Save as CSV, close the file, return to the same tuner window, and press **Enter**.
+5. Confirm that the tool reports the expected nonzero **exact semantic conversation topic** count and completes the template build. File creation alone is not evidence that approvals were applied.
+
+Spreadsheet changes from `0.8000` to `0.8` in **MinimumSimilarity** or **MinimumMargin** are accepted only when the numeric value is identical. Changed values, additional significant precision, examples, group context, and conversation evidence remain integrity-protected. Do not round scores, edit evidence, or remove integrity checks to make a review pass.
+
+Keep the original review CSV, evidence JSON, and integrity key together in their customer-controlled folder. If an earlier run rejected an otherwise unchanged spreadsheet review, use the printed `--review-semantic` recovery command with the corrected complete package and the same environment's saved setup. A fresh analysis is not required solely to restore trailing zeros. Do not share the integrity key or copy review files into the product repository.
+
 ### REVIEW REQUIRED
 
 1. Open only the `customer-topic-overrides.csv` path printed by the tool.
@@ -188,6 +200,8 @@ In the newly opened **Desktop Validation - Topics - LOCAL ONLY** template:
    - ambiguous conversations remain unassigned when appropriate;
    - topic counts are plausible on **Conversation Details**, **Improvement Opportunities**, and **Adjust Topic Assumptions**; and
    - the **Glossary** load diagnostics show no blocking topic-rule error.
+
+`classification-audit.csv`, `topic-enrichment.csv`, and `privacy-report.json` describe the analysis before grouped decisions are applied. They are not refreshed-report counts. Compare the same environment, agent, date window, and filters before and after refreshing the generated Topics report. Exact approvals cover only the reviewed conversation IDs; new or unreviewed conversations do not inherit a semantic label.
 
 Classification follows this order:
 

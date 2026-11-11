@@ -62,6 +62,38 @@ class TopicClassifierComprehensiveTests(unittest.TestCase):
         payload = json.dumps([{column: rule[column] for column in ("Locale", "Vertical", "CanonicalTopic", "Keywords", "Exclusions", "Priority")}
                               for rule in rules])
         invalid = json.dumps([{**json.loads(payload)[0], "Keywords": "\u2014\U00010d6e\U0001e5ff"}])
+        approved_id = "aabbccdd-1122-4333-8444-556677889900"
+        native_id = "bbccddee-2233-4444-8555-667788990011"
+        review_digest = "a" * 64
+        conversation_mappings = [
+            {
+                "ConversationTranscriptId": conversation_id,
+                "Vertical": "HR",
+                "CanonicalTopic": "Payroll & Compensation",
+                "Confidence": 1.0,
+                "ProviderVersion": "ESS-SEMANTIC-HUMAN-REVIEW-V1",
+                "ReviewDigest": review_digest,
+            }
+            for conversation_id in (approved_id, native_id)
+        ]
+        conversation_cases = [
+            {
+                "ConversationTranscriptId": conversation_id,
+                "PrimaryTopic": native_topic,
+                "FirstUserMessage": "zorbex quux",
+                "Locale": "en-US",
+                "UserMessageCount": 1,
+                "ExpectedTopic": expected_topic,
+                "ExpectedSource": expected_source,
+            }
+            for conversation_id, native_topic, expected_topic, expected_source in (
+                (f" {approved_id.upper()} ", "No Topic Detected!", "Payroll & Compensation", "Semantic"),
+                (approved_id, "[System] - Response Preparation", "Payroll & Compensation", "Semantic"),
+                (approved_id, "Greeting!", "Payroll & Compensation", "Semantic"),
+                (native_id, "Customer Business Topic", "Customer Business Topic", "Native"),
+                ("ccddeeff-3344-4555-8666-778899001122", "", "Other / Uncategorized", "Derived"),
+            )
+        ]
         query = f'''let
     #"Customer Topic Overrides JSON (optional)" = {m_string(payload)},
     CustomerTopicRules = ({build_customer_topic_rules()}),
@@ -71,9 +103,24 @@ class TopicClassifierComprehensiveTests(unittest.TestCase):
     Checks = List.Transform(Cases, (test) => let actual = ClassifyTopic(test[prompt], test[locale])
         in List.AllTrue(List.Transform(Record.FieldNames(test[expected]), (field) => Record.Field(actual, field) = Record.Field(test[expected], field)))),
     InvalidRules = let #"Customer Topic Overrides JSON (optional)" = {m_string(invalid)} in ({build_customer_topic_rules()}),
-    InvalidCheck = try Table.RowCount(InvalidRules)
+    InvalidCheck = try Table.RowCount(InvalidRules),
+    ConversationChecks =
+        let
+            #"Customer Conversation Topics JSON (optional)" = {m_string(json.dumps(conversation_mappings))},
+            #"Approved Conversation Review Digest" = {m_string(review_digest)},
+            CustomerConversationTopics = ({build_customer_conversation_topics()}),
+            ExcludeTestConversations = Table.FromRecords(
+                Json.Document(Text.ToBinary({m_string(json.dumps(conversation_cases))}, TextEncoding.Utf8))
+            ),
+{build_derived_block()}
+            Results = List.Transform(
+                Table.ToRecords(WithTopicSource),
+                each [DerivedPrimaryTopic] = [ExpectedTopic] and [TopicSource] = [ExpectedSource]
+            )
+        in
+            List.AllTrue(Results)
 in
-    if List.AllTrue(Checks) and InvalidCheck[HasError] then #table({{"Status"}}, {{{{"ESS_CANONICALIZATION_PASS"}}}})
+    if List.AllTrue(Checks) and InvalidCheck[HasError] and ConversationChecks then #table({{"Status"}}, {{{{"ESS_CANONICALIZATION_PASS"}}}})
     else error "ESS_CANONICALIZATION_MISMATCH"
 '''
         with tempfile.TemporaryDirectory() as directory:
