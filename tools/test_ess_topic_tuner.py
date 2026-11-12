@@ -11,14 +11,641 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ess_topic_tuner import (
-    OVERRIDE_COLUMNS, apply_dataverse_rules, expand_customer_terms, finish_analysis, next_command, print_outcome,
-    read_csv, review_and_apply, rules_from_override_rows, validate_tuner_output, workflow_outcome,
+    OVERRIDE_COLUMNS, apply_dataverse_rules, classify_records, classify_semantic_evidence,
+    expand_customer_terms, extract_terms, finish_analysis, is_learnable_native_topic,
+    learn_native_topic_rules, next_command, print_outcome, read_csv, review_and_apply,
+    rules_from_override_rows, validate_tuner_output, workflow_outcome,
 )
 from guided_dataverse_setup import SetupOptions, TOPIC_OUTPUT_NAME, load_settings, save_settings
 from topic_classifier import classify, load_rules, normalize
 
 
 class TopicTunerTests(unittest.TestCase):
+    def test_system_state_topics_are_not_learning_evidence(self) -> None:
+        self.assertFalse(
+            is_learnable_native_topic("[System] - Response Preparation")
+        )
+        self.assertFalse(
+            is_learnable_native_topic("[SYSTEM] - Response Preparation [Customer]")
+        )
+        self.assertFalse(is_learnable_native_topic("[Internal] Routing"))
+        self.assertFalse(is_learnable_native_topic("Conversational Boosting"))
+        self.assertTrue(is_learnable_native_topic("Benefits Enrollment"))
+
+    def test_later_business_trace_outranks_earlier_generic_trace(self) -> None:
+        from ess_topic_tuner import parse_transcript_details
+
+        content = json.dumps(
+            {
+                "activities": [
+                    {
+                        "type": "trace",
+                        "valueType": "IntentRecognition",
+                        "value": {"intentTitle": "Conversation Start"},
+                    },
+                    {
+                        "type": "message",
+                        "from": {"role": "user"},
+                        "text": "medical plan benefits",
+                        "locale": "en-US",
+                    },
+                    {
+                        "type": "trace",
+                        "valueType": "IntentRecognition",
+                        "value": {"intentTitle": "Custom Payroll Topic"},
+                    },
+                ]
+            }
+        )
+        prompt, locale, native_topic, _ = parse_transcript_details(content)
+        self.assertEqual(native_topic, "Custom Payroll Topic")
+        result = classify_records(
+            [
+                {
+                    "id": "native-priority",
+                    "prompt": prompt,
+                    "locale": locale,
+                    "native_topic": native_topic,
+                }
+            ],
+            [],
+            "",
+        )[0][0]
+        self.assertEqual(result["Topic"], "Custom Payroll Topic")
+        self.assertEqual(result["Source"], "native")
+
+    def test_unknown_locale_filters_common_multilingual_stopwords(self) -> None:
+        terms = extract_terms(
+            "What can you help me with for the fleet card para employee",
+            "*",
+        )
+        self.assertIn("fleet card", terms)
+        self.assertNotIn("what", terms)
+        self.assertNotIn("can", terms)
+        self.assertNotIn("you", terms)
+        self.assertNotIn("the", terms)
+        self.assertNotIn("para", terms)
+
+    def test_system_state_falls_through_to_business_classifier(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        rules = load_rules(repo / "taxonomy" / "topics-taxonomy.csv")
+        enrichments, audits, uncategorized = classify_records(
+            [
+                {
+                    "id": "system-topic",
+                    "prompt": "What medical plan benefits are available?",
+                    "locale": "en-US",
+                    "native_topic": "[System] - Response Preparation",
+                }
+            ],
+            rules,
+            "",
+        )
+        self.assertEqual(
+            enrichments[0]["Topic"],
+            "Benefits & Retirement",
+        )
+        self.assertEqual(audits[0]["Source"], "keyword")
+        self.assertEqual(uncategorized, [])
+
+    def test_punctuated_generic_native_topic_falls_through_to_business_classifier(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        rules = load_rules(repo / "taxonomy" / "topics-taxonomy.csv")
+        for native_topic in (
+            "Greeting!",
+            "Unknown-Intent",
+            "Conversation: Start",
+            "No Topic Detected!",
+        ):
+            with self.subTest(native_topic=native_topic):
+                enrichments, audits, _ = classify_records(
+                    [
+                        {
+                            "id": native_topic,
+                            "prompt": "What medical plan benefits are available?",
+                            "locale": "en-US",
+                            "native_topic": native_topic,
+                        }
+                    ],
+                    rules,
+                    "",
+                )
+                self.assertEqual(
+                    enrichments[0]["Topic"],
+                    "Benefits & Retirement",
+                )
+                self.assertEqual(audits[0]["Source"], "keyword")
+
+    def test_semantic_evidence_becomes_cross_validated_local_rule(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        rules = load_rules(repo / "taxonomy" / "topics-taxonomy.csv")
+        records = [
+            {
+                "id": f"semantic-{index}",
+                "prompt": (
+                    "Explain the zorbex wellbeing allowance "
+                    f"for person{index}@example.com"
+                ),
+                "locale": "en-US",
+            }
+            for index in range(6)
+        ]
+        args = Namespace(
+            hash_salt="",
+            semantic_batch_size=20,
+            semantic_deployment="approved-model",
+            semantic_min_confidence=0.90,
+            semantic_endpoint="https://customer.openai.azure.com",
+            semantic_timeout=90,
+            non_interactive=True,
+        )
+        sent = []
+
+        def classify(items, _catalog, _config):
+            sent.extend(items)
+            return [
+                {
+                    "id": item["id"],
+                    "topic": "Benefits & Retirement",
+                    "vertical": "HR",
+                    "confidence": 0.97,
+                }
+                for item in items
+            ]
+
+        with patch(
+            "ess_topic_tuner.semantic_config"
+        ) as config, patch(
+            "ess_topic_tuner.classify_semantic_batch",
+            side_effect=classify,
+        ):
+            config.return_value.deployment = "approved-model"
+            semantic_records, suggestions, audits, pii_counts, stats = (
+                classify_semantic_evidence(records, rules, args)
+            )
+
+        self.assertEqual(stats["accepted"], 6)
+        self.assertEqual(len(semantic_records), 6)
+        self.assertEqual(suggestions, [])
+        self.assertEqual(pii_counts["email"], 6)
+        self.assertTrue(all("@example.com" not in item["text"] for item in sent))
+        self.assertTrue(all(row["Status"] == "Accepted" for row in audits))
+        self.assertEqual(
+            semantic_records[0]["training_examples"][0]["prompt"],
+            sent[0]["text"],
+        )
+        self.assertEqual(
+            semantic_records[0]["training_examples"][0]["vertical"],
+            "HR",
+        )
+
+        learned_rows, learned_rules, learning_audit, _ = (
+            learn_native_topic_rules(
+                semantic_records,
+                rules,
+                [],
+                min_frequency=5,
+                min_precision=0.90,
+                max_keywords=8,
+                validation_folds=5,
+                min_validation_conversations=3,
+            )
+        )
+        self.assertEqual(len(learned_rules), 1)
+        self.assertEqual(
+            learned_rules[0]["CanonicalTopic"],
+            "Benefits & Retirement",
+        )
+        self.assertEqual(learned_rules[0]["Vertical"], "HR")
+        self.assertEqual(learned_rows[0]["Enabled"], "true")
+        self.assertEqual(learning_audit[0]["AssignedVertical"], "HR")
+        self.assertEqual(learning_audit[0]["ValidationStatus"], "Passed")
+
+    def test_semantic_learning_excludes_text_beyond_provider_limit(self) -> None:
+        rules = load_rules(
+            Path(__file__).resolve().parents[1]
+            / "taxonomy"
+            / "topics-taxonomy.csv"
+        )
+        tail = " model-never-saw-this-tail"
+        records = [
+            {
+                "id": f"semantic-long-{index}",
+                "prompt": "zorbex allowance " + ("filler " * 700) + tail,
+                "locale": "en-US",
+            }
+            for index in range(6)
+        ]
+        args = Namespace(
+            hash_salt="",
+            semantic_batch_size=20,
+            semantic_deployment="approved-model",
+            semantic_min_confidence=0.90,
+            semantic_endpoint="https://customer.openai.azure.com",
+            semantic_timeout=90,
+            non_interactive=True,
+        )
+        sent = []
+
+        def classify(items, _catalog, _config):
+            sent.extend(items)
+            return [
+                {
+                    "id": item["id"],
+                    "topic": "Benefits & Retirement",
+                    "vertical": "HR",
+                    "confidence": 0.97,
+                }
+                for item in items
+            ]
+
+        with patch("ess_topic_tuner.semantic_config") as config, patch(
+            "ess_topic_tuner.classify_semantic_batch",
+            side_effect=classify,
+        ):
+            config.return_value.deployment = "approved-model"
+            semantic_records, _, _, _, _ = classify_semantic_evidence(
+                records,
+                rules,
+                args,
+            )
+
+        self.assertTrue(all(len(item["text"]) == 4000 for item in sent))
+        self.assertTrue(
+            all(
+                tail.strip() not in item["training_examples"][0]["prompt"]
+                for item in semantic_records
+            )
+        )
+        learned_rows, learned_rules, _, _ = learn_native_topic_rules(
+            semantic_records,
+            rules,
+            [],
+            min_frequency=5,
+            min_precision=0.90,
+            max_keywords=8,
+            validation_folds=5,
+            min_validation_conversations=3,
+        )
+        self.assertEqual(len(learned_rules), 1)
+        self.assertNotIn(tail.strip(), learned_rows[0]["Keywords"])
+
+    def test_local_review_displays_complete_redacted_text_beyond_model_limit(self) -> None:
+        from build_service_refresh_template import validate_conversation_topics
+        from ess_topic_tuner import (
+            SEMANTIC_REVIEW_COLUMNS,
+            build_semantic_review,
+            reviewed_semantic_topics,
+            write_csv,
+            write_semantic_review_files,
+        )
+
+        rules = load_rules(
+            Path(__file__).resolve().parents[1]
+            / "taxonomy"
+            / "topics-taxonomy.csv"
+        )
+        tail = " END_OF_REDACTED_EXAMPLE unrelated billing dispute"
+        prompt = (
+            "zorbex allowance "
+            + ("ordinary background " * 8000)
+            + tail
+        )
+        args = Namespace(
+            hash_salt="",
+            semantic_provider="local",
+            semantic_batch_size=20,
+            semantic_deployment="",
+            local_model_dir=Path("model"),
+            local_min_similarity=0.82,
+            local_min_margin=0.01,
+        )
+        sent = []
+
+        def classify(items, _catalog, _config):
+            sent.extend(items)
+            return [
+                {
+                    "id": item["id"],
+                    "topic": None,
+                    "vertical": "",
+                    "confidence": 0.9,
+                    "margin": 0.1,
+                    "candidates": [
+                        {
+                            "topic": "Benefits & Retirement",
+                            "vertical": "HR",
+                            "similarity": 0.9,
+                        }
+                    ],
+                }
+                for item in items
+            ]
+
+        with patch(
+            "ess_topic_tuner.classify_local_batch",
+            side_effect=classify,
+        ):
+            _, suggestions, _, _, _ = classify_semantic_evidence(
+                [
+                    {
+                        "id": "conversation-long",
+                        "prompt": prompt,
+                        "locale": "en-US",
+                    }
+                ],
+                rules,
+                args,
+            )
+        review, evidence = build_semantic_review(suggestions)
+        self.assertEqual(len(sent[0]["text"]), 4000)
+        self.assertGreater(len(review[0]["Example1"]), 131_072)
+        self.assertIn("END_OF_REDACTED_EXAMPLE", review[0]["Example1"])
+        review[0]["Enabled"] = "true"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            review_path = root / "semantic-topic-review.csv"
+            evidence_path = root / "semantic-review-evidence.json"
+            key_path = root / "semantic-review-integrity.key"
+            write_semantic_review_files(
+                review_path,
+                evidence_path,
+                key_path,
+                review,
+                evidence,
+            )
+            write_csv(review_path, review, SEMANTIC_REVIEW_COLUMNS)
+            previous_limit = csv.field_size_limit()
+            csv.field_size_limit(131_072)
+            try:
+                mappings = reviewed_semantic_topics(
+                    review_path,
+                    evidence_path,
+                    key_path,
+                    Path(__file__).resolve().parents[1]
+                    / "taxonomy"
+                    / "topics-taxonomy.csv",
+                )
+                self.assertEqual(csv.field_size_limit(), 131_072)
+                mapping_path = root / "semantic-conversation-topics.json"
+                mapping_path.write_text(
+                    json.dumps(mappings),
+                    encoding="utf-8",
+                )
+                validate_conversation_topics(mapping_path)
+                self.assertEqual(csv.field_size_limit(), 131_072)
+            finally:
+                csv.field_size_limit(previous_limit)
+
+    def test_semantic_evidence_does_not_request_credentials_when_redaction_removes_every_message(self) -> None:
+        args = Namespace(
+            hash_salt="",
+            semantic_batch_size=20,
+            semantic_deployment="approved-model",
+            semantic_min_confidence=0.90,
+        )
+        with patch(
+            "ess_topic_tuner.semantic_config",
+            side_effect=AssertionError("unexpected credential request"),
+        ):
+            semantic_records, suggestions, audits, pii_counts, stats = (
+                classify_semantic_evidence(
+                    [
+                        {
+                            "id": "redacted-only",
+                            "prompt": "person@example.com",
+                            "locale": "en-US",
+                        }
+                    ],
+                    [],
+                    args,
+                )
+            )
+        self.assertEqual(semantic_records, [])
+        self.assertEqual(suggestions, [])
+        self.assertEqual(audits[0]["Status"], "EmptyAfterRedaction")
+        self.assertEqual(pii_counts["email"], 1)
+        self.assertEqual(
+            stats,
+            {
+                "redactedMessagesSent": 0,
+                "messagesProcessedLocally": 0,
+                "requests": 0,
+                "localBatches": 0,
+                "accepted": 0,
+                "suggested": 0,
+                "abstained": 0,
+                "lowConfidence": 0,
+                "emptyAfterRedaction": 1,
+                "insufficientContent": 0,
+                "provider": "azure",
+                "providerVersion": "ESS-SEMANTIC-AZURE-OPENAI-V1",
+                "modelDeployment": "approved-model",
+            },
+        )
+
+    def test_local_semantic_evidence_creates_grouped_review_suggestions(self) -> None:
+        from ess_topic_tuner import build_semantic_review
+
+        rules = load_rules(
+            Path(__file__).resolve().parents[1]
+            / "taxonomy"
+            / "topics-taxonomy.csv"
+        )
+        args = Namespace(
+            hash_salt="",
+            semantic_provider="local",
+            semantic_batch_size=20,
+            semantic_deployment="",
+            semantic_min_confidence=0.90,
+            local_model_dir=Path("model"),
+            local_min_similarity=0.82,
+            local_min_margin=0.03,
+        )
+
+        def classify(items, _catalog, _config):
+            return [
+                {
+                    "id": item["id"],
+                    "topic": "Benefits & Retirement",
+                    "vertical": "HR",
+                    "confidence": 0.84,
+                    "margin": 0.08,
+                    "candidates": [
+                        {
+                            "topic": "Benefits & Retirement",
+                            "vertical": "HR",
+                            "similarity": 0.84,
+                        },
+                        {
+                            "topic": "Personal Information & Profile",
+                            "vertical": "HR",
+                            "similarity": 0.76,
+                        },
+                    ],
+                }
+                for item in items
+            ]
+
+        with patch(
+            "ess_topic_tuner.classify_local_batch",
+            side_effect=classify,
+        ), patch(
+            "ess_topic_tuner.classify_semantic_batch",
+            side_effect=AssertionError("Azure provider must not run"),
+        ):
+            semantic_records, suggestions, audits, _, stats = classify_semantic_evidence(
+                [
+                    {
+                        "id": "Conversation-1",
+                        "prompt": "Explain my retirement contribution.",
+                        "locale": "en-US",
+                    }
+                ],
+                rules,
+                args,
+            )
+
+        self.assertEqual(stats["provider"], "local")
+        self.assertEqual(stats["accepted"], 0)
+        self.assertEqual(stats["suggested"], 1)
+        self.assertEqual(semantic_records, [])
+        self.assertEqual(audits[0]["Status"], "Suggested")
+        review, evidence = build_semantic_review(suggestions)
+        self.assertEqual(review[0]["SuggestedTopic"], "Benefits & Retirement")
+        self.assertEqual(review[0]["Enabled"], "false")
+        self.assertIn(
+            "Personal Information & Profile",
+            review[0]["AlternativeTopics"],
+        )
+        self.assertEqual(
+            evidence[0]["Conversations"][0]["ConversationTranscriptId"],
+            "conversation-1",
+        )
+        self.assertNotIn(
+            "retirement contribution",
+            json.dumps(evidence),
+        )
+
+    def test_local_semantic_skips_messages_without_business_content(self) -> None:
+        args = Namespace(
+            hash_salt="",
+            semantic_provider="local",
+            semantic_batch_size=20,
+            semantic_deployment="",
+            local_model_dir=Path("model"),
+            local_min_similarity=0.82,
+            local_min_margin=0.01,
+        )
+        with patch(
+            "ess_topic_tuner.classify_local_batch",
+            side_effect=AssertionError("generic message must not reach model"),
+        ):
+            semantic_records, suggestions, audits, _, stats = classify_semantic_evidence(
+                [
+                    {
+                        "id": "generic-help",
+                        "prompt": "Can you help me with this?",
+                        "locale": "en-US",
+                    }
+                ],
+                [],
+                args,
+            )
+        self.assertEqual(semantic_records, [])
+        self.assertEqual(suggestions, [])
+        self.assertEqual(
+            audits[0]["Status"],
+            "InsufficientSemanticContent",
+        )
+        self.assertEqual(stats["insufficientContent"], 1)
+        self.assertEqual(stats["messagesProcessedLocally"], 0)
+
+    def test_semantic_review_groups_show_every_example_and_cap_at_ten(self) -> None:
+        from ess_topic_tuner import build_semantic_review
+
+        suggestions = [
+            {
+                "id": f"conversation-{index}",
+                "prompt": f"redacted example {index}",
+                "locale": "en-US",
+                "confidence": 0.90 - index / 1000,
+                "margin": 0.02,
+                "candidates": [
+                    {
+                        "topic": "Benefits & Retirement",
+                        "vertical": "HR",
+                        "similarity": 0.90,
+                    },
+                    {
+                        "topic": "Personal Information & Profile",
+                        "vertical": "HR",
+                        "similarity": 0.88,
+                    },
+                ],
+            }
+            for index in range(11)
+        ]
+        review, evidence = build_semantic_review(suggestions)
+        self.assertEqual(
+            [row["SupportingConversations"] for row in review],
+            ["10", "1"],
+        )
+        self.assertEqual(
+            sum(
+                bool(review[0][f"Example{index}"])
+                for index in range(1, 11)
+            ),
+            10,
+        )
+        self.assertEqual(
+            [len(row["Conversations"]) for row in evidence],
+            [10, 1],
+        )
+
+        suggestions[0]["prompt"] = "=HYPERLINK(\"unsafe\")"
+        review, _ = build_semantic_review(suggestions[:1])
+        self.assertTrue(review[0]["Example1"].startswith("="))
+
+    def test_semantic_config_consumes_environment_key(self) -> None:
+        from ess_topic_tuner import semantic_config
+
+        args = Namespace(
+            semantic_endpoint="https://customer.openai.azure.com",
+            semantic_deployment="approved-model",
+            semantic_timeout=90,
+            non_interactive=True,
+        )
+        with patch.dict(
+            os.environ,
+            {"ESS_SEMANTIC_API_KEY": "secret-sentinel"},
+            clear=False,
+        ):
+            config = semantic_config(args)
+            self.assertEqual(config.api_key, "secret-sentinel")
+            self.assertNotIn("ESS_SEMANTIC_API_KEY", os.environ)
+
+    def test_customer_csv_writer_neutralizes_formula_cells(self) -> None:
+        from ess_topic_tuner import spreadsheet_unescape, write_csv
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "review.csv"
+            write_csv(
+                path,
+                [{"Value": "=HYPERLINK(\"https://example.com\")"}],
+                ("Value",),
+            )
+            with path.open(
+                encoding="utf-8-sig",
+                newline="",
+            ) as handle:
+                row = next(csv.DictReader(handle))
+        self.assertTrue(row["Value"].startswith("'="))
+        self.assertEqual(
+            spreadsheet_unescape(row["Value"]),
+            '=HYPERLINK("https://example.com")',
+        )
+
     def test_read_csv_accepts_large_dataverse_transcript_fields(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "ConversationTranscript.csv"
@@ -200,7 +827,16 @@ class TopicTunerTests(unittest.TestCase):
             selected = Path(load_settings(settings).topic_overrides_json)
             self.assertEqual(selected.resolve(), (output / "customer-topic-overrides.json").resolve())
             rules = json.loads(selected.read_text(encoding="utf-8"))
-            self.assertEqual(rules, [{**old_rules[0], "Keywords": "device enrollment|devices enrollment"}])
+            self.assertEqual(
+                rules,
+                [
+                    {
+                        **old_rules[0],
+                        "Keywords": "device enrollment|devices enrollment",
+                        "RuleOrigin": "CustomerSaved",
+                    }
+                ],
+            )
             self.assertNotEqual(template.read_bytes(), old_template)
             with zipfile.ZipFile(template) as package:
                 self.assertIsNone(package.testzip())
@@ -246,6 +882,58 @@ class TopicTunerTests(unittest.TestCase):
                        (saved, explicit, learned[::-1]), (saved[::-1], explicit[::-1], learned[::-1])):
             self.assertEqual(merge_customer_rules(*groups), merged)
         self.assertEqual(json.dumps([saved, explicit, learned], sort_keys=True), original)
+
+    def test_rule_precedence_keeps_semantic_learning_below_native_saved_and_explicit_rules(self) -> None:
+        from ess_topic_tuner import merge_customer_rules
+
+        def rule(topic: str, source: str) -> dict:
+            return {
+                "Locale": "en",
+                "Vertical": "Customer",
+                "CanonicalTopic": topic,
+                "Keywords": "shared customer phrase",
+                "Exclusions": "",
+                "Priority": 120,
+                "RuleSource": source,
+            }
+
+        semantic = rule("Semantic topic", "SemanticLearned")
+        native = rule("Native learned topic", "NativeLearned")
+        saved = rule("Saved topic", "Customer")
+        explicit = rule("Explicit topic", "Customer")
+
+        learned = merge_customer_rules([], [native], [semantic])
+        self.assertEqual(learned[0]["CanonicalTopic"], "Native learned topic")
+        self.assertEqual(
+            merge_customer_rules([], [], [semantic])[0]["CanonicalTopic"],
+            "Semantic topic",
+        )
+        self.assertEqual(
+            merge_customer_rules([saved], [], learned)[0]["CanonicalTopic"],
+            "Saved topic",
+        )
+        self.assertEqual(
+            merge_customer_rules([saved], [explicit], learned)[0]["CanonicalTopic"],
+            "Explicit topic",
+        )
+        overlapping = [
+            {
+                **rule("Explicit broad topic", "Customer"),
+                "Keywords": "benefits",
+                "Priority": 1,
+                "RuleOrigin": "CustomerExplicit",
+            },
+            {
+                **rule("Semantic specific topic", "Customer"),
+                "Keywords": "medical benefits",
+                "Priority": 999,
+                "RuleOrigin": "SemanticLearned",
+            },
+        ]
+        self.assertEqual(
+            classify("medical benefits", "en-US", overlapping)["topic"],
+            "Explicit broad topic",
+        )
 
     def test_saved_rules_missing_or_invalid_fail_before_analysis_or_writes(self) -> None:
         from ess_topic_tuner import main
@@ -826,6 +1514,80 @@ class TopicTunerTests(unittest.TestCase):
         self.assertIn("same window", messages)
         self.assertNotIn("--review", messages)
 
+    def test_exact_semantic_topics_make_workflow_ready_without_rules(self) -> None:
+        args = Namespace(analyze_only=False, output_dir=Path("review"))
+        outcome = workflow_outcome(
+            {
+                "enabledCustomerRulesWritten": 0,
+                "semanticConversationOverridesWritten": 4,
+                "publicationRequired": False,
+                "nativeTopicTrainingExamples": 0,
+                "ambiguousRows": 0,
+                "uncategorizedRowsAnalyzed": 4,
+            },
+            [],
+            args,
+        )
+        self.assertEqual(outcome["status"], "ready")
+        self.assertEqual(outcome["semanticConversations"], 4)
+
+    def test_grouped_semantic_suggestions_require_review_before_rules(self) -> None:
+        args = Namespace(
+            analyze_only=False,
+            non_interactive=True,
+            output_dir=Path("review"),
+            settings_file=Path("settings.json"),
+            template_output=None,
+            no_open=True,
+            skip_agent_registry=False,
+            skip_org_data=False,
+            skip_agent_credits=False,
+            skip_feedback=False,
+        )
+        outcome = workflow_outcome(
+            {
+                "enabledCustomerRulesWritten": 2,
+                "semanticConversationOverridesWritten": 0,
+                "semanticSuggestionGroups": 3,
+                "publicationRequired": True,
+                "nativeTopicTrainingExamples": 0,
+                "ambiguousRows": 0,
+                "uncategorizedRowsAnalyzed": 20,
+            },
+            [],
+            args,
+        )
+        self.assertEqual(outcome["status"], "semantic-review-required")
+        self.assertEqual(outcome["semanticSuggestionGroups"], 3)
+        self.assertIn("--review-semantic", outcome["action"])
+
+    def test_grouped_semantic_review_opens_and_applies_in_same_session(self) -> None:
+        review = Path("semantic-topic-review.csv")
+        args = Namespace(
+            analyze_only=False,
+            non_interactive=False,
+        )
+        outcome = {
+            "status": "semantic-review-required",
+            "reviewFile": str(review),
+        }
+        with patch(
+            "ess_topic_tuner.sys.stdin.isatty",
+            return_value=True,
+        ), patch(
+            "ess_topic_tuner.os.startfile",
+            create=True,
+        ) as opener, patch(
+            "builtins.input",
+            return_value="",
+        ), patch(
+            "ess_topic_tuner.review_semantic_and_apply",
+            return_value=0,
+        ) as apply:
+            self.assertEqual(finish_analysis(outcome, args), 0)
+        opener.assert_called_once_with(str(review.resolve()))
+        apply.assert_called_once_with(review, args)
+
     def test_stop_and_review_reruns_preserve_applied_rules_settings_and_template(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as directory:
@@ -944,6 +1706,7 @@ class TopicTunerTests(unittest.TestCase):
         for action, handler in (
             ("--apply", "apply_dataverse_rules"),
             ("--review", "review_and_apply"),
+            ("--review-semantic", "review_semantic_and_apply"),
         ):
             with self.subTest(action=action), patch(
                 "sys.argv",
@@ -1084,6 +1847,7 @@ class TopicTunerTests(unittest.TestCase):
                 sys.executable, str(repo / "tools/guided_dataverse_setup.py"), "--tune-topics",
                 "--topic-transcripts", str(source), "--settings-file", str(settings),
                 "--output", str(template), "--no-open", "--non-interactive",
+                "--no-semantic-classification",
             ]
             if sys.platform == "win32":
                 command = [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", str(repo / "TUNE-TOPICS.cmd"), *command[3:]]
@@ -1575,6 +2339,298 @@ class TopicTunerTests(unittest.TestCase):
                 self.assertIn("--topic-overrides-json", command)
                 self.assertNotIn("--environment-url", command)
                 self.assertEqual(command[command.index("--output") + 1], str(args.template_output.resolve()))
+                self.assertNotIn(
+                    "ESS_SEMANTIC_API_KEY",
+                    runner.call_args.kwargs["env"],
+                )
+
+    def test_standalone_exact_semantic_topics_cannot_bypass_review(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rules = root / "customer-topic-overrides.json"
+            rules.write_text("[]\n", encoding="utf-8")
+            conversation_topics = root / "semantic-conversation-topics.json"
+            conversation_topics.write_text(
+                json.dumps(
+                    [
+                        {
+                            "ConversationTranscriptId": "conversation-1",
+                            "Vertical": "HR",
+                            "CanonicalTopic": "Benefits & Retirement",
+                            "Confidence": 0.91,
+                            "ProviderVersion": "ESS-SEMANTIC-HUMAN-REVIEW-V1",
+                            "ReviewDigest": "a" * 64,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            args = Namespace(
+                settings_file=root / "settings.json",
+                template_output=root / "semantic-topics.pbit",
+                no_open=True,
+            )
+            with self.assertRaisesRegex(ValueError, "original reviewed"):
+                apply_dataverse_rules(rules, args)
+
+    def test_grouped_semantic_review_builds_human_approved_mapping(self) -> None:
+        from ess_topic_tuner import (
+            SEMANTIC_REVIEW_COLUMNS,
+            build_semantic_review,
+            review_semantic_and_apply,
+            write_semantic_review_files,
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            review_rows, evidence_rows = build_semantic_review(
+                [
+                    {
+                        "id": "conversation-1",
+                        "prompt": "change where my wages arrive",
+                        "locale": "en-US",
+                        "confidence": 0.86,
+                        "margin": 0.02,
+                        "candidates": [
+                            {
+                                "topic": "Job & Organization Changes",
+                                "vertical": "HR",
+                                "similarity": 0.86,
+                            },
+                            {
+                                "topic": "Payroll & Compensation",
+                                "vertical": "HR",
+                                "similarity": 0.84,
+                            },
+                        ],
+                    }
+                ]
+            )
+            review_rows[0]["Enabled"] = "true"
+            review_rows[0]["DecisionVertical"] = "HR"
+            review_rows[0]["DecisionTopic"] = "Payroll & Compensation"
+            review = root / "semantic-topic-review.csv"
+            write_semantic_review_files(
+                review,
+                root / "semantic-review-evidence.json",
+                root / "semantic-review-integrity.key",
+                review_rows,
+                evidence_rows,
+            )
+            (root / "customer-topic-overrides.json").write_text(
+                "[]\n",
+                encoding="utf-8",
+            )
+            settings = root / "settings.json"
+            save_settings(
+                settings,
+                SetupOptions(
+                    environment_url="https://savedqa.crm.dynamics.com"
+                ),
+            )
+            args = Namespace(
+                settings_file=settings,
+                template_output=root / "semantic-topics.pbit",
+                no_open=True,
+                taxonomy=(
+                    Path(__file__).resolve().parents[1]
+                    / "taxonomy"
+                    / "topics-taxonomy.csv"
+                ),
+                output_dir=root,
+                input=None,
+                overrides=None,
+                apply=None,
+                review=None,
+                review_semantic=review,
+                skip_agent_registry=False,
+                skip_org_data=False,
+                skip_agent_credits=False,
+                skip_feedback=False,
+            )
+            with patch("ess_topic_tuner.subprocess.run") as runner:
+                runner.return_value.returncode = 0
+                self.assertEqual(
+                    review_semantic_and_apply(review, args),
+                    0,
+                )
+            mapping = json.loads(
+                (
+                    root / "semantic-conversation-topics.json"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                mapping[0]["CanonicalTopic"],
+                "Payroll & Compensation",
+            )
+            self.assertEqual(mapping[0]["Confidence"], 1.0)
+            self.assertEqual(
+                mapping[0]["ProviderVersion"],
+                "ESS-SEMANTIC-HUMAN-REVIEW-V1",
+            )
+            self.assertIn(
+                "--conversation-topics-json",
+                runner.call_args.args[0],
+            )
+
+    def test_grouped_semantic_review_accepts_spreadsheet_numeric_formatting(self) -> None:
+        from ess_topic_tuner import (
+            SEMANTIC_REVIEW_COLUMNS,
+            build_semantic_review,
+            reviewed_semantic_topics,
+            write_csv,
+            write_semantic_review_files,
+        )
+        from build_service_refresh_template import validate_conversation_topics
+
+        repo = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rows, evidence = build_semantic_review(
+                [
+                    {
+                        "id": "11111111-2222-4333-8444-555555555555",
+                        "prompt": "change where my wages arrive",
+                        "locale": "en-US",
+                        "confidence": 0.9,
+                        "margin": 0.1,
+                        "candidates": [
+                            {
+                                "topic": "Payroll & Compensation",
+                                "vertical": "HR",
+                                "similarity": 0.9,
+                            }
+                        ],
+                    }
+                ]
+            )
+            review = root / "semantic-topic-review.csv"
+            evidence_path = root / "semantic-review-evidence.json"
+            key_path = root / "semantic-review-integrity.key"
+            write_semantic_review_files(
+                review, evidence_path, key_path, rows, evidence
+            )
+            rows[0]["Enabled"] = "TRUE"
+            for column in ("MinimumSimilarity", "MinimumMargin"):
+                rows[0][column] = str(float(rows[0][column]))
+            write_csv(review, rows, SEMANTIC_REVIEW_COLUMNS)
+
+            mappings = reviewed_semantic_topics(
+                review, evidence_path, key_path,
+                repo / "taxonomy" / "topics-taxonomy.csv",
+            )
+            self.assertEqual(len(mappings), 1)
+            self.assertEqual(mappings[0]["CanonicalTopic"], "Payroll & Compensation")
+            mapping = root / "semantic-conversation-topics.json"
+            mapping.write_text(json.dumps(mappings), encoding="utf-8")
+            _, validation = validate_conversation_topics(mapping)
+            self.assertEqual(validation["classifiedConversations"], 1)
+
+            for column, value in (
+                ("MinimumSimilarity", "0.8"),
+                ("MinimumSimilarity", "0.900000000000001"),
+                ("MinimumMargin", "0.100000000000001"),
+                ("MinimumMargin", "NaN"),
+                ("MinimumMargin", "Infinity"),
+                ("MinimumMargin", ""),
+            ):
+                with self.subTest(column=column, value=value):
+                    changed = [{**rows[0], column: value}]
+                    write_csv(review, changed, SEMANTIC_REVIEW_COLUMNS)
+                    with self.assertRaises(ValueError):
+                        reviewed_semantic_topics(
+                            review, evidence_path, key_path,
+                            repo / "taxonomy" / "topics-taxonomy.csv",
+                        )
+                    with self.assertRaises(ValueError):
+                        validate_conversation_topics(mapping)
+
+    def test_grouped_semantic_review_rejects_context_or_evidence_tampering(self) -> None:
+        from ess_topic_tuner import (
+            build_semantic_review,
+            reviewed_semantic_topics,
+            write_semantic_review_files,
+        )
+
+        repo = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rows, evidence = build_semantic_review(
+                [
+                    {
+                        "id": "conversation-1",
+                        "prompt": "change where my wages arrive",
+                        "locale": "en-US",
+                        "confidence": 0.86,
+                        "margin": 0.02,
+                        "candidates": [
+                            {
+                                "topic": "Payroll & Compensation",
+                                "vertical": "HR",
+                                "similarity": 0.86,
+                            }
+                        ],
+                    }
+                ]
+            )
+            review = root / "semantic-topic-review.csv"
+            evidence_path = root / "semantic-review-evidence.json"
+            key_path = root / "semantic-review-integrity.key"
+            write_semantic_review_files(
+                review,
+                evidence_path,
+                key_path,
+                rows,
+                evidence,
+            )
+            with review.open(
+                encoding="utf-8-sig",
+                newline="",
+            ) as handle:
+                written = list(csv.DictReader(handle))
+                fields = tuple(written[0])
+            written[0]["Example1"] = "different text"
+            written[0]["Enabled"] = "true"
+            with review.open(
+                "w",
+                encoding="utf-8-sig",
+                newline="",
+            ) as handle:
+                writer = csv.DictWriter(handle, fieldnames=fields)
+                writer.writeheader()
+                writer.writerows(written)
+            with self.assertRaisesRegex(ValueError, "changed"):
+                reviewed_semantic_topics(
+                    review,
+                    evidence_path,
+                    key_path,
+                    repo / "taxonomy" / "topics-taxonomy.csv",
+                )
+
+            write_semantic_review_files(
+                review,
+                evidence_path,
+                key_path,
+                rows,
+                evidence,
+            )
+            payload = json.loads(
+                evidence_path.read_text(encoding="utf-8")
+            )
+            payload["groups"][0]["Conversations"][0][
+                "ConversationTranscriptId"
+            ] = "substituted-id"
+            evidence_path.write_text(
+                json.dumps(payload),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "changed"):
+                reviewed_semantic_topics(
+                    review,
+                    evidence_path,
+                    key_path,
+                    repo / "taxonomy" / "topics-taxonomy.csv",
+                )
 
     def test_disabled_review_is_stop_and_invalid_enabled_review_does_not_apply(self) -> None:
         repo = Path(__file__).resolve().parents[1]

@@ -1,22 +1,87 @@
 {
-  "packageVersion": "V23",
-  "releaseStatus": "Validated GitHub Dataverse V23 release",
+  "packageVersion": "V23.2",
+  "releaseStatus": "Validated stable V23.2 release with customer acceptance",
+  "groupedReviewRepair": {
+    "date": "2026-11-11",
+    "checkpointHead": "72c3fff",
+    "status": "Implementation repaired, tested, and accepted in a customer-refreshed report",
+    "testedWorktreeSourceSha256": {
+      "tools/build_service_refresh_template.py": "B6C0566383780A53343D60C272B5E29AB42A2B5B34E2BDE764B387A34A4020E8",
+      "tools/ess_topic_tuner.py": "2CF82AF9D37312B10572333A42F60CD0283A37A1B408F6454C8E0A6F909F8B61",
+      "tools/test_build_service_refresh_template.py": "4ED9FAFFC6CFC4B2B9B9767FAB84EB0FBB27FA992E4828C6F95AF91B61B9B6E8",
+      "tools/test_ess_topic_tuner.py": "F5B13E7B9D71733CEAB65AD402D2297A2B2209385BF6FE74C672B12579D01C21",
+      "tools/test_topic_classifier_comprehensive.py": "17934B4784E8C20547A43A83C00D335EE88DE6AEAE656C999E3CC38C8D5B1C05"
+    },
+    "integrityContract": {
+      "sharedOwner": "build_service_refresh_template.semantic_review_payload",
+      "scoreRepresentation": "Exact Decimal equality to the original four-decimal value; no significant precision may be discarded",
+      "originalReviewDigestPreserved": true,
+      "changedScoresAndEvidenceRejected": true,
+      "automaticSemanticActivation": false
+    },
+    "validation": {
+      "testsRun": 235,
+      "passed": 234,
+      "failures": 0,
+      "errors": 0,
+      "optionalPqtestSkipped": 1,
+      "realPinnedOnnxInferenceExecuted": true,
+      "python310GrammarFiles": 29,
+      "python310RuntimeExecuted": false,
+      "spreadsheetRoundTripRegression": true,
+      "desktopAndServiceMappingDigestRetention": true,
+      "disabledGroupExcludedFromEmbeddedMappings": true,
+      "unchangedReviewValidatedLocallyWithoutWritingDiagnosticFiles": true,
+      "modelCompleteTestZipInspected": true,
+      "testZipBuiltFromTrackedWorktreeSnapshot": true,
+      "testZipContainsCustomerArtifacts": false,
+      "testZipDeterministic": true,
+      "v23RegenerationByteIdempotent": true,
+      "shippedV23ClassifierContractMatchesSource": true,
+      "v21V22Unchanged": true,
+      "productionCleanWorktreeGuardUnchangedAndEnforced": true
+    },
+    "privacy": {
+      "customerDiagnosticsAddedToRepository": false,
+      "customerPbitsGenerated": 0,
+      "liveServicesCalled": 0,
+      "published": true
+    },
+    "remainingGates": [
+      "Standalone Power Query execution is skipped because PQTest is unavailable.",
+      "Customer-specific Power BI Service refresh with the approved exact mappings remains a post-release follow-up."
+    ],
+    "customerAcceptance": {
+      "date": "2026-11-12",
+      "successful": true,
+      "approvedMappingsRecovered": 625,
+      "otherUncategorizedBefore": 671,
+      "otherUncategorizedAfter": 103,
+      "reduction": 568,
+      "reductionPercent": 84.7,
+      "note": "The refreshed report cohort changed between screenshots, so continued topic-accuracy sampling is recommended."
+    }
+  },
   "baseline": {
     "repository": "microsoft/ESS",
-    "commit": "039417fd7d5f5ccdd703f3501745fd9944e50296",
+    "commit": "79ca039a66afdfc3c9ed8428aaaad26341bf8a05",
     "archiveSha256": "F2B003D82A0D73319F6A507568417554BFB04FEAB2B853C26273B3FD2D2CCC03",
     "originalFilesVerifiedUnchanged": 68,
     "originalArchiveVerifiedUnchanged": true
   },
   "python": {
     "minimum": "3.10",
+    "maximum": "3.14",
     "testedRuntime": "3.14.5",
-    "minimumRuntimeExecuted": false
+    "minimumRuntimeExecuted": false,
+    "python315RejectedWithActionableMessage": true,
+    "launcherPrefersCompatibleInstalledVersion": true
   },
   "template": {
     "default": "ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit",
     "baseSource": "ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit",
-    "baseByteIdentical": true,
+    "baseByteIdentical": false,
+    "sha256": "47F3EE7AE37216CBC5CAA6D3F87398EBA8B4AE3571B772F7FBBCFA193C419273",
     "archiveEntries": 349,
     "retainedVersions": [
       "V22",
@@ -26,11 +91,11 @@
   "modifiedFiles": [
     {
       "path": ".gitignore",
-      "sha256": "297CB15FFC7B3917ACCB86FE4A0B3B721E604838C0CC153EE9C1F46B505FB0FE"
+      "sha256": "8F42A4480FFC20CE2709225DB1ABD3E230C674B36B3BE2DA4D0AAD3665AF7B5C"
     },
     {
       "path": "AGENT-REGISTRY.md",
-      "sha256": "234B8F2E1756A2829FABB700EB3ECC645FA456E6F40A6F240F39F50709057DDB"
+      "sha256": "EED5F41CA3CB6630B285E0FF9510C6221362A2B56E04CB8A3D8248F3F90E49A4"
     },
     {
       "path": "AUTO-REFRESH.md",
@@ -42,35 +107,43 @@
     },
     {
       "path": "FEEDBACK-INGESTION.md",
-      "sha256": "F1C7ED172C7BF3918386AB43802490098DC50797F15C6DCCC91E70C67F973DAC"
+      "sha256": "1F1ACAB924872FD75517A5E93947905FFFA834D526AF68556B88DD7464D0A51F"
     },
     {
       "path": "README.md",
-      "sha256": "3391D8E8A10101646FD1AA63A57EEED8DB90622CD6EEEC7CA48DD015E987C60F"
+      "sha256": "49370DB5BF584357F4DBCCD9F82637B3CD01DBFDA57983726CDF3A31E266AFD3"
     },
     {
       "path": "SETUP-CSV-Download.md",
-      "sha256": "B713CD985E940AD5427A6F3E8554514FE142E7473BA3FC517DEA7ECDE6EBCF26"
+      "sha256": "249449CDD35630930F2F2326097E7189A40289816F174C1BDEF5C16BEB7F94DD"
     },
     {
       "path": "SETUP-Dataverse.md",
-      "sha256": "4613D6BF35AD3C7B0FF242945FBC0C3F98FE298C8FC58DA13BA419BF76E71559"
+      "sha256": "EFA2B9DDBDB51D980C3E726A358423D4D44053C169AFAF66466FE83D9B623AD1"
     },
     {
       "path": "SETUP-Fabric.md",
-      "sha256": "F11FD2ED267B410255916029D0A4C22530E36C927BA0F42738BA3EBC1224EBCE"
+      "sha256": "58CA69A11F387EC8931939944F301B3939D43CBF0AE9BC42DBF45E612D0C63B6"
+    },
+    {
+      "path": "START-HERE-DATAVERSE.cmd",
+      "sha256": "D06594C6A89137179488B049F305E4BA06F8E6B8D172C79D31F7C4C3544011C2"
+    },
+    {
+      "path": "tools\\build_service_refresh_template.py",
+      "sha256": "B6C0566383780A53343D60C272B5E29AB42A2B5B34E2BDE764B387A34A4020E8"
     },
     {
       "path": "tools\\ess_topic_tuner.py",
-      "sha256": "58E947F90096F29AE90599B1181D2851EFF8CFEA5FC8027495DD7273C51DA2C0"
+      "sha256": "2CF82AF9D37312B10572333A42F60CD0283A37A1B408F6454C8E0A6F909F8B61"
     },
     {
       "path": "tools\\guided_dataverse_setup.py",
-      "sha256": "39F733E67845320674A90C33406D1403D5C9FCD7C6D7B5B5B15E05ECED7F732B"
+      "sha256": "031A10F1D306C9D0559B137D99730B832814AC5395CBEE203BF9F49C6A1398DB"
     },
     {
       "path": "tools\\test_build_service_refresh_template.py",
-      "sha256": "6A32B8360615C4F626E406021D43409C3516D1A8BEE71B178F92CF33DD67289C"
+      "sha256": "4ED9FAFFC6CFC4B2B9B9767FAB84EB0FBB27FA992E4828C6F95AF91B61B9B6E8"
     },
     {
       "path": "tools\\test_ess_agent_registry.py",
@@ -78,31 +151,90 @@
     },
     {
       "path": "tools\\test_ess_topic_tuner.py",
-      "sha256": "4F3DEE282B5CEDFB96F9673512C63343E0F75ED2FE6D381CF56D94262364BD12"
+      "sha256": "F5B13E7B9D71733CEAB65AD402D2297A2B2209385BF6FE74C672B12579D01C21"
     },
     {
       "path": "tools\\test_guided_dataverse_setup.py",
-      "sha256": "14910B7A29D914AFF35A22606A0471EB8D95491CB3F96B35C918740178A9E774"
+      "sha256": "7E6FC00BAE0164AF881F6275A05EE020992A4EA4E3AD57CBDB6C33848378CF12"
+    },
+    {
+      "path": "tools\\test_topic_classifier_comprehensive.py",
+      "sha256": "17934B4784E8C20547A43A83C00D335EE88DE6AEAE656C999E3CC38C8D5B1C05"
     },
     {
       "path": "tools\\test_template_packages.py",
       "sha256": "274C597602F382F40CBE90123F654EBBF8F1BF78B59A3870C6C69C0DA39496C7"
     },
     {
+      "path": "tools\\topic_classifier.py",
+      "sha256": "3B02A86A98016E4CBD8F07DB0DB9A48F14E08DFDBE41E632C18C746E51C3B6B9"
+    },
+    {
+      "path": "tools\\update_topic_classifier.py",
+      "sha256": "22AB663820E4779AB29D63407177FB0C9EC6C3727F5454E4DEA5FE94C70379FE"
+    },
+    {
       "path": "TOPIC-TUNER.md",
-      "sha256": "2F4C6A86C5EB699145C9CF85BD36DCF79E5C0A8E5BBB8871FA2F072C36FC1CFA"
+      "sha256": "8DE8217688F06C0262375FF0C09E3FC9365A9EC5DEF6C06513BA4970B977B246"
     }
   ],
   "addedFiles": [
     "ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit",
-    "QA-V23.json"
+    "QA-V23.json",
+    "models\\multilingual-e5-small\\LICENSE",
+    "models\\multilingual-e5-small\\model-manifest.json",
+    "tools\\build_v23_release_package.py",
+    "tools\\local_semantic_topic_classifier.py",
+    "tools\\semantic-topic-benchmark.json",
+    "tools\\semantic_topic_classifier.py",
+    "tools\\test_build_v23_release_package.py",
+    "tools\\test_local_semantic_topic_classifier.py",
+    "tools\\test_semantic_topic_classifier.py"
+  ],
+  "addedFileHashes": [
+    {
+      "path": "models\\multilingual-e5-small\\LICENSE",
+      "sha256": "904DC4D8749877F1DBA1CDA48200D2462DCCBEB7C134D5E4EF6FA75E0198C8FE"
+    },
+    {
+      "path": "models\\multilingual-e5-small\\model-manifest.json",
+      "sha256": "21B60E15D9C221CBE2C17A2F13E2DB517823E0684B13ED81D077AB81F3480A82"
+    },
+    {
+      "path": "tools\\build_v23_release_package.py",
+      "sha256": "6F7505AFFF9568827C7437F2D2B3074F4C7FDECDF561B76FD682E38BF05774AF"
+    },
+    {
+      "path": "tools\\local_semantic_topic_classifier.py",
+      "sha256": "0253B407C1E9A881668494291442BE8EC83D2ED37BE156488E7DAF9DF7E0EBE8"
+    },
+    {
+      "path": "tools\\semantic-topic-benchmark.json",
+      "sha256": "23F3C8D1DE6EF9BAA8A9E8F2F1CA0BDC12A5AA2FC45E166FE6156F319E6441EE"
+    },
+    {
+      "path": "tools\\semantic_topic_classifier.py",
+      "sha256": "C3027F49D3679EA36B68A981D87CEC2985178C252967DB9573A728B16B06EDA7"
+    },
+    {
+      "path": "tools\\test_build_v23_release_package.py",
+      "sha256": "06E3C09B86FDCDC7900A55ACC0C0C83F89EF47D43DD616BCF61555159D857A66"
+    },
+    {
+      "path": "tools\\test_local_semantic_topic_classifier.py",
+      "sha256": "5E5D56B77FEB51E7483AB57DF8B8A0423DC24E5677ED568D6033AAAA0FDC0978"
+    },
+    {
+      "path": "tools\\test_semantic_topic_classifier.py",
+      "sha256": "8C8D925387B3C57991A7F06B4A56992EE8AD80D9122DE4C966367B2641835842"
+    }
   ],
   "validation": {
     "unitTests": {
-      "baselineCommit": "039417fd7d5f5ccdd703f3501745fd9944e50296",
-      "packageVersion": "V23",
-      "phase": "full-regression-after-large-transcript-hotfix",
-      "testsRun": 190,
+      "baselineCommit": "79ca039a66afdfc3c9ed8428aaaad26341bf8a05",
+      "packageVersion": "V23.2",
+      "phase": "local-grouped-semantic-review-and-release-package-validation",
+      "testsRun": 235,
       "failures": 0,
       "errors": 0,
       "skipped": 1,
@@ -110,14 +242,23 @@
       "failedTests": []
     },
     "testModules": [
-      "test_guided_dataverse_setup",
       "test_build_service_refresh_template",
+      "test_build_v23_release_package",
       "test_ess_agent_registry",
+      "test_ess_fabric_credit_ingester",
+      "test_ess_fabric_transcript_parser",
+      "test_ess_feedback_normalizer",
+      "test_ess_topic_tuner",
+      "test_guided_dataverse_setup",
+      "test_local_semantic_topic_classifier",
+      "test_semantic_topic_classifier",
       "test_template_packages",
-      "test_ess_topic_tuner"
+      "test_topic_classifier_comprehensive",
+      "test_topic_classifier_examples",
+      "test_topic_taxonomy"
     ],
-    "pythonFilesUnchangedSinceTests": 23,
-    "python310GrammarChecked": 23,
+    "pythonFilesUnchangedSinceTests": 29,
+    "python310GrammarChecked": 29,
     "offlineBuildScenarios": {
       "count": 13,
       "desktopValidation": [
@@ -152,8 +293,51 @@
     },
     "documentation": {
       "relativeLinksChecked": 89,
-      "newCliExamplesParsed": 4,
+      "newCliExamplesParsed": 5,
       "versionCommandVerified": true
+    },
+    "localSemanticProvider": {
+      "contractTestsPassed": true,
+      "realOnnxInferenceExecuted": true,
+      "languagesValidated": [
+        "en",
+        "es",
+        "zh"
+      ],
+      "suggestionOnly": true,
+      "humanApprovalRequired": true,
+      "maximumConversationsPerReviewGroup": 10,
+      "allGroupedExamplesDisplayed": true,
+      "completeRedactedExamplesDisplayedBeyondModelInputLimit": true,
+      "reviewExamplesAbove131072CharactersApproved": true,
+      "reviewIntegrityBoundToConversationIds": true,
+      "powerQueryRequiresInternalApprovedReviewDigest": true,
+      "csvFormulaInjectionNeutralized": true,
+      "powerBiModelCalls": 0,
+      "laterBusinessNativeTopicOutranksEarlierGenericTrace": true,
+      "powerQueryUpstreamNativeSelectorRejectsGenericTrace": true,
+      "pythonPowerQueryPlaceholderParity": true,
+      "releasePackagingRequiresCleanTrackedGitInventory": true
+    },
+    "optionalAzureProvider": {
+      "contractTestsPassed": true,
+      "structuredOutputValidated": true,
+      "endpointAllowListValidated": true,
+      "credentialPersistenceTestsPassed": true,
+      "liveEndpointExecuted": false,
+      "releaseBlocking": false,
+      "reason": "Azure is optional and is outside the local grouped-review release-readiness claim."
+    },
+    "modelPack": {
+      "modelId": "intfloat/multilingual-e5-small",
+      "revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+      "license": "MIT",
+      "quantizedModelBytes": 118330479,
+      "quantizedModelSha256": "C9391BD927DBF1AADEDDE96DB8AD660034BE110D04DE4EB4EE6EC323D5DAB618",
+      "tokenizerBytes": 17082730,
+      "tokenizerSha256": "0B44A9D7B51C3C62626640CDA0E2C2F70FDACDC25BBBD68038369D14EBDF4C39",
+      "cpuProviderOnly": true,
+      "releasePackagingIncludesIgnoredBinaries": true
     }
   },
   "runtimeValidation": {
@@ -205,7 +389,8 @@
       "verifiedExclusion": "lost device"
     },
     "notExecuted": [
-      "SharePoint or OneDrive organization CSV existence, permissions, and runtime schema; the Service runtime test intentionally used only the Dataverse Cds cloud source."
+      "SharePoint or OneDrive organization CSV existence, permissions, and runtime schema; the Service runtime test intentionally used only the Dataverse Cds cloud source.",
+      "Customer-specific Power BI Service refresh with the 625 approved mappings remains a post-release follow-up."
     ],
     "checklist": "SETUP-Dataverse.md#v23-manual-qa-with-authorized-how2demo-access"
   }

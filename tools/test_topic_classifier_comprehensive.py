@@ -14,6 +14,7 @@ from topic_classifier import SEPARATOR_CHARACTERS, SEPARATOR_UNICODE_VERSION, cl
 from update_fabric_topic_classifier import build_stage_one, read_taxonomy
 from update_topic_classifier import (
     build_classifier,
+    build_customer_conversation_topics,
     build_customer_topic_rules,
     build_derived_block,
     build_normalization,
@@ -25,11 +26,11 @@ from update_topic_classifier import (
 
 ROOT = Path(__file__).resolve().parents[1]
 TAXONOMY = ROOT / "taxonomy" / "topics-taxonomy.csv"
-DIRECT_SERVICE = (
+V23_SERVICE = (
     ROOT
-    / "ESS Dashboard - Dynamic Topics (Dataverse) V21 - Power BI Service - PUBLISH THIS.pbit"
+    / "ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit"
 )
-SOURCE = DIRECT_SERVICE
+SOURCE = V23_SERVICE
 LOCALES = {"*": "en-US", "es": "es-MX", "zh": "zh-CN"}
 
 
@@ -61,6 +62,38 @@ class TopicClassifierComprehensiveTests(unittest.TestCase):
         payload = json.dumps([{column: rule[column] for column in ("Locale", "Vertical", "CanonicalTopic", "Keywords", "Exclusions", "Priority")}
                               for rule in rules])
         invalid = json.dumps([{**json.loads(payload)[0], "Keywords": "\u2014\U00010d6e\U0001e5ff"}])
+        approved_id = "aabbccdd-1122-4333-8444-556677889900"
+        native_id = "bbccddee-2233-4444-8555-667788990011"
+        review_digest = "a" * 64
+        conversation_mappings = [
+            {
+                "ConversationTranscriptId": conversation_id,
+                "Vertical": "HR",
+                "CanonicalTopic": "Payroll & Compensation",
+                "Confidence": 1.0,
+                "ProviderVersion": "ESS-SEMANTIC-HUMAN-REVIEW-V1",
+                "ReviewDigest": review_digest,
+            }
+            for conversation_id in (approved_id, native_id)
+        ]
+        conversation_cases = [
+            {
+                "ConversationTranscriptId": conversation_id,
+                "PrimaryTopic": native_topic,
+                "FirstUserMessage": "zorbex quux",
+                "Locale": "en-US",
+                "UserMessageCount": 1,
+                "ExpectedTopic": expected_topic,
+                "ExpectedSource": expected_source,
+            }
+            for conversation_id, native_topic, expected_topic, expected_source in (
+                (f" {approved_id.upper()} ", "No Topic Detected!", "Payroll & Compensation", "Semantic"),
+                (approved_id, "[System] - Response Preparation", "Payroll & Compensation", "Semantic"),
+                (approved_id, "Greeting!", "Payroll & Compensation", "Semantic"),
+                (native_id, "Customer Business Topic", "Customer Business Topic", "Native"),
+                ("ccddeeff-3344-4555-8666-778899001122", "", "Other / Uncategorized", "Derived"),
+            )
+        ]
         query = f'''let
     #"Customer Topic Overrides JSON (optional)" = {m_string(payload)},
     CustomerTopicRules = ({build_customer_topic_rules()}),
@@ -70,9 +103,24 @@ class TopicClassifierComprehensiveTests(unittest.TestCase):
     Checks = List.Transform(Cases, (test) => let actual = ClassifyTopic(test[prompt], test[locale])
         in List.AllTrue(List.Transform(Record.FieldNames(test[expected]), (field) => Record.Field(actual, field) = Record.Field(test[expected], field)))),
     InvalidRules = let #"Customer Topic Overrides JSON (optional)" = {m_string(invalid)} in ({build_customer_topic_rules()}),
-    InvalidCheck = try Table.RowCount(InvalidRules)
+    InvalidCheck = try Table.RowCount(InvalidRules),
+    ConversationChecks =
+        let
+            #"Customer Conversation Topics JSON (optional)" = {m_string(json.dumps(conversation_mappings))},
+            #"Approved Conversation Review Digest" = {m_string(review_digest)},
+            CustomerConversationTopics = ({build_customer_conversation_topics()}),
+            ExcludeTestConversations = Table.FromRecords(
+                Json.Document(Text.ToBinary({m_string(json.dumps(conversation_cases))}, TextEncoding.Utf8))
+            ),
+{build_derived_block()}
+            Results = List.Transform(
+                Table.ToRecords(WithTopicSource),
+                each [DerivedPrimaryTopic] = [ExpectedTopic] and [TopicSource] = [ExpectedSource]
+            )
+        in
+            List.AllTrue(Results)
 in
-    if List.AllTrue(Checks) and InvalidCheck[HasError] then #table({{"Status"}}, {{{{"ESS_CANONICALIZATION_PASS"}}}})
+    if List.AllTrue(Checks) and InvalidCheck[HasError] and ConversationChecks then #table({{"Status"}}, {{{{"ESS_CANONICALIZATION_PASS"}}}})
     else error "ESS_CANONICALIZATION_MISMATCH"
 '''
         with tempfile.TemporaryDirectory() as directory:
@@ -299,7 +347,7 @@ in
         ]
         result = classify("shared", "en-US", synthetic)
         self.assertEqual(result["topic"], "Higher Priority")
-        self.assertEqual(result["version"], "ESS-TOPICS-2026.10+CUSTOMER")
+        self.assertEqual(result["version"], "ESS-TOPICS-2026.11+CUSTOMER")
 
         same_priority = [dict(item, Priority=20) for item in synthetic]
         result = classify("shared", "en-US", same_priority)
@@ -449,6 +497,22 @@ in
             expressions["CustomerTopicRules"].rstrip(),
             build_customer_topic_rules().rstrip(),
         )
+        self.assertEqual(
+            expressions["CustomerConversationTopics"].rstrip(),
+            build_customer_conversation_topics().rstrip(),
+        )
+        self.assertIn(
+            '[ProviderVersion] <> "ESS-SEMANTIC-HUMAN-REVIEW-V1"',
+            expressions["CustomerConversationTopics"],
+        )
+        self.assertIn(
+            "ReviewDigests{0} <> ApprovedDigest",
+            expressions["CustomerConversationTopics"],
+        )
+        self.assertEqual(
+            expressions["Approved Conversation Review Digest"],
+            "null",
+        )
         table = next(
             item
             for item in model["tables"]
@@ -459,11 +523,38 @@ in
         )
         self.assertIn(build_derived_block(), partition)
         self.assertIn(
-            "then ClassifyTopic([FirstUserMessage], [Locale])",
+            "else ClassifyTopic([FirstUserMessage], [Locale])",
             partition,
         )
+        self.assertIn(
+            "Record.Field(CustomerConversationTopics, conversationKey)",
+            partition,
+        )
+        self.assertIn('RuleSource = "Semantic"', partition)
+        self.assertIn("IsBusinessNativeTopic", partition)
+        self.assertIn("NormalizeNativeTopic", partition)
+        self.assertIn("topicNormalized = NormalizeNativeTopic(topic)", partition)
+        self.assertIn(
+            'placeholders = {"no topic detected", "no user intent", "other uncategorized"}',
+            partition,
+        )
+        self.assertNotIn('"other / uncategorized"', partition)
+        self.assertIn('internalPrefixes = {"[system]", "[internal]", "[admin]", "[debug]", "[test]"}', partition)
+        self.assertIn("not List.AnyTrue(List.Transform(internalPrefixes", partition)
         self.assertIn('RuleSource = "Native"', partition)
         self.assertIn('then "Native"', partition)
+        native_noise = partition.split(
+            "NoiseExactTitles = {",
+            1,
+        )[1].split("},", 1)[0]
+        self.assertIn('"conversation start"', native_noise)
+        self.assertIn('"unknown intent"', native_noise)
+        self.assertNotIn(
+            "Conversation Start\" is intentionally NOT treated as noise",
+            partition,
+        )
+        self.assertIn('rule[RuleOrigin] = "CustomerExplicit"', expressions["ClassifyTopic"])
+        self.assertIn("RuleOrigin", expressions["CustomerTopicRules"])
 
     def test_service_refresh_build_preserves_classifier_cleanly(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -495,7 +586,7 @@ in
             )
 
     def test_checked_in_direct_service_pbit_contains_current_classifier(self):
-        with zipfile.ZipFile(DIRECT_SERVICE) as package:
+        with zipfile.ZipFile(V23_SERVICE) as package:
             self.assertIsNone(package.testzip())
             model = json.loads(
                 package.read("DataModelSchema").decode("utf-16-le")

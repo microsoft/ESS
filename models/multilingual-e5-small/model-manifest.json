@@ -1,0 +1,23 @@
+{
+  "model_id": "intfloat/multilingual-e5-small",
+  "revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+  "license": "MIT",
+  "source": "https://huggingface.co/intfloat/multilingual-e5-small",
+  "quantization": {
+    "method": "onnxruntime.quantization.quantize_dynamic",
+    "weight_type": "QUInt8",
+    "per_channel": true,
+    "reduce_range": false,
+    "target": "AVX2"
+  },
+  "files": {
+    "model_quint8_avx2.onnx": {
+      "size": 118330479,
+      "sha256": "c9391bd927dbf1aadedde96db8ad660034be110d04de4eb4ee6ec323d5dab618"
+    },
+    "tokenizer.json": {
+      "size": 17082730,
+      "sha256": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39"
+    }
+  }
+}

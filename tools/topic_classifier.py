@@ -3,8 +3,15 @@ import re
 from pathlib import Path
 
 
-CLASSIFIER_VERSION = "ESS-TOPICS-2026.10"
+CLASSIFIER_VERSION = "ESS-TOPICS-2026.11"
 RULE_COLUMNS = ("Locale", "Vertical", "CanonicalTopic", "Keywords", "Exclusions", "Priority")
+RULE_ORIGIN_RANKS = {
+    "BuiltIn": 0,
+    "SemanticLearned": 1,
+    "NativeLearned": 2,
+    "CustomerSaved": 3,
+    "CustomerExplicit": 4,
+}
 SEPARATOR_UNICODE_VERSION = "16.0.0"
 _SEPARATOR_RANGE_SPEC = (
     "0009-000D 001C-002F 003A-0040 005B-0060 007B 007D-007E 0085 00A0-00A1 00A7 00AB 00B6-00B7 00BB 00BF 037E "
@@ -107,6 +114,8 @@ def load_rules(path: Path, *, enabled_only: bool = False, rule_source: str = "Bu
                 "Exclusions": canonical_terms(row["Exclusions"]),
                 "Priority": priority,
                 "RuleSource": row.get("RuleSource", "").strip() or rule_source,
+                "RuleOrigin": row.get("RuleOrigin", "").strip()
+                or ("CustomerExplicit" if rule_source == "Customer" else rule_source),
             }
         )
     return rules
@@ -134,7 +143,14 @@ def classify(prompt: str | None, locale: str | None, rules: list[dict]) -> dict:
         excluded = any(contains_term(text, term, language) for term in exclusions)
         score = 0 if excluded else sum(term_weight(term, language) for term in hits)
         if score:
-            source_rank = 1 if rule.get("RuleSource") == "Customer" else 0
+            origin = str(rule.get("RuleOrigin") or "").strip()
+            if not origin:
+                origin = (
+                    "CustomerExplicit"
+                    if rule.get("RuleSource") == "Customer"
+                    else "BuiltIn"
+                )
+            source_rank = RULE_ORIGIN_RANKS.get(origin, 0)
             scored.append((source_rank, score, int(rule["Priority"]), rule, hits))
 
     if not scored:
