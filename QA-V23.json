@@ -1,10 +1,10 @@
 {
   "packageVersion": "V23.2",
-  "releaseStatus": "V23.2 grouped-review spreadsheet repair validated; customer refreshed-report acceptance remains pending",
-  "unpublishedGroupedReviewRepair": {
+  "releaseStatus": "Validated stable V23.2 release with customer acceptance",
+  "groupedReviewRepair": {
     "date": "2026-11-11",
     "checkpointHead": "72c3fff",
-    "status": "Implementation repaired and tested; customer refreshed-report acceptance remains unverified",
+    "status": "Implementation repaired, tested, and accepted in a customer-refreshed report",
     "testedWorktreeSourceSha256": {
       "tools/build_service_refresh_template.py": "B6C0566383780A53343D60C272B5E29AB42A2B5B34E2BDE764B387A34A4020E8",
       "tools/ess_topic_tuner.py": "2CF82AF9D37312B10572333A42F60CD0283A37A1B408F6454C8E0A6F909F8B61",
@@ -45,15 +45,22 @@
       "customerDiagnosticsAddedToRepository": false,
       "customerPbitsGenerated": 0,
       "liveServicesCalled": 0,
-      "published": false
+      "published": true
     },
     "remainingGates": [
-      "Customer-generated Topics PBIT and matching refreshed-report evidence were not provided.",
-      "Refreshed Dataverse ID matching, final topics, and the reported visual count require customer-side verification.",
       "Standalone Power Query execution is skipped because PQTest is unavailable.",
-      "The customer RC2 asset checksum and exact executable component versions remain unverified.",
-      "Production release packaging still requires a clean Git worktree; the guard is unchanged."
-    ]
+      "Customer-specific Power BI Service refresh with the approved exact mappings remains a post-release follow-up."
+    ],
+    "customerAcceptance": {
+      "date": "2026-11-12",
+      "successful": true,
+      "approvedMappingsRecovered": 625,
+      "otherUncategorizedBefore": 671,
+      "otherUncategorizedAfter": 103,
+      "reduction": 568,
+      "reductionPercent": 84.7,
+      "note": "The refreshed report cohort changed between screenshots, so continued topic-accuracy sampling is recommended."
+    }
   },
   "baseline": {
     "repository": "microsoft/ESS",
@@ -104,7 +111,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "8124072BF71D8C49E8B4D3C20FC7DF204617A2C7981F3B83D27884DFEDB97D29"
+      "sha256": "49370DB5BF584357F4DBCCD9F82637B3CD01DBFDA57983726CDF3A31E266AFD3"
     },
     {
       "path": "SETUP-CSV-Download.md",
@@ -383,7 +390,7 @@
     },
     "notExecuted": [
       "SharePoint or OneDrive organization CSV existence, permissions, and runtime schema; the Service runtime test intentionally used only the Dataverse Cds cloud source.",
-      "The exact reduction for the reported customer backlog was not measured because the available diagnostic folder contains no raw first-user message text. The customer must run the grouped local review against its representative transcript export."
+      "Customer-specific Power BI Service refresh with the 625 approved mappings remains a post-release follow-up."
     ],
     "checklist": "SETUP-Dataverse.md#v23-manual-qa-with-authorized-how2demo-access"
   }
