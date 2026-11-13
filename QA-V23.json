@@ -1,6 +1,19 @@
 {
-  "packageVersion": "V23.2",
-  "releaseStatus": "Validated stable V23.2 release with customer acceptance",
+  "packageVersion": "V23.2.1",
+  "releaseStatus": "V23.2.1 visual-interaction hotfix candidate pending customer bookmark confirmation",
+  "visualInteractionRepair": {
+    "date": "2026-11-13",
+    "powerBiDesktopVersion": "2.151.1182.0 (February 2026)",
+    "error": "VisualRelationshipService.relationshipFilterAction failed while resolving stale report interactions",
+    "danglingInteractionsRemoved": 12,
+    "affectedPage": "Business Impact",
+    "missingSourceVisual": "bi_table_topic",
+    "bookmarksPreserved": 73,
+    "v21V22Unchanged": true,
+    "testsRun": 236,
+    "optionalPqtestSkipped": 1,
+    "customerDesktopConfirmationPending": true
+  },
   "groupedReviewRepair": {
     "date": "2026-11-11",
     "checkpointHead": "72c3fff",
@@ -81,7 +94,7 @@
     "default": "ESS Dashboard - Dynamic Topics (Dataverse) V23 - Power BI Service - PUBLISH THIS.pbit",
     "baseSource": "ESS Dashboard - Dynamic Topics (Dataverse) V22 - Power BI Service - PUBLISH THIS.pbit",
     "baseByteIdentical": false,
-    "sha256": "47F3EE7AE37216CBC5CAA6D3F87398EBA8B4AE3571B772F7FBBCFA193C419273",
+    "sha256": "577692980157A85EE42E9CAA57A8D159A86F1FC6D22DECE16213A821AAB4C656",
     "archiveEntries": 349,
     "retainedVersions": [
       "V22",
@@ -111,7 +124,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "49370DB5BF584357F4DBCCD9F82637B3CD01DBFDA57983726CDF3A31E266AFD3"
+      "sha256": "BD03B5E07F7336898A8EF92B0380F441FAFE5A32327468C95BDAC51C44BC270A"
     },
     {
       "path": "SETUP-CSV-Download.md",
@@ -163,7 +176,7 @@
     },
     {
       "path": "tools\\test_template_packages.py",
-      "sha256": "274C597602F382F40CBE90123F654EBBF8F1BF78B59A3870C6C69C0DA39496C7"
+      "sha256": "F29D51B2EF8864219A6BD37DAC405D44D043DEA53EF2981354DE2DB2B8385C4F"
     },
     {
       "path": "tools\\topic_classifier.py",
@@ -171,7 +184,7 @@
     },
     {
       "path": "tools\\update_topic_classifier.py",
-      "sha256": "22AB663820E4779AB29D63407177FB0C9EC6C3727F5454E4DEA5FE94C70379FE"
+      "sha256": "B6D4C9E2FE9688F2400DAB1676C59D5A5165F4C78B7CC6BCABD2CEFDF2BE1809"
     },
     {
       "path": "TOPIC-TUNER.md",
@@ -232,9 +245,9 @@
   "validation": {
     "unitTests": {
       "baselineCommit": "79ca039a66afdfc3c9ed8428aaaad26341bf8a05",
-      "packageVersion": "V23.2",
+      "packageVersion": "V23.2.1",
       "phase": "local-grouped-semantic-review-and-release-package-validation",
-      "testsRun": 235,
+      "testsRun": 236,
       "failures": 0,
       "errors": 0,
       "skipped": 1,
