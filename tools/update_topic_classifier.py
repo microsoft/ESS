@@ -683,6 +683,46 @@ def patch_partition(model: dict) -> None:
         )
 
 
+def remove_dangling_visual_interactions(
+    parts: dict[str, bytes],
+) -> int:
+    removed = 0
+    page_paths = [
+        name
+        for name in parts
+        if name.startswith("Report/definition/pages/")
+        and name.endswith("/page.json")
+    ]
+    for page_path in page_paths:
+        page = json.loads(parts[page_path].decode("utf-8-sig"))
+        interactions = page.get("visualInteractions")
+        if not isinstance(interactions, list) or not interactions:
+            continue
+        page_prefix = page_path.rsplit("/", 1)[0] + "/visuals/"
+        visual_names = {
+            json.loads(parts[name].decode("utf-8-sig")).get("name")
+            for name in parts
+            if name.startswith(page_prefix)
+            and name.endswith("/visual.json")
+        }
+        valid = [
+            interaction
+            for interaction in interactions
+            if interaction.get("source") in visual_names
+            and interaction.get("target") in visual_names
+        ]
+        if len(valid) == len(interactions):
+            continue
+        removed += len(interactions) - len(valid)
+        page["visualInteractions"] = valid
+        parts[page_path] = json.dumps(
+            page,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    return removed
+
+
 def replace_query_text_raw(raw: str, query_name: str, transform) -> str:
     document = json.loads(raw)
     query = next((item for item in document["queries"] if item["name"] == query_name), None)
@@ -778,6 +818,7 @@ def patch_pbit(source: Path, destination: Path, topic_rules: str, classifier: st
     set_expression(model, "TopicRules", topic_rules)
     set_expression(model, "ClassifyTopic", classifier)
     patch_partition(model)
+    removed_interactions = remove_dangling_visual_interactions(parts)
     parts["DataModelSchema"] = json.dumps(schema, ensure_ascii=False, separators=(",", ":")).encode("utf-16-le")
 
     if "UnappliedChanges" in parts:
@@ -882,6 +923,7 @@ def patch_pbit(source: Path, destination: Path, topic_rules: str, classifier: st
         "source": str(source),
         "destination": str(destination),
         "size": destination.stat().st_size,
+        "danglingVisualInteractionsRemoved": removed_interactions,
     }
 
 

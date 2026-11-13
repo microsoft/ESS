@@ -69,6 +69,53 @@ def find_misplaced_display(value, path="$"):
 
 
 class TemplatePackageTests(unittest.TestCase):
+    def test_v23_has_no_dangling_visual_interactions(self):
+        file_name = (
+            "ESS Dashboard - Dynamic Topics (Dataverse) V23 - "
+            "Power BI Service - PUBLISH THIS.pbit"
+        )
+        with zipfile.ZipFile(ROOT / file_name) as package:
+            names = package.namelist()
+            issues = []
+            for page_path in (
+                name
+                for name in names
+                if name.startswith("Report/definition/pages/")
+                and name.endswith("/page.json")
+            ):
+                page = json.loads(
+                    package.read(page_path).decode("utf-8-sig")
+                )
+                page_prefix = (
+                    page_path.rsplit("/", 1)[0] + "/visuals/"
+                )
+                visual_names = {
+                    json.loads(
+                        package.read(name).decode("utf-8-sig")
+                    ).get("name")
+                    for name in names
+                    if name.startswith(page_prefix)
+                    and name.endswith("/visual.json")
+                }
+                for interaction in page.get(
+                    "visualInteractions",
+                    [],
+                ):
+                    source = interaction.get("source")
+                    target = interaction.get("target")
+                    if (
+                        source not in visual_names
+                        or target not in visual_names
+                    ):
+                        issues.append(
+                            (
+                                page.get("displayName"),
+                                source,
+                                target,
+                            )
+                        )
+            self.assertEqual(issues, [])
+
     def test_customer_templates_contain_no_loaded_or_synthetic_customer_data(self):
         for file_name in CUSTOMER_TEMPLATE_NAMES:
             with self.subTest(file_name=file_name), zipfile.ZipFile(ROOT / file_name) as package:
